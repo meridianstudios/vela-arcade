@@ -19,9 +19,14 @@
  * `tags` drive the filter tabs; keep them to the ones in TAGS below.
  */
 
-export const TAGS = ['Solo', 'Multiplayer', 'Puzzle', 'Action', 'Strategy', 'Cards', 'Sports', 'Racing']
+export const ALL_TAGS = ['Solo', 'Multiplayer', 'Puzzle', 'Action', 'Strategy', 'Cards', 'Sports', 'Racing']
 
-export const GAMES = [
+// GameDistribution only serves its games on domains registered to a publisher
+// account; anywhere else they show a "not available here" screen. Turn this on
+// once the site's domains are registered there.
+export const SHOW_GAMEDISTRIBUTION = false
+
+export const CATALOGUE = [
   {
     slug: 'wildcard',
     title: 'Wildcard',
@@ -964,6 +969,10 @@ export const GAMES = [
     </g>`,
   },
 ]
+
+export const GAMES = CATALOGUE.filter((g) => SHOW_GAMEDISTRIBUTION || g.via !== 'GameDistribution')
+// Filters with nothing behind them are left out.
+export const TAGS = ALL_TAGS.filter((t) => GAMES.some((g) => g.tags.includes(t)))
 
 export const playable = (g) => g.status !== 'soon'
 export const bySlug = (slug) => GAMES.find((g) => g.slug === slug)

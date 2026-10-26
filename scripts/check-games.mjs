@@ -3,7 +3,8 @@
 //  - external games answer and do not forbid being framed
 //  - no em-dashes in any copy
 import { existsSync, readFileSync } from 'node:fs'
-import { GAMES, TAGS, playable } from '../src/games.js'
+// Checks every entry, including ones currently hidden from the site.
+import { CATALOGUE as GAMES, ALL_TAGS as TAGS, playable } from '../src/games.js'
 
 let problems = 0
 const fail = (g, msg) => { problems++; console.log(`  x ${g.slug}: ${msg}`) }
