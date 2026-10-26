@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Memory Match</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --gap: 12px;
+    --c: 80px;        /* card size, set from JS */
+    --cg: 6px;        /* gap between cards */
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    display: flex; flex-direction: column; align-items: center;
+    gap: var(--gap);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+
+  .head { display: grid; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .app.wide .head {
+    grid-template-columns: 1fr auto auto auto auto;
+    grid-template-areas: "brand s1 s2 size new";
+  }
+  .app.narrow .head {
+    grid-template-columns: 1fr 1fr auto auto;
+    grid-template-areas: "brand brand brand brand" "s1 s2 size new";
+  }
+  html.vela-embedded .app.narrow .head { grid-template-areas: "s1 s2 size new"; }
+  html.vela-embedded .app.narrow .brand { display: none; }
+
+  .brand { grid-area: brand; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .app.narrow .brand { padding: 0.15em 0 0.25em; }
+
+  .s1 { grid-area: s1; }
+  .s2 { grid-area: s2; }
+  .b-size { grid-area: size; }
+  .b-new { grid-area: new; }
+
+  .stat {
+    position: relative;
+    min-width: 5.6em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transition: border-color 180ms var(--ease);
+  }
+  .app.narrow .stat { min-width: 0; }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .app.narrow .stat { padding-left: 0.7em; padding-right: 0.6em; }
+  /* Pass and play: each player's colour as a bar, the player to move outlined. */
+  .duo .stat::after {
+    content: "";
+    position: absolute;
+    left: -1px; right: -1px; bottom: -1px;
+    height: 3px;
+    background: var(--brand);
+  }
+  .duo .s2::after { background: #fff; }
+  .duo .stat:not(.turn) .num { color: var(--muted); }
+  .duo .s1.turn { border-color: var(--brand); }
+  .duo .s2.turn { border-color: #fff; }
+  .duo .stat.turn .lab { color: #fff; }
+  .num {
+    display: block;
+    font: 600 1.4em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6em;
+    min-height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.76rem, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .app.narrow .head .btn { padding: 0 0.9em; }
+
+  /* ---------- board ---------- */
+  .stage { display: flex; align-items: center; justify-content: center; }
+  .board {
+    display: grid;
+    gap: var(--cg);
+    touch-action: none;
+    outline: none;
+  }
+  .cd {
+    position: relative;
+    width: var(--c); height: var(--c);
+    perspective: calc(var(--c) * 4);
+    cursor: pointer;
+  }
+  .cd.up, .cd.got, .board.over .cd { cursor: default; }
+  .in {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 280ms var(--ease);
+  }
+  .cd.up .in, .cd.got .in { transform: rotateY(180deg); }
+  .bk, .fc {
+    position: absolute; inset: 0;
+    border-radius: 2px;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+  .bk {
+    background: var(--surface-2);
+    transition: background-color 150ms var(--ease);
+  }
+  .bk::after {
+    content: "";
+    position: absolute;
+    left: 42%; top: 42%; width: 16%; height: 16%;
+    background: rgba(255, 255, 255, 0.14);
+  }
+  @media (hover: hover) {
+    .cd:not(.up):not(.got):hover .bk { background: var(--surface-3); }
+  }
+  .fc {
+    transform: rotateY(180deg);
+    background: var(--bg-2);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+    display: grid; place-items: center;
+  }
+  .fc svg { width: 64%; height: 64%; display: block; transition: opacity 250ms var(--ease) 250ms; }
+  .cd.miss .fc { box-shadow: inset 0 0 0 2px var(--outline); }
+  .cd.got .fc { box-shadow: none; background: var(--surface); }
+  .cd.got .fc svg { opacity: 0.35; }
+  .cd.hit .fc { box-shadow: inset 0 0 0 2px var(--brand); }
+  .cd.hit { animation: pop 300ms var(--ease) 120ms both; }
+  @keyframes pop { 50% { transform: scale(1.07); } }
+  .cd.o0 .fc::after, .cd.o1 .fc::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: max(3px, calc(var(--c) * 0.05));
+    background: var(--brand);
+  }
+  .cd.o1 .fc::after { background: #fff; }
+  .cd.cur::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border: 2px solid var(--brand-hover);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card h2.c-white::before { background: #fff; }
+  .card h2.c-none::before { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); }
+  .card .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .card .tag[hidden] { display: none; }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .card .line[hidden] { display: none; }
+  .group { margin-top: 1.05em; }
+  .group .lab { margin-bottom: 0.45em; }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    border: 1px solid var(--outline);
+  }
+  .seg button {
+    height: 2.9em;
+    min-width: 0;
+    padding: 0 0.2em;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 clamp(11px, 0.76em, 13px) var(--font);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .seg button + button { box-shadow: -1px 0 0 var(--line); }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; box-shadow: none; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -3px; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats[hidden] { display: none; }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div[hidden] { display: none; }
+  .ov-stats > div:nth-child(2n) { border-left: 1px solid var(--line); }
+  .ov-stats > div:nth-child(n + 3) { border-top: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .ov-stats .num.none { font-size: 1.3em; line-height: 1.7; color: var(--muted); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .btns .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .in, .fc svg, .stat { transition: none; }
+    .cd.hit { animation: none; }
+    .overlay, .card { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app narrow" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Memory Match</h1></div>
+    <div class="stat s1" id="s1"><span class="lab" id="s1Lab">Moves</span><span class="num" id="s1Num">0</span></div>
+    <div class="stat s2" id="s2"><span class="lab" id="s2Lab">Time</span><span class="num" id="s2Num">0:00</span></div>
+    <button class="btn b-size" id="sizeBtn" type="button" aria-haspopup="dialog">
+      <span id="sizeName">4 x 4</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="btn primary b-new" id="newBtn" type="button">New game</button>
+  </header>
+  <main class="stage" id="stage">
+    <div class="board" id="board" role="grid" aria-label="Cards"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="menuCard" role="dialog" aria-labelledby="menuTitle" hidden>
+    <h2 id="menuTitle">Memory Match</h2>
+    <p class="line">Turn over two cards at a time to find the pairs. Tap a card, or use the arrow keys and Enter.</p>
+    <div class="group">
+      <span class="lab">Mode</span>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-v="solo">Solo</button>
+        <button type="button" data-v="duo">Pass and play</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lab">Size</span>
+      <div class="seg" id="sizeSeg">
+        <button type="button" data-v="4x4">4 x 4</button>
+        <button type="button" data-v="4x6">4 x 6</button>
+        <button type="button" data-v="6x6">6 x 6</button>
+      </div>
+    </div>
+    <div class="ov-stats" id="menuBests">
+      <div><span class="lab">Best moves</span><span class="num" id="menuBestMoves">0</span></div>
+      <div><span class="lab">Best time</span><span class="num" id="menuBestTime">0:00.0</span></div>
+    </div>
+    <p class="line" id="duoNote" hidden>Two players take turns on one device. A pair gives another turn. Most pairs wins.</p>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Play</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>Resume</button>
+    </div>
+  </div>
+  <div class="card" id="resultCard" role="dialog" aria-live="polite" hidden>
+    <div class="card-top"><h2 id="resTitle">You win</h2><span class="tag" id="resTag" hidden>New best</span></div>
+    <p class="line" id="resSub">4 x 4</p>
+    <div class="ov-stats" id="resStats">
+      <div><span class="lab" id="resLab1">Moves</span><span class="num" id="resVal1">0</span></div>
+      <div><span class="lab" id="resLab2">Time</span><span class="num" id="resVal2">0:00.0</span></div>
+      <div id="resCell3"><span class="lab">Best moves</span><span class="num" id="resBestMoves">0</span></div>
+      <div id="resCell4"><span class="lab">Best time</span><span class="num" id="resBestTime">0:00.0</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="memory-match"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, onPause() {} };
+
+  /* ---------- settings and storage ---------- */
+  const SIZES = {
+    '4x4': { a: 4, b: 4 },
+    '4x6': { a: 4, b: 6 },
+    '6x6': { a: 6, b: 6 },
+  };
+  const KEY_SIZE = 'vela:memory-match:size';
+  const KEY_MODE = 'vela:memory-match:mode';
+  const KEY_MOVES = 'vela:memory-match:best-moves:';
+  const KEY_TIME = 'vela:memory-match:best-time:';
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+  function readNum(k) { const v = Number(lsGet(k)); return Number.isFinite(v) && v > 0 ? v : 0; }
+  const bestMoves = (s) => readNum(KEY_MOVES + s);
+  const bestTime = (s) => readNum(KEY_TIME + s);
+
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const sizeText = (s) => s.replace('x', ' x ');
+
+  function fmtClock(ms) {
+    const s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function fmtTime(ms) { return fmtClock(ms) + '.' + Math.floor((ms % 1000) / 100); }
+
+  /* ---------- symbols ---------- */
+  // Flat shapes on a 100 x 100 grid, in the arcade's oranges, white and grey.
+  const O = '#ea5426', W = '#ffffff', G = '#9ba0a8';
+  function starPath(cx, cy, ro, ri) {
+    let d = '';
+    for (let k = 0; k < 10; k++) {
+      const r = k % 2 ? ri : ro, a = -Math.PI / 2 + k * Math.PI / 5;
+      d += (k ? 'L' : 'M') + (cx + r * Math.cos(a)).toFixed(1) + ' ' + (cy + r * Math.sin(a)).toFixed(1);
+    }
+    return d + 'Z';
+  }
+  const SYMBOLS = [
+    '<circle cx="50" cy="50" r="31" fill="' + O + '"/>',
+    '<rect x="21" y="21" width="58" height="58" fill="' + W + '"/>',
+    '<path d="M50 16 86 80H14Z" fill="' + O + '"/>',
+    '<path d="M50 12 88 50 50 88 12 50Z" fill="' + W + '"/>',
+    '<path d="M40 14h20v26h26v20H60v26H40V60H14V40h26Z" fill="' + O + '"/>',
+    '<path transform="rotate(45 50 50)" d="M41 12h18v29h29v18H59v29H41V59H12V41h29Z" fill="' + W + '"/>',
+    '<circle cx="50" cy="50" r="27" fill="none" stroke="' + O + '" stroke-width="12"/>',
+    '<rect x="25" y="25" width="50" height="50" fill="none" stroke="' + W + '" stroke-width="11"/>',
+    '<path d="M16 64a34 34 0 0 1 68 0Z" fill="' + O + '"/>',
+    '<path d="M50 14 81 32v36L50 86 19 68V32Z" fill="' + G + '"/>',
+    '<path d="M16 20h68v14H16zM16 43h68v14H16zM16 66h68v14H16z" fill="' + W + '"/>',
+    '<path d="M14 30 50 56 86 30v24L50 80 14 54Z" fill="' + O + '"/>',
+    '<circle cx="31" cy="31" r="12" fill="' + W + '"/><circle cx="69" cy="31" r="12" fill="' + W + '"/><circle cx="31" cy="69" r="12" fill="' + W + '"/><circle cx="69" cy="69" r="12" fill="' + W + '"/>',
+    '<path d="M18 14h64L50 50ZM18 86h64L50 50Z" fill="' + O + '"/>',
+    '<path d="' + starPath(50, 53, 38, 16) + '" fill="' + G + '"/>',
+    '<circle cx="50" cy="50" r="30" fill="none" stroke="' + W + '" stroke-width="9"/><circle cx="50" cy="50" r="11" fill="' + O + '"/>',
+    '<rect x="18" y="18" width="64" height="64" fill="' + O + '"/><circle cx="50" cy="50" r="14" fill="' + W + '"/>',
+    '<path d="M18 18h64v64Z" fill="' + O + '"/><path d="M18 18v64h64Z" fill="' + W + '"/>',
+  ];
+  const svgOf = (k) => '<svg viewBox="0 0 100 100" aria-hidden="true">' + SYMBOLS[k] + '</svg>';
+
+  /* ===== LOGIC START ===== */
+  function makeDeck(pairs, rnd) {
+    rnd = rnd || Math.random;
+    const ids = SYMBOLS.map((_, i) => i);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const t = ids[i]; ids[i] = ids[j]; ids[j] = t;
+    }
+    const deck = [];
+    for (let i = 0; i < pairs; i++) deck.push(ids[i], ids[i]);
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const t = deck[i]; deck[i] = deck[j]; deck[j] = t;
+    }
+    return deck;
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), board = $('board');
+  const overlay = $('overlay'), menuCard = $('menuCard'), resultCard = $('resultCard');
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const DOWN = 0, UP = 1, GOT = 2;
+  let size = SIZES[lsGet(KEY_SIZE)] ? lsGet(KEY_SIZE) : '4x4';
+  let mode = lsGet(KEY_MODE) === 'duo' ? 'duo' : 'solo';
+  let menuSize = size, menuMode = mode;
+  let cols = 4, rows = 4, N = 16, P = 8;
+  let deck = [], st = [], owner = [], cards = [];
+  let open = [];          // indexes face up and not yet matched
+  let missTimer = 0;
+  let moves = 0, found = 0;
+  let turn = 0, pairs = [0, 0];
+  let status = 'idle';    // idle, ready, playing, over
+  let elapsed = 0, startedAt = 0, running = false;
+  let paused = false, overlayOpen = false;
+  let cur = 0, curShown = false;
+  let resultTimer = 0;
+
+  /* ---------- timer ---------- */
+  function getElapsed() { return running ? elapsed + (performance.now() - startedAt) : elapsed; }
+  function syncTimer() {
+    const should = status === 'playing' && !paused && !overlayOpen;
+    if (should && !running) { startedAt = performance.now(); running = true; }
+    else if (!should && running) { elapsed += performance.now() - startedAt; running = false; }
+  }
+  let shownClock = '';
+  function tick() {
+    if (mode !== 'solo') return;
+    const t = fmtClock(getElapsed());
+    if (t !== shownClock) { $('s2Num').textContent = t; shownClock = t; }
+  }
+  setInterval(tick, 200);
+
+  /* ---------- board ---------- */
+  function paint(i) {
+    const el = cards[i];
+    let k = 'cd';
+    if (st[i] === UP) k += ' up';
+    if (st[i] === GOT) k += ' got';
+    if (st[i] === GOT && mode === 'duo') k += ' o' + owner[i];
+    if (el._hit) k += ' hit';
+    if (el._miss) k += ' miss';
+    if (curShown && i === cur) k += ' cur';
+    if (el.className !== k) el.className = k;
+  }
+
+  function buildBoard() {
+    board.textContent = '';
+    board.classList.remove('over');
+    cards = new Array(N);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < N; i++) {
+      const el = document.createElement('div');
+      el.dataset.i = i;
+      el.innerHTML = '<div class="in"><div class="bk"></div><div class="fc">' + svgOf(deck[i]) + '</div></div>';
+      cards[i] = el;
+      frag.appendChild(el);
+      paint(i);
+    }
+    board.appendChild(frag);
+  }
+
+  function updateHud() {
+    $('sizeName').textContent = sizeText(size);
+    app.classList.toggle('duo', mode === 'duo');
+    const s1 = $('s1'), s2 = $('s2');
+    if (mode === 'solo') {
+      $('s1Lab').textContent = 'Moves';
+      $('s2Lab').textContent = 'Time';
+      $('s1Num').textContent = moves;
+      shownClock = '';
+      tick();
+      s1.classList.remove('turn'); s2.classList.remove('turn');
+    } else {
+      $('s1Lab').textContent = 'Player 1';
+      $('s2Lab').textContent = 'Player 2';
+      $('s1Num').textContent = pairs[0];
+      $('s2Num').textContent = pairs[1];
+      const live = status !== 'over' && status !== 'idle';
+      s1.classList.toggle('turn', live && turn === 0);
+      s2.classList.toggle('turn', live && turn === 1);
+    }
+  }
+
+  /* ---------- game flow ---------- */
+  function newGame(s, m) {
+    clearTimeout(resultTimer); resultTimer = 0;
+    clearTimeout(missTimer); missTimer = 0;
+    if (s) { size = s; lsSet(KEY_SIZE, s); }
+    if (m) { mode = m; lsSet(KEY_MODE, m); }
+    N = SIZES[size].a * SIZES[size].b;
+    P = N / 2;
+    deck = makeDeck(P);
+    st = new Array(N).fill(DOWN);
+    owner = new Array(N).fill(-1);
+    open = [];
+    moves = 0; found = 0; turn = 0; pairs = [0, 0];
+    status = 'ready';
+    elapsed = 0; running = false; shownClock = '';
+    if (cur >= N) cur = 0;
+    buildBoard();
+    hideOverlay();
+    layout();
+    updateHud();
+  }
+
+  // Turn the two unmatched cards back over. In pass and play the turn passes.
+  function settleMiss() {
+    clearTimeout(missTimer); missTimer = 0;
+    if (open.length < 2) return;
+    for (const i of open) { st[i] = DOWN; cards[i]._miss = false; paint(i); }
+    open = [];
+    if (mode === 'duo') { turn = 1 - turn; updateHud(); }
+  }
+
+  function flip(i) {
+    if (overlayOpen || (status !== 'ready' && status !== 'playing')) return;
+    if (i < 0 || i >= N) return;
+    // A tap while a wrong pair is showing turns it back at once.
+    if (open.length === 2) settleMiss();
+    if (st[i] !== DOWN) return;
+    if (paused) paused = false;
+    if (status === 'ready') status = 'playing';
+    syncTimer();
+    st[i] = UP;
+    open.push(i);
+    paint(i);
+    if (open.length < 2) return;
+
+    const a = open[0], b = open[1];
+    moves++;
+    if (deck[a] === deck[b]) {
+      open = [];
+      found++;
+      for (const j of [a, b]) {
+        st[j] = GOT;
+        owner[j] = turn;
+        cards[j]._hit = !reduceMotion;
+        paint(j);
+      }
+      if (mode === 'duo') pairs[turn]++;
+      setTimeout(() => {
+        for (const j of [a, b]) { if (cards[j] && cards[j]._hit) { cards[j]._hit = false; paint(j); } }
+      }, 650);
+      updateHud();
+      if (found === P) finish();
+    } else {
+      cards[a]._miss = true; cards[b]._miss = true;
+      paint(a); paint(b);
+      missTimer = setTimeout(settleMiss, 900);
+      if (mode === 'solo') $('s1Num').textContent = moves;
+    }
+  }
+
+  function finish() {
+    status = 'over';
+    syncTimer();
+    board.classList.add('over');
+    const t = Math.max(1, Math.round(getElapsed()));
+    elapsed = t;
+    tick();
+    updateHud();
+    let isBest = false;
+    if (mode === 'solo') {
+      const pm = bestMoves(size), pt = bestTime(size);
+      const newMoves = !pm || moves < pm, newTime = !pt || t < pt;
+      if (newMoves) lsSet(KEY_MOVES + size, String(moves));
+      if (newTime) lsSet(KEY_TIME + size, String(t));
+      isBest = newMoves || newTime;
+    }
+    resultTimer = setTimeout(() => showResult(t, isBest), reduceMotion ? 300 : 800);
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    menuCard.hidden = card !== menuCard;
+    resultCard.hidden = card !== resultCard;
+    overlayOpen = true;
+    syncTimer();
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    syncTimer();
+  }
+
+  function setNum(el, v, text) {
+    el.textContent = v ? text : 'None';
+    el.classList.toggle('none', !v);
+  }
+
+  function showResult(t, isBest) {
+    resultTimer = 0;
+    const title = $('resTitle');
+    title.className = '';
+    $('resTag').hidden = !isBest;
+    if (mode === 'solo') {
+      title.textContent = 'You win';
+      $('resSub').textContent = sizeText(size);
+      $('resLab1').textContent = 'Moves';
+      $('resVal1').textContent = moves;
+      $('resLab2').textContent = 'Time';
+      $('resVal2').textContent = fmtTime(t);
+      $('resCell3').hidden = false; $('resCell4').hidden = false;
+      const bm = bestMoves(size), bt = bestTime(size);
+      setNum($('resBestMoves'), bm, String(bm));
+      setNum($('resBestTime'), bt, fmtTime(bt));
+    } else {
+      if (pairs[0] === pairs[1]) { title.textContent = 'Draw'; title.className = 'c-none'; }
+      else if (pairs[0] > pairs[1]) title.textContent = 'Player 1 wins';
+      else { title.textContent = 'Player 2 wins'; title.className = 'c-white'; }
+      $('resSub').textContent = sizeText(size) + ', pass and play';
+      $('resLab1').textContent = 'Player 1 pairs';
+      $('resVal1').textContent = pairs[0];
+      $('resLab2').textContent = 'Player 2 pairs';
+      $('resVal2').textContent = pairs[1];
+      $('resCell3').hidden = true; $('resCell4').hidden = true;
+    }
+    openOverlay(resultCard);
+    setTimeout(() => { try { $('againBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  function renderMenu() {
+    $('modeSeg').querySelectorAll('button').forEach((b) => {
+      b.setAttribute('aria-pressed', b.dataset.v === menuMode ? 'true' : 'false');
+    });
+    $('sizeSeg').querySelectorAll('button').forEach((b) => {
+      b.setAttribute('aria-pressed', b.dataset.v === menuSize ? 'true' : 'false');
+    });
+    const solo = menuMode === 'solo';
+    $('menuBests').hidden = !solo;
+    $('duoNote').hidden = solo;
+    if (solo) {
+      const bm = bestMoves(menuSize), bt = bestTime(menuSize);
+      setNum($('menuBestMoves'), bm, String(bm));
+      setNum($('menuBestTime'), bt, fmtTime(bt));
+    }
+    const canResume = (status === 'ready' || status === 'playing') && menuSize === size && menuMode === mode;
+    $('resumeBtn').hidden = !canResume;
+  }
+
+  function openMenu() {
+    clearTimeout(resultTimer); resultTimer = 0;
+    menuSize = size; menuMode = mode;
+    renderMenu();
+    openOverlay(menuCard);
+    setTimeout(() => { try { $('playBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  $('modeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    menuMode = b.dataset.v;
+    renderMenu();
+  });
+  $('sizeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    menuSize = b.dataset.v;
+    renderMenu();
+  });
+  $('playBtn').addEventListener('click', () => newGame(menuSize, menuMode));
+  $('resumeBtn').addEventListener('click', hideOverlay);
+  $('againBtn').addEventListener('click', () => newGame(size, mode));
+  $('menuBtn').addEventListener('click', openMenu);
+  $('sizeBtn').addEventListener('click', openMenu);
+  $('newBtn').addEventListener('click', () => newGame(size, mode));
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay && !menuCard.hidden && !$('resumeBtn').hidden) hideOverlay();
+  });
+
+  /* ---------- layout ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = Math.round(clamp(8, m * 0.03, 24));
+    const gap = Math.round(clamp(8, m * 0.022, 14));
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.padding = pad + 'px';
+    app.style.setProperty('--gap', gap + 'px');
+    const availW = vw - 2 * pad;
+    const cg = Math.round(clamp(4, m * 0.014, 10));
+    const A = SIZES[size].a, B = SIZES[size].b;
+
+    // Pick the orientation that gives the biggest cards.
+    function fit(headH) {
+      const availH = vh - 2 * pad - headH - gap;
+      let best = null;
+      for (const [c, r] of [[A, B], [B, A]]) {
+        const s = Math.floor(Math.min((availW - (c - 1) * cg) / c, (availH - (r - 1) * cg) / r, 132));
+        if (!best || s > best.s) best = { c, r, s: Math.max(24, s) };
+      }
+      best.bw = best.c * best.s + (best.c - 1) * cg;
+      best.bh = best.r * best.s + (best.r - 1) * cg;
+      return best;
+    }
+    function trial(narrow) {
+      app.classList.toggle('narrow', narrow);
+      app.classList.toggle('wide', !narrow);
+      head.style.width = availW + 'px';
+      let f = fit(head.offsetHeight);
+      const hw = Math.min(availW, Math.max(f.bw, 320));
+      head.style.width = hw + 'px';
+      f = fit(head.offsetHeight);
+      f.hw = hw;
+      return f;
+    }
+    app.classList.add('wide'); app.classList.remove('narrow');
+    head.style.width = 'max-content';
+    const wideNeed = head.offsetWidth;
+    let f = trial(false);
+    if (wideNeed > f.hw) f = trial(true);
+
+    cols = f.c; rows = f.r;
+    board.style.setProperty('--c', f.s + 'px');
+    board.style.setProperty('--cg', cg + 'px');
+    board.style.gridTemplateColumns = 'repeat(' + cols + ', var(--c))';
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- pointer input ---------- */
+  function hideCursor() {
+    if (!curShown) return;
+    curShown = false;
+    paint(cur);
+  }
+  board.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (paused) { paused = false; syncTimer(); }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.target && e.target.closest ? e.target.closest('.cd') : null;
+    if (!el || !board.contains(el)) return;
+    e.preventDefault();
+    hideCursor();
+    flip(Number(el.dataset.i));
+  });
+  board.addEventListener('contextmenu', (e) => e.preventDefault());
+  board.addEventListener('dragstart', (e) => e.preventDefault());
+
+  // No page scroll, rubber-banding or pull to refresh.
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- keyboard ---------- */
+  const MOVES = {
+    ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0],
+    a: [0, -1], d: [0, 1], w: [-1, 0], s: [1, 0], A: [0, -1], D: [0, 1], W: [-1, 0], S: [1, 0],
+  };
+  function moveCursor(dr, dc) {
+    const old = cur;
+    if (curShown) {
+      const r = clamp(0, Math.floor(cur / cols) + dr, rows - 1);
+      const c = clamp(0, cur % cols + dc, cols - 1);
+      cur = r * cols + c;
+    }
+    curShown = true;
+    paint(old);
+    paint(cur);
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape' && !menuCard.hidden && !$('resumeBtn').hidden) { e.preventDefault(); hideOverlay(); }
+      return;
+    }
+    if (paused) { paused = false; syncTimer(); }
+    const mv = MOVES[e.key];
+    if (mv) { e.preventDefault(); moveCursor(mv[0], mv[1]); return; }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      e.preventDefault();
+      if (!curShown) { moveCursor(0, 0); return; }
+      if (!e.repeat) flip(cur);
+      return;
+    }
+    if ((e.key === 'n' || e.key === 'N') && !e.repeat) { newGame(size, mode); return; }
+    if (e.key === 'Escape') { e.preventDefault(); openMenu(); }
+  });
+
+  V.onPause((p) => { paused = !!p; syncTimer(); });
+
+  /* ---------- boot ---------- */
+  // A face-down deck sits behind the start menu until a game starts.
+  newGame(size, mode);
+  status = 'idle';
+  updateHud();
+  app.classList.add('ready');
+  openMenu();
+  V.ready();
+})();
+</script>
+</body>
+</html>

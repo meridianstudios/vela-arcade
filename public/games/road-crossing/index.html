@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Road Crossing</title>
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --panel: #16181c;
+    --panel-2: #1d2025;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-2: rgba(255, 255, 255, 0.22);
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-h: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  #cv { position: fixed; inset: 0; display: block; touch-action: none; }
+
+  .lbl {
+    font-weight: 600;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); line-height: 1.2;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed; left: 12px; right: 12px; top: 12px; z-index: 2;
+    height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    pointer-events: none;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; }
+  .brand svg { width: 18px; height: 18px; flex: none; display: block; }
+  .brand span { font-weight: 700; font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
+  .stats { display: flex; align-items: stretch; gap: 6px; height: 44px; margin-left: auto; }
+  .stat {
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px;
+    min-width: 68px; padding: 0 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 2px;
+  }
+  .stat .lbl { font-size: 10px; letter-spacing: 0.14em; }
+  .num {
+    font-family: var(--font-display, var(--font)); font-weight: 600;
+    font-size: 17px; line-height: 1.1; font-variant-numeric: tabular-nums;
+  }
+  .num.bump { animation: bump 0.3s var(--ease); }
+  @keyframes bump { 0% { color: var(--brand-h); } 100% { color: var(--text); } }
+  .icon-btn {
+    width: 44px; flex: none; display: grid; place-items: center; pointer-events: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 2px; cursor: pointer;
+    color: var(--text);
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .icon-btn:hover { border-color: var(--line-2); background: var(--panel-2); }
+  .icon-btn svg { width: 14px; height: 14px; display: block; }
+  .icon-btn:focus-visible, .btn:focus-visible { outline: 1px solid var(--brand-h); outline-offset: 2px; }
+  @media (max-width: 420px) { .brand { display: none; } }
+
+  /* Overlays */
+  .overlay {
+    position: fixed; inset: 0; z-index: 3;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0, 0, 0, 0.72);
+    visibility: hidden; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s;
+  }
+  .overlay.show { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity 0.2s var(--ease); }
+  #startOv { background: rgba(0, 0, 0, 0.5); cursor: pointer; }
+  .card {
+    width: 100%; max-width: 300px; text-align: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 0;
+    border-top: 2px solid var(--brand);
+    padding: 22px 20px 20px;
+    transform: translateY(12px); opacity: 0;
+    transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+  }
+  .overlay.show .card { transform: none; opacity: 1; }
+  .name {
+    font-weight: 700;
+    font-size: 20px; letter-spacing: 0.24em; text-transform: uppercase;
+    padding-left: 0.24em;
+  }
+  .line { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .focus-hint { display: none; margin-top: 10px; font-size: 12px; color: var(--brand-h); }
+  .focus-hint.show { display: block; }
+  .go-score {
+    margin-top: 10px; font-family: var(--font-display, var(--font)); font-weight: 300;
+    font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .go-best { margin-top: 12px; }
+  .go-best .v { color: var(--text); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .go-new { display: none; margin-top: 12px; color: var(--brand-h); }
+  .go-new.show { display: block; }
+  .btn {
+    margin-top: 18px; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 148px; height: 40px; padding: 0 20px;
+    font-weight: 600;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff;
+    background: var(--brand); border: 0; border-radius: 0; cursor: pointer;
+    transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-h); }
+  .btn:active { background: var(--brand-d); transform: scale(0.98); }
+
+  html.touch .keys-only { display: none !important; }
+  html:not(.touch) .touch-only { display: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .overlay.show, .card, .btn { transition: none; }
+    .card { transform: none; }
+    .num.bump { animation: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Road Crossing game"></canvas>
+
+<header id="hud">
+  <div class="brand">
+    <svg viewBox="0 0 18 18" aria-hidden="true">
+      <rect x="0" y="0" width="18" height="5" fill="#b83f19"/><rect x="0" y="6.5" width="18" height="5" fill="#16181c"/>
+      <rect x="2" y="8.5" width="4" height="1" fill="#ffffff"/><rect x="12" y="8.5" width="4" height="1" fill="#ffffff"/>
+      <rect x="0" y="13" width="18" height="5" fill="#ea5426"/><rect x="6.5" y="6.5" width="5" height="5" fill="#ffffff"/>
+    </svg>
+    <span>Road Crossing</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="lbl">Score</span><span class="num" id="score">0</span></div>
+    <div class="stat"><span class="lbl">Best</span><span class="num" id="best">0</span></div>
+    <button id="pauseBtn" class="icon-btn" type="button" aria-label="Pause">
+      <svg id="icoPause" viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.5" height="12" fill="currentColor"/><rect x="8.5" y="1" width="3.5" height="12" fill="currentColor"/></svg>
+      <svg id="icoPlay" viewBox="0 0 14 14" aria-hidden="true" style="display:none"><path d="M3 1v12l10-6z" fill="currentColor"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="overlay show" id="startOv">
+  <div class="card">
+    <div class="name">Road Crossing</div>
+    <p class="line keys-only">Arrows or WASD to hop. Press one to start.</p>
+    <p class="line touch-only">Tap to hop forward. Swipe to hop any way.</p>
+    <p class="focus-hint keys-only" id="focusHint">Click here first to use the keyboard.</p>
+  </div>
+</div>
+
+<div class="overlay" id="pauseOv">
+  <div class="card">
+    <div class="lbl">Paused</div>
+    <button class="btn" id="resumeBtn" type="button">Resume</button>
+  </div>
+</div>
+
+<div class="overlay" id="overOv">
+  <div class="card">
+    <div class="lbl">Game over</div>
+    <div class="go-score" id="goScore">0</div>
+    <div class="lbl go-new" id="goNew">New best</div>
+    <div class="lbl go-best" id="goBestRow">Best<span class="v" id="goBest">0</span></div>
+    <button class="btn" id="againBtn" type="button">Play again</button>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="road-crossing"></script>
+<script>
+(() => {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: window.parent !== window,
+    ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  // ---------- Config (distances in cells, times in seconds) ----------
+  const COLS = 9;                 // playable columns
+  const LOOP = 27;                // lane length; traffic and logs wrap around it
+  const M = (LOOP - COLS) / 2;    // lane length either side of the playable strip
+  const HOP_T = 0.11;
+  const FOLLOW = 3.5;             // rows the camera keeps below the player
+  const CREEP_MIN = 0.3, CREEP_MAX = 0.75, CREEP_PER_ROW = 0.0035;
+  const TRAIN_SPEED = 34, TRAIN_LEN = 18, WARN_T = 1.5;
+  const DEATH_DELAY = 0.9;
+  const SUB = 1 / 240;            // physics substep
+  const MIN_ROWS = 11.5, MAX_CELL = 72;
+
+  const DIRS = { up: [0, 1], down: [0, -1], left: [-1, 0], right: [1, 0] };
+  const KEYMAP = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
+  };
+
+  const C = {
+    grassA: '#1b1e23', grassB: '#1f2228',
+    treeA: '#30353c', treeB: '#3e444c',
+    rockA: '#4b5059', rockB: '#5e646d',
+    road: '#0c0d10', mark: 'rgba(255,255,255,0.28)', curb: 'rgba(255,255,255,0.16)',
+    water: '#030304', ripple: 'rgba(255,255,255,0.07)', shore: 'rgba(255,255,255,0.12)',
+    logA: '#b83f19', logB: '#cd4a1f', grain: 'rgba(0,0,0,0.28)',
+    rail: '#121418', sleeper: '#262a30', steel: '#6b7079',
+    orange: '#ea5426', light: '#ff7a4d', dark: '#b83f19', white: '#ffffff', grey: '#8a8f99', ink: '#000000',
+  };
+  const CAR_COLORS = ['#ea5426', '#ffffff', '#ff7a4d', '#8a8f99'];
+  const CAR_ROOF = { '#ea5426': '#b83f19', '#ffffff': '#c9cacd', '#ff7a4d': '#ea5426', '#8a8f99': '#686d76' };
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- DOM ----------
+  const $ = (s) => document.querySelector(s);
+  const root = document.documentElement;
+  const canvas = $('#cv');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = $('#score');
+  const bestEl = $('#best');
+  const startOv = $('#startOv');
+  const pauseOv = $('#pauseOv');
+  const overOv = $('#overOv');
+  const focusHint = $('#focusHint');
+  const pauseBtn = $('#pauseBtn');
+
+  // ---------- Helpers ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const mod = (a, n) => ((a % n) + n) % n;
+  const sum = (arr) => arr.reduce((s, v) => s + v, 0);
+  const easeOut = (t) => 1 - (1 - t) * (1 - t);
+  // Signed distance along a lane loop, in [-LOOP/2, LOOP/2)
+  const loopDelta = (a, b) => mod(a - b + LOOP / 2, LOOP) - LOOP / 2;
+
+  // ---------- World state ----------
+  let rows = [];          // rows[i] is world row rowBase + i
+  let rowBase = 0;
+  let nextRow = 0;
+  let plan = [];          // queued row specs from the zone planner
+  let lastZone = 'grass';
+  let hazardRun = 0;
+  let reach = new Uint8Array(COLS).fill(1);   // columns reachable at the newest generated row
+
+  let state = 'ready';    // ready | playing | paused | dying | over
+  let player = null;
+  let queue = [];          // hops pressed while one is in the air (up to 2)
+  let score = 0;
+  let best = V.best() || 0;
+  let camY = 0;
+  let worldT = 0;         // lane animation clock
+  let deathT = 0, deathKind = '', deathInfo = null;
+  let particles = [];
+  let shake = 0, flash = 0;
+
+  function row(r) { return rows[r - rowBase]; }
+  function diff(r) { return clamp((r - 6) / 220, 0, 1); }
+
+  // ---------- Lane layout ----------
+  // Places n items round a loop of LOOP cells so every gap sits in [gapMin, gapMax].
+  function layoutLane(n, lenFn, gapMin, gapMax) {
+    for (let tries = 0; tries < 60; tries++) {
+      const lens = Array.from({ length: n }, lenFn);
+      const free = LOOP - sum(lens);
+      if (free < n * gapMin) { if (n > 1 && tries > 20) n--; continue; }
+      const raw = lens.map(() => rand(1, 2.2));
+      const s = sum(raw);
+      const gaps = raw.map((g) => (g / s) * free);
+      if (!gaps.every((g) => g >= gapMin && g <= gapMax)) { if (tries > 30) { n += free / n > gapMax ? 1 : 0; } continue; }
+      return build(lens, gaps);
+    }
+    // Fallback: even spacing, sized to fit the bounds
+    const len = lenFn();
+    let k = Math.max(1, Math.round(LOOP / (len + (gapMin + gapMax) / 2)));
+    while (k > 1 && LOOP / k - len < gapMin) k--;
+    return build(Array(k).fill(len), Array(k).fill(LOOP / k - len));
+
+    function build(lens, gaps) {
+      const items = [];
+      let x = rand(0, LOOP);
+      for (let i = 0; i < lens.length; i++) {
+        items.push({ x: mod(x, LOOP), len: lens[i] });
+        x += lens[i] + gaps[i];
+      }
+      return items;
+    }
+  }
+
+  // ---------- Row makers ----------
+  function reachThrough(obs, prev) {
+    const out = new Uint8Array(COLS);
+    for (let c = 0; c < COLS; c++) if (!obs[c] && prev[c]) out[c] = 1;
+    for (let c = 1; c < COLS; c++) if (out[c - 1] && !obs[c]) out[c] = 1;
+    for (let c = COLS - 2; c >= 0; c--) if (out[c + 1] && !obs[c]) out[c] = 1;
+    return out;
+  }
+
+  // Every stretch of the previous row the player can reach must have a way forward,
+  // so a pocket between trees is never a dead end.
+  function noDeadEnds(obs, prev) {
+    let c = 0;
+    while (c < COLS) {
+      if (!prev[c]) { c++; continue; }
+      let open = false;
+      while (c < COLS && prev[c]) { if (!obs[c]) open = true; c++; }
+      if (!open) return false;
+    }
+    return true;
+  }
+
+  function decor(density) {
+    const d = [];
+    for (let x = -M; x < COLS + M; x++) {
+      if (x >= 0 && x < COLS) continue;
+      if (Math.random() < density) d.push({ x, rock: Math.random() < 0.25 });
+    }
+    return d;
+  }
+
+  function makeGrass(r, kind) {
+    const d = diff(r);
+    let obs = new Uint8Array(COLS);
+    if (kind === 'wall') {
+      obs.fill(1);                       // behind the start: solid, and leaves reach alone
+    } else if (kind === 'safe') {
+      reach = new Uint8Array(COLS).fill(1);
+    } else {
+      let ok = false;
+      for (let tries = 0; tries < 40 && !ok; tries++) {
+        obs = new Uint8Array(COLS);
+        const n = randInt(1, 2 + Math.round(2.5 * d));
+        for (let i = 0; i < n; i++) obs[randInt(0, COLS - 1)] = 1;
+        // no one-cell pockets against the edges (a current there would sweep you straight off)
+        if (obs[1]) obs[0] = 1;
+        if (obs[COLS - 2]) obs[COLS - 1] = 1;
+        if (noDeadEnds(obs, reach)) { ok = true; reach = reachThrough(obs, reach); }
+      }
+      if (!ok) { obs = new Uint8Array(COLS); reach = reachThrough(obs, reach); }
+    }
+    const rock = new Uint8Array(COLS);
+    for (let c = 0; c < COLS; c++) if (obs[c] && Math.random() < 0.3) rock[c] = 1;
+    return { r, type: 'grass', obs, rock, decor: decor(kind === 'wall' ? 0.9 : 0.42) };
+  }
+
+  function makeRoad(r, dir) {
+    const d = diff(r);
+    const speed = rand(1.5 + 1.8 * d, 2.5 + 2.9 * d);
+    const trucks = Math.random() < 0.3;
+    const lenFn = () => (trucks && Math.random() < 0.6 ? 2 : 1);
+    const gapMin = Math.max(2.4, speed * 0.62) + (1 - d) * 0.8;
+    const target = (6 - 2.6 * d) + speed * 0.3;
+    const n = Math.max(2, Math.round(LOOP / ((trucks ? 1.6 : 1) + target)));
+    const items = layoutLane(n, lenFn, gapMin, target * 2.6);
+    items.forEach((it) => { it.color = CAR_COLORS[randInt(0, CAR_COLORS.length - 1)]; it.alt = CAR_COLORS[randInt(0, 1)]; });
+    reach = new Uint8Array(COLS).fill(1);
+    return { r, type: 'road', v: dir * speed, items };
+  }
+
+  function makeRiver(r, dir) {
+    const d = diff(r);
+    const speed = rand(0.9 + 0.6 * d, 1.6 + 1.0 * d);
+    const maxLen = d > 0.6 ? 3 : 4;
+    const lenFn = () => randInt(2, maxLen);
+    const gap = 1.6 + 0.8 * d;
+    const n = Math.max(2, Math.round(LOOP / ((2 + maxLen) / 2 + gap)));
+    const items = layoutLane(n, lenFn, 1.0, 3.0);
+    reach = new Uint8Array(COLS).fill(1);
+    return { r, type: 'river', v: dir * speed, items };
+  }
+
+  function makeRail(r) {
+    const d = diff(r);
+    reach = new Uint8Array(COLS).fill(1);
+    return { r, type: 'rail', phase: 'wait', t: rand(1.5, 5), dir: 1, tx: 0, gapLo: 2.6, gapHi: 6.5 - 2 * d };
+  }
+
+  // ---------- Zone planner ----------
+  function planZone() {
+    const r = nextRow, d = diff(r);
+    if (lastZone !== 'grass') {
+      // A rest row after most zones, and always after a long run of hazards
+      if (Math.random() < 1 - 0.45 * d || hazardRun >= 7) {
+        const n = Math.random() < 0.35 ? 2 : 1;
+        for (let i = 0; i < n; i++) plan.push({ type: 'grass' });
+        lastZone = 'grass';
+        return;
+      }
+    }
+    const w = {
+      road: lastZone === 'road' ? 0 : 4,
+      river: r > 10 && lastZone !== 'river' ? 3 : 0,
+      rail: r > 18 && lastZone !== 'rail' ? 1.6 : 0,
+    };
+    let pick = rand(0, w.road + w.river + w.rail);
+    let type = 'road';
+    for (const k of ['road', 'river', 'rail']) { if (pick < w[k]) { type = k; break; } pick -= w[k]; }
+
+    if (type === 'road') {
+      const n = randInt(1, 2 + Math.round(2 * d));
+      for (let i = 0; i < n; i++) plan.push({ type: 'road', dir: Math.random() < 0.5 ? -1 : 1 });
+    } else if (type === 'river') {
+      const n = randInt(1, d > 0.5 ? 3 : 2);
+      let dir = Math.random() < 0.5 ? -1 : 1;
+      for (let i = 0; i < n; i++) { plan.push({ type: 'river', dir }); dir = -dir; }
+    } else {
+      const n = d > 0.3 && Math.random() < 0.5 ? 2 : 1;
+      for (let i = 0; i < n; i++) plan.push({ type: 'rail' });
+    }
+    lastZone = type;
+  }
+
+  function genRow() {
+    const r = nextRow;
+    let R;
+    if (r < 0) R = makeGrass(r, 'wall');
+    else if (r < 4) R = makeGrass(r, 'safe');
+    else {
+      if (!plan.length) planZone();
+      const s = plan.shift();
+      if (s.type === 'grass') R = makeGrass(r, 'normal');
+      else if (s.type === 'road') R = makeRoad(r, s.dir);
+      else if (s.type === 'river') R = makeRiver(r, s.dir);
+      else R = makeRail(r);
+    }
+    hazardRun = R.type === 'grass' ? 0 : hazardRun + 1;
+    rows.push(R);
+    nextRow++;
+  }
+
+  function ensureRows(top, bottom) {
+    while (nextRow <= top) genRow();
+    while (rows.length && rowBase < bottom) { rows.shift(); rowBase++; }
+  }
+
+  // ---------- Lanes ----------
+  function updateRow(R, h) {
+    if (R.type === 'road' || R.type === 'river') {
+      for (const it of R.items) it.x = mod(it.x + R.v * h, LOOP);
+    } else if (R.type === 'rail') {
+      if (R.phase === 'wait' || R.phase === 'warn') {
+        R.t -= h;
+        if (R.phase === 'wait' && R.t <= WARN_T) R.phase = 'warn';
+        if (R.t <= 0) {
+          R.phase = 'pass';
+          R.dir = Math.random() < 0.5 ? -1 : 1;
+          R.tx = R.dir > 0 ? -M - TRAIN_LEN : COLS + M;     // left edge, world x
+        }
+      } else {
+        R.tx += R.dir * TRAIN_SPEED * h;
+        if ((R.dir > 0 && R.tx > COLS + M) || (R.dir < 0 && R.tx + TRAIN_LEN < -M)) {
+          R.phase = 'wait';
+          R.t = rand(R.gapLo, Math.max(R.gapLo + 0.5, R.gapHi));
+        }
+      }
+    }
+  }
+
+  // Item centre in world x (loop coords shifted by M)
+  function itemHits(R, px, halfW) {
+    const p = px + M;
+    for (const it of R.items) {
+      const dx = loopDelta(p, it.x + it.len / 2);
+      if (Math.abs(dx) < it.len / 2 + halfW) return it;
+    }
+    return null;
+  }
+
+  // ---------- Player ----------
+  function newPlayer() {
+    return { x: Math.floor(COLS / 2) + 0.5, r: 0, face: 'up', hop: null, bump: 0, bumpDir: [0, 0] };
+  }
+
+  function playerPos() {
+    const p = player;
+    if (!p.hop) return { x: p.x, y: p.r + 0.5, lift: 0, k: 1 };
+    const k = clamp(p.hop.t / HOP_T, 0, 1), e = easeOut(k);
+    return {
+      x: p.hop.x0 + (p.hop.x1 - p.hop.x0) * e,
+      y: p.hop.y0 + (p.hop.y1 - p.hop.y0) * e,
+      lift: Math.sin(Math.PI * k), k,
+    };
+  }
+
+  function occupiedRow() {
+    const p = player;
+    if (!p.hop) return p.r;
+    return p.hop.t / HOP_T < 0.5 ? p.hop.r0 : p.hop.r1;
+  }
+
+  const snapX = (x) => Math.floor(x) + 0.5;
+
+  function tryMove(dir) {
+    if (!DIRS[dir]) return;
+    if (state === 'ready') startRun();
+    if (state !== 'playing') return;
+    if (player.hop) { if (queue.length < 2) queue.push(dir); return; }
+    doMove(dir);
+  }
+
+  function doMove(dir) {
+    const p = player;
+    const [dx, dy] = DIRS[dir];
+    p.face = dir;
+    const r0 = p.r, r1 = p.r + dy;
+    const from = row(r0), to = row(r1);
+    if (!to || !from) return;
+    let x1;
+    if (to.type === 'river' && from.type === 'river') {
+      x1 = p.x + dx;
+      if (x1 < 0.3 || x1 > COLS - 0.3) return blocked(dx, dy);
+    } else {
+      x1 = snapX(p.x) + dx;
+      const col = Math.floor(x1);
+      if (col < 0 || col >= COLS) return blocked(dx, dy);
+      if (to.type === 'grass' && to.obs[col]) return blocked(dx, dy);
+    }
+    p.hop = {
+      x0: p.x, y0: r0 + 0.5, x1, y1: r1 + 0.5, t: 0, r0, r1,
+      drift: from.type === 'river' && r1 === r0 ? from.v : 0,
+    };
+  }
+
+  function blocked(dx, dy) {
+    player.bump = 0.12;
+    player.bumpDir = [dx, dy];
+  }
+
+  function land() {
+    const p = player, h = p.hop;
+    p.x = h.x1; p.r = h.r1; p.hop = null;
+    const R = row(p.r);
+    // On water the centre must land on a log, with a little grace at each end.
+    if (R.type === 'river' && !itemHits(R, p.x, 0.1)) return die('drown');
+    if (p.r > score) {
+      score = p.r;
+      V.score(score);
+      updateHud(true);
+    }
+    while (queue.length && !player.hop) doMove(queue.shift());
+  }
+
+  // ---------- Game flow ----------
+  function reset() {
+    rows = []; rowBase = -8; nextRow = -8; plan = []; lastZone = 'grass'; hazardRun = 0;
+    reach = new Uint8Array(COLS).fill(1);
+    player = newPlayer();
+    queue = [];
+    score = 0;
+    camY = 0.5 - FOLLOW;
+    worldT = 0;
+    deathT = 0; deathKind = ''; deathInfo = null;
+    particles = []; shake = 0; flash = 0;
+    ensureRows(Math.ceil(camY + viewRows()) + 4, Math.floor(camY) - 3);
+    // Let the traffic settle so the first screen is already moving
+    for (let i = 0; i < 240; i++) rows.forEach((R) => updateRow(R, 1 / 60));
+    state = 'ready';
+    V.score(0);
+    updateHud(false);
+    setPauseIcon(false);
+    updateFocusHint();
+    show(startOv);
+  }
+
+  function startRun() {
+    state = 'playing';
+    show(null);
+  }
+
+  function pause() {
+    if (state !== 'playing') return;
+    state = 'paused';
+    queue = [];
+    setPauseIcon(true);
+    show(pauseOv);
+  }
+  function resume() {
+    if (state !== 'paused') return;
+    state = 'playing';
+    setPauseIcon(false);
+    show(null);
+  }
+  function togglePause() { if (state === 'playing') pause(); else if (state === 'paused') resume(); }
+
+  function die(kind, info) {
+    if (state !== 'playing') return;
+    const pp = playerPos();
+    deathKind = kind;
+    deathInfo = Object.assign({ x: pp.x, y: pp.y }, info || {});
+    player.hop = null;
+    player.x = pp.x;
+    state = 'dying';
+    deathT = 0;
+    queue = [];
+    if (kind === 'drown') {
+      burst(pp.x, pp.y, [C.white, C.white, C.grey], 16, 3.2);
+    } else if (kind === 'train') {
+      burst(pp.x, pp.y, [C.white, C.white, C.orange, C.light], 26, 9, info && info.dir);
+      shake = reduceMotion ? 0 : 1;
+      flash = 1;
+    } else if (kind === 'hit') {
+      burst(pp.x, pp.y, [C.white, C.white, C.light], 14, 4.5);
+      shake = reduceMotion ? 0 : 0.6;
+      flash = 0.7;
+    } else {
+      burst(pp.x, pp.y, [C.white, C.orange, C.light], 18, 5);
+      shake = reduceMotion ? 0 : 0.6;
+    }
+    const isBest = !!V.gameOver(score) && score > 0;
+    best = Math.max(best, V.best() || 0, score);
+    $('#goScore').textContent = score;
+    $('#goBest').textContent = best;
+    $('#goNew').classList.toggle('show', isBest);
+    $('#goBestRow').style.display = isBest ? 'none' : '';
+    updateHud(false);
+  }
+
+  function showOver() { state = 'over'; show(overOv); }
+  function playAgain() { if (state === 'over') reset(); }
+
+  // ---------- Simulation ----------
+  function step(h) {
+    worldT += h;
+    for (const R of rows) updateRow(R, h);
+
+    if (state !== 'playing') return;
+    const p = player;
+
+    if (p.bump > 0) p.bump = Math.max(0, p.bump - h);
+
+    if (p.hop) {
+      if (p.hop.drift) { p.hop.x0 += p.hop.drift * h; p.hop.x1 += p.hop.drift * h; }
+      p.hop.t += h;
+      if (p.hop.t >= HOP_T) land();
+      if (state !== 'playing') return;
+    } else {
+      const R = row(p.r);
+      if (R.type === 'river') {
+        p.x += R.v * h;
+        if (p.x < 0 || p.x > COLS) return die('swept');
+      }
+    }
+
+    // Hazards at the player's current spot
+    const pos = playerPos();
+    const R = row(occupiedRow());
+    if (R.type === 'road') {
+      const car = itemHits(R, pos.x, 0.3);
+      if (car) return die('hit', { dir: Math.sign(R.v), car });
+    } else if (R.type === 'rail' && R.phase === 'pass') {
+      if (pos.x + 0.3 > R.tx && pos.x - 0.3 < R.tx + TRAIN_LEN) return die('train', { dir: R.dir });
+    }
+
+    // Camera: follows ahead, and creeps forward on its own once the run starts
+    const target = pos.y - FOLLOW;
+    if (target > camY) camY += (target - camY) * (1 - Math.exp(-6 * h));
+    camY += Math.min(CREEP_MAX, CREEP_MIN + score * CREEP_PER_ROW) * h;
+    if (pos.y < camY + 0.2) return die('caught');
+  }
+
+  // ---------- Effects ----------
+  function burst(x, y, colors, count, spd, dir) {
+    for (let i = 0; i < count; i++) {
+      let a = Math.random() * Math.PI * 2;
+      let v = spd * (0.35 + Math.random() * 0.8);
+      let vx = Math.cos(a) * v, vy = Math.sin(a) * v;
+      if (dir) vx += dir * spd * 0.9;
+      const life = 0.35 + Math.random() * 0.35;
+      particles.push({ x, y, vx, vy, s: 0.08 + Math.random() * 0.1, color: colors[i % colors.length], life, max: life });
+    }
+  }
+
+  function updateFx(dt) {
+    const drag = Math.pow(0.04, dt);
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const q = particles[i];
+      q.life -= dt;
+      if (q.life <= 0) { particles.splice(i, 1); continue; }
+      q.x += q.vx * dt; q.y += q.vy * dt;
+      q.vx *= drag; q.vy *= drag;
+    }
+    if (shake > 0) shake = Math.max(0, shake - dt / 0.4);
+    if (flash > 0) flash = Math.max(0, flash - dt / 0.3);
+  }
+
+  // ---------- Layout ----------
+  let W = 0, H = 0, dpr = 1, cs = 40;
+  function viewRows() { return H / cs; }
+  function layout() {
+    W = window.innerWidth; H = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    cs = Math.max(16, Math.floor(Math.min(W / COLS, H / MIN_ROWS, MAX_CELL)));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+  }
+
+  // ---------- Rendering ----------
+  let ox = 0, oy = 0;    // screen x of world x = 0; shake offset y
+  const SX = (x) => ox + x * cs;
+  const SY = (y) => H - (y - camY) * cs + oy;    // world y (rows, upward) to screen y
+
+  function rect(x0, y0, x1, y1, color) {
+    const a = Math.round(x0), b = Math.round(y0), c = Math.round(x1), d = Math.round(y1);
+    if (c <= a || d <= b) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(a, b, c - a, d - b);
+  }
+  // A rect in world units: x from wx0 to wx1, rows from wy0 (bottom) to wy1 (top)
+  function wrect(wx0, wy0, wx1, wy1, color) { rect(SX(wx0), SY(wy1), SX(wx1), SY(wy0), color); }
+
+  function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    let sx = 0, sy = 0;
+    if (shake > 0) {
+      const amp = 8 * shake * shake;
+      sx = Math.round((Math.random() * 2 - 1) * amp);
+      sy = Math.round((Math.random() * 2 - 1) * amp);
+    }
+    ox = Math.round(W / 2 - (COLS / 2) * cs) + sx;
+    oy = sy;
+
+    const bandL = Math.max(0, SX(-M)), bandR = Math.min(W, SX(COLS + M));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bandL, 0, bandR - bandL, H);
+    ctx.clip();
+
+    const r0 = Math.floor(camY) - 1, r1 = Math.ceil(camY + H / cs) + 1;
+    for (let r = r0; r <= r1; r++) { const R = row(r); if (R) drawGround(R); }
+    for (let r = r0; r <= r1; r++) { const R = row(r); if (R) drawThings(R); }
+
+    drawPlayer();
+    drawParticles();
+
+    // Out of bounds: dim the lanes either side of the playable strip
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(bandL, 0, Math.max(0, SX(0) - bandL), H);
+    ctx.fillRect(SX(COLS), 0, Math.max(0, bandR - SX(COLS)), H);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(SX(0) - 1, 0, 1, H);
+    ctx.fillRect(SX(COLS), 0, 1, H);
+    ctx.restore();
+
+    // The camera edge: warn when it gets close
+    if (state === 'playing') {
+      const gap = playerPos().y - camY;
+      if (gap < 1.7 && Math.floor(worldT / 0.16) % 2 === 0) {
+        ctx.fillStyle = C.orange;
+        ctx.fillRect(0, H - 4, W, 4);
+      }
+    }
+
+    if (flash > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${(0.22 * flash).toFixed(3)})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function neighbourType(r) { const R = row(r); return R ? R.type : ''; }
+
+  function drawGround(R) {
+    const r = R.r;
+    const L = -M, Rr = COLS + M;
+    if (R.type === 'grass') {
+      wrect(L, r, Rr, r + 1, (r & 1) ? C.grassB : C.grassA);
+    } else if (R.type === 'road') {
+      wrect(L, r, Rr, r + 1, C.road);
+      const up = neighbourType(r + 1) === 'road', dn = neighbourType(r - 1) === 'road';
+      const t = Math.max(1, Math.round(cs * 0.04));
+      if (up) {
+        // dashed lane divider along the top edge
+        const y = Math.round(SY(r + 1)) - Math.floor(t / 2);
+        ctx.fillStyle = C.mark;
+        for (let x = L + 0.2; x < Rr; x += 1) {
+          const a = Math.round(SX(x)), b = Math.round(SX(x + 0.55));
+          ctx.fillRect(a, y, b - a, t);
+        }
+      } else {
+        const y = Math.round(SY(r + 1));
+        ctx.fillStyle = C.curb;
+        ctx.fillRect(SX(L), y, SX(Rr) - SX(L), t);
+      }
+      if (!dn) {
+        const y = Math.round(SY(r)) - t;
+        ctx.fillStyle = C.curb;
+        ctx.fillRect(SX(L), y, SX(Rr) - SX(L), t);
+      }
+    } else if (R.type === 'river') {
+      wrect(L, r, Rr, r + 1, C.water);
+      // ripples drift with the current
+      const off = mod(worldT * R.v * 0.5, 3);
+      ctx.fillStyle = C.ripple;
+      const t = Math.max(1, Math.round(cs * 0.04));
+      for (let x = L - 3 + off; x < Rr; x += 3) {
+        const a = Math.round(SX(x)), b = Math.round(SX(x + 0.5));
+        ctx.fillRect(a, Math.round(SY(r + 0.72)), b - a, t);
+        const c = Math.round(SX(x + 1.5)), d = Math.round(SX(x + 2.2));
+        ctx.fillRect(c, Math.round(SY(r + 0.3)), d - c, t);
+      }
+      const t2 = Math.max(1, Math.round(cs * 0.05));
+      ctx.fillStyle = C.shore;
+      if (neighbourType(r + 1) !== 'river') ctx.fillRect(SX(L), Math.round(SY(r + 1)), SX(Rr) - SX(L), t2);
+      if (neighbourType(r - 1) !== 'river') ctx.fillRect(SX(L), Math.round(SY(r)) - t2, SX(Rr) - SX(L), t2);
+    } else if (R.type === 'rail') {
+      wrect(L, r, Rr, r + 1, C.rail);
+      for (let x = L + 0.17; x < Rr; x += 0.5) wrect(x, r + 0.12, x + 0.16, r + 0.88, C.sleeper);
+      const t = Math.max(2, Math.round(cs * 0.05));
+      ctx.fillStyle = C.steel;
+      ctx.fillRect(SX(L), Math.round(SY(r + 0.7)), SX(Rr) - SX(L), t);
+      ctx.fillRect(SX(L), Math.round(SY(r + 0.3)) - t, SX(Rr) - SX(L), t);
+      if (R.phase === 'warn' && Math.floor(R.t / 0.18) % 2 === 0) {
+        ctx.fillStyle = C.orange;
+        const tt = Math.max(2, Math.round(cs * 0.06));
+        ctx.fillRect(SX(L), Math.round(SY(r + 1)), SX(Rr) - SX(L), tt);
+        ctx.fillRect(SX(L), Math.round(SY(r)) - tt, SX(Rr) - SX(L), tt);
+      }
+    }
+  }
+
+  function drawTree(x, r, rock) {
+    if (rock) {
+      wrect(x + 0.2, r + 0.2, x + 0.8, r + 0.74, C.rockA);
+      wrect(x + 0.2, r + 0.56, x + 0.8, r + 0.74, C.rockB);
+    } else {
+      wrect(x + 0.08, r + 0.08, x + 0.92, r + 0.92, C.treeA);
+      wrect(x + 0.22, r + 0.36, x + 0.64, r + 0.78, C.treeB);
+    }
+  }
+
+  // Draws a lane item at its loop position, plus its wrapped copy if it straddles the loop end
+  function eachCopy(it, fn) {
+    const wl = it.x - M;
+    fn(wl);
+    if (wl + it.len > COLS + M) fn(wl - LOOP);
+  }
+
+  function drawCar(wl, len, r, dir, it) {
+    const x0 = wl + 0.07, x1 = wl + len - 0.07;
+    const y0 = r + 0.16, y1 = r + 0.84;
+    const front = dir > 0 ? x1 : x0;
+    const f = (d) => front - dir * d;          // a point d cells behind the front
+    const sx = (a, b) => [Math.min(a, b), Math.max(a, b)];
+    if (len >= 2) {
+      // truck: trailer, then cab at the front
+      const [ta, tb] = sx(f(0.78), dir > 0 ? x0 : x1);
+      wrect(ta, y0, tb, y1, it.alt === C.orange ? '#d9dadc' : '#5e646d');
+      wrect(ta + 0.08, y0 + 0.1, tb - 0.08, y1 - 0.1, it.alt === C.orange ? '#c9cacd' : '#535860');
+      const [ca, cb] = sx(f(0), f(0.7));
+      wrect(ca, y0 + 0.03, cb, y1 - 0.03, it.color === C.grey ? C.orange : it.color);
+      const [wa, wb] = sx(f(0.12), f(0.3));
+      wrect(wa, y0 + 0.12, wb, y1 - 0.12, C.ink);
+    } else {
+      wrect(x0, y0, x1, y1, it.color);
+      // roof, with the windscreen at its front edge
+      const [ca, cb] = sx(f(0.24), f(0.72));
+      wrect(ca, y0 + 0.1, cb, y1 - 0.1, CAR_ROOF[it.color]);
+      const [wa, wb] = sx(f(0.24), f(0.34));
+      wrect(wa, y0 + 0.1, wb, y1 - 0.1, C.ink);
+    }
+  }
+
+  function drawLog(wl, len, r) {
+    const x0 = wl + 0.04, x1 = wl + len - 0.04;
+    wrect(x0, r + 0.17, x1, r + 0.83, C.logA);
+    wrect(x0, r + 0.6, x1, r + 0.83, C.logB);
+    const t = Math.max(1, Math.round(cs * 0.035));
+    ctx.fillStyle = C.grain;
+    for (let k = 1; k < len; k++) {
+      const a = Math.round(SX(wl + k));
+      ctx.fillRect(a, Math.round(SY(r + 0.83)), t, Math.round(SY(r + 0.17)) - Math.round(SY(r + 0.83)));
+    }
+  }
+
+  function drawTrain(R) {
+    const r = R.r;
+    const cars = Math.round(TRAIN_LEN / 4.5);
+    const cl = TRAIN_LEN / cars;
+    for (let i = 0; i < cars; i++) {
+      const a = R.tx + i * cl + 0.06, b = R.tx + (i + 1) * cl - 0.06;
+      wrect(a, r + 0.1, b, r + 0.9, C.orange);
+      wrect(a, r + 0.62, b, r + 0.9, C.light);
+      for (let w = a + 0.45; w < b - 0.5; w += 0.9) wrect(w, r + 0.32, w + 0.4, r + 0.52, C.ink);
+    }
+    // the leading end is dark
+    const lead = R.dir > 0 ? R.tx + TRAIN_LEN - 0.06 : R.tx + 0.06;
+    wrect(Math.min(lead, lead - R.dir * 0.5), r + 0.1, Math.max(lead, lead - R.dir * 0.5), r + 0.9, C.dark);
+  }
+
+  function drawSignal(R) {
+    const r = R.r;
+    const on = R.phase === 'warn' && Math.floor(R.t / 0.18) % 2 === 0;
+    for (const x of [-0.75, COLS + 0.25]) {
+      wrect(x, r + 0.32, x + 0.5, r + 0.68, '#2a2d33');
+      wrect(x + 0.1, r + 0.4, x + 0.4, r + 0.6, on ? C.orange : '#4b5059');
+    }
+  }
+
+  function drawThings(R) {
+    const r = R.r;
+    if (R.type === 'grass') {
+      for (const d of R.decor) drawTree(d.x, r, d.rock);
+      for (let c = 0; c < COLS; c++) if (R.obs[c]) drawTree(c, r, R.rock[c]);
+    } else if (R.type === 'road') {
+      const dir = Math.sign(R.v);
+      for (const it of R.items) eachCopy(it, (wl) => drawCar(wl, it.len, r, dir, it));
+    } else if (R.type === 'river') {
+      for (const it of R.items) eachCopy(it, (wl) => drawLog(wl, it.len, r));
+    } else if (R.type === 'rail') {
+      drawSignal(R);
+      if (R.phase === 'pass') drawTrain(R);
+    }
+  }
+
+  function drawPlayer() {
+    if (!player) return;
+    const dead = state === 'dying' || state === 'over';
+    let pos = dead ? { x: deathInfo.x, y: deathInfo.y, lift: 0 } : playerPos();
+    let bx = 0, by = 0;
+    if (!dead && player.bump > 0) {
+      const k = Math.sin((player.bump / 0.12) * Math.PI) * 0.12;
+      bx = player.bumpDir[0] * k; by = player.bumpDir[1] * k;
+    }
+    const x = pos.x + bx, y = pos.y + by;
+
+    if (dead) {
+      if (deathKind === 'drown' || deathKind === 'train') {
+        if (deathKind === 'drown') {
+          // expanding square ripple
+          const k = clamp(deathT / 0.6, 0, 1);
+          if (k < 1) {
+            const s = 0.3 + 0.6 * easeOut(k);
+            const t = Math.max(1, Math.round(cs * 0.05));
+            const a = Math.round(SX(x - s)), b = Math.round(SY(y + s)), c = Math.round(SX(x + s)), d = Math.round(SY(y - s));
+            ctx.fillStyle = k < 0.6 ? C.white : 'rgba(255,255,255,0.4)';
+            ctx.fillRect(a, b, c - a, t); ctx.fillRect(a, d - t, c - a, t);
+            ctx.fillRect(a, b, t, d - b); ctx.fillRect(c - t, b, t, d - b);
+          }
+        }
+        return;
+      }
+      if (deathKind === 'hit') {
+        // flattened along the road
+        wrect(x - 0.42, y - 0.12, x + 0.42, y + 0.12, C.white);
+        wrect(x - 0.06, y - 0.12, x + 0.06, y + 0.12, C.orange);
+        return;
+      }
+      if (deathKind === 'caught' || deathKind === 'swept') {
+        if (Math.floor(deathT / 0.1) % 2 === 1) return;
+      }
+    }
+
+    const lift = pos.lift || 0;
+    const s = 0.31 * (1 + 0.16 * lift);
+    // hard shadow on the ground
+    wrect(x - 0.31 + 0.05, y - 0.31 - 0.06, x + 0.31 + 0.05, y + 0.31 - 0.06, 'rgba(0,0,0,0.45)');
+    const cy = y + 0.12 * lift;
+    wrect(x - s, cy - s, x + s, cy + s, C.white);
+    wrect(x - s, cy - s, x + s, cy - s + 0.12, '#d9dadc');
+
+    // face: beak and eyes on the side it is heading
+    const f = DIRS[player.face];
+    const px = -f[1], py = f[0];
+    const bxw = x + f[0] * (s + 0.06), byw = cy + f[1] * (s + 0.06);
+    const bs = 0.09;
+    wrect(bxw - bs, byw - bs, bxw + bs, byw + bs, C.orange);
+    const es = 0.055;
+    for (const k of [-1, 1]) {
+      const ex = x + f[0] * (s - 0.12) + px * k * 0.15, ey = cy + f[1] * (s - 0.12) + py * k * 0.15;
+      wrect(ex - es, ey - es, ex + es, ey + es, C.ink);
+    }
+  }
+
+  function drawParticles() {
+    for (const q of particles) {
+      const a = q.life / q.max;
+      const s = q.s * (a > 0.5 ? 1 : 0.6);
+      ctx.globalAlpha = a > 0.35 ? 1 : 0.5;
+      wrect(q.x - s, q.y - s, q.x + s, q.y + s, q.color);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- UI ----------
+  function show(ov) { [startOv, pauseOv, overOv].forEach((o) => o.classList.toggle('show', o === ov)); }
+  function updateHud(bump) {
+    scoreEl.textContent = score;
+    bestEl.textContent = Math.max(best, score);
+    if (bump && !reduceMotion) { scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump'); }
+  }
+  function setPauseIcon(paused) {
+    $('#icoPause').style.display = paused ? 'none' : '';
+    $('#icoPlay').style.display = paused ? '' : 'none';
+    pauseBtn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  }
+  function updateFocusHint() { focusHint.classList.toggle('show', !!V.embedded && !document.hasFocus()); }
+  function markTouch() { root.classList.add('touch'); }
+
+  // ---------- Input ----------
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const name = KEYMAP[e.code] || KEYMAP[e.key];
+    if (name) {
+      e.preventDefault();
+      if (!e.repeat) tryMove(name);
+      return;
+    }
+    const k = e.key;
+    if (k === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (state === 'over') playAgain(); else togglePause();
+      return;
+    }
+    if (e.code === 'KeyP') { e.preventDefault(); if (!e.repeat) togglePause(); return; }
+    if (k === 'Enter') {
+      if (state === 'over') { e.preventDefault(); playAgain(); }
+      else if (state === 'paused') { e.preventDefault(); resume(); }
+      return;
+    }
+    if (k === 'Escape' && state === 'playing') pause();
+  });
+
+  // Tap to hop forward, swipe to hop in that direction
+  let gesture = null;
+  const SWIPE_MIN = 24;
+  function onGameSurface(t) { return !(t.closest && t.closest('button, #pauseOv, #overOv')); }
+  document.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (e.pointerType === 'touch') markTouch();
+    if (!onGameSurface(e.target) || (e.pointerType === 'mouse' && e.button !== 0)) { gesture = null; return; }
+    gesture = { id: e.pointerId, x: e.clientX, y: e.clientY, used: false };
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    if (!gesture || gesture.used || e.pointerId !== gesture.id) return;
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_MIN) return;
+    gesture.used = true;
+    tryMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+  });
+  document.addEventListener('pointerup', (e) => {
+    if (!gesture || e.pointerId !== gesture.id) return;
+    if (!gesture.used) tryMove('up');
+    gesture = null;
+  });
+  document.addEventListener('pointercancel', () => { gesture = null; });
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  window.addEventListener('focus', updateFocusHint);
+  window.addEventListener('blur', () => { updateFocusHint(); pause(); });
+  pauseBtn.addEventListener('click', () => { if (state === 'playing' || state === 'paused') togglePause(); });
+  $('#resumeBtn').addEventListener('click', resume);
+  $('#againBtn').addEventListener('click', playAgain);
+  V.onPause((paused) => { if (paused) pause(); });
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', layout);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+
+  // ---------- Main loop ----------
+  let lastT = 0;
+  function frame(t) {
+    let dt = lastT ? (t - lastT) / 1000 : 0;
+    lastT = t;
+    if (dt > 0.05) dt = 0.05;     // a stalled tab never fast-forwards the game
+    if (dt < 0) dt = 0;
+    if (Math.min(window.devicePixelRatio || 1, 3) !== dpr || window.innerWidth !== W || window.innerHeight !== H) layout();
+
+    if (state !== 'paused') {
+      // Split the frame into equal substeps no longer than SUB, so motion is the same at any refresh rate
+      const n = Math.ceil(dt / SUB);
+      for (let i = 0; i < n; i++) step(dt / n);
+      updateFx(dt);
+      if (state === 'dying') {
+        deathT += dt;
+        if (deathT >= DEATH_DELAY) showOver();
+      }
+    }
+    ensureRows(Math.ceil(camY + H / cs) + 4, Math.floor(camY) - 4);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Boot ----------
+  if (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) markTouch();
+  layout();
+  reset();
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>

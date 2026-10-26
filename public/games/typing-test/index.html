@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Typing Test</title>
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --panel: #16181c;
+    --panel-2: #1d2025;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-2: rgba(255, 255, 255, 0.22);
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.34);
+    --brand: #ea5426;
+    --brand-h: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --fs: 28px;
+    --edge: 24px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none; touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  #app {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: var(--edge);
+  }
+  #app.top { justify-content: flex-start; }
+  #col { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 16px; }
+
+  .lbl {
+    font-weight: 600;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); line-height: 1.2;
+  }
+
+  /* HUD */
+  #hud { height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand svg { width: 18px; height: 18px; flex: none; display: block; }
+  .brand span { font-weight: 700; font-size: 15px; letter-spacing: 0.22em; text-transform: uppercase; white-space: nowrap; }
+  .stats { display: flex; align-items: stretch; gap: 6px; height: 44px; }
+  .stat {
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px;
+    min-width: 68px; padding: 0 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 2px;
+  }
+  .stat .lbl { font-size: 10px; letter-spacing: 0.14em; }
+  .num {
+    font-family: var(--font-display, var(--font)); font-weight: 600;
+    font-size: 17px; line-height: 1.1; font-variant-numeric: tabular-nums;
+  }
+  .icon-btn {
+    width: 44px; flex: none; display: grid; place-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 2px; cursor: pointer;
+    color: var(--text);
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .icon-btn:hover { border-color: var(--line-2); background: var(--panel-2); }
+  .icon-btn svg { width: 14px; height: 14px; display: block; }
+  button:focus-visible { outline: 1px solid var(--brand-h); outline-offset: 2px; }
+
+  /* Options */
+  #bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg { display: flex; }
+  .seg button {
+    height: 32px; min-width: 44px; padding: 0 12px;
+    font-weight: 600; font-size: 12px; letter-spacing: 0.08em; font-variant-numeric: tabular-nums;
+    color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 0;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .seg button + button { border-left: 0; }
+  .seg button:hover { color: var(--text); background: var(--panel); }
+  .seg button.on { color: #fff; background: var(--brand); border-color: var(--brand); }
+  .seg .unit { margin-right: 10px; align-self: center; }
+  .toggle {
+    height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 0; cursor: pointer;
+    transition: color 0.15s var(--ease), background-color 0.15s var(--ease);
+  }
+  .toggle:hover { color: var(--text); background: var(--panel); }
+  .toggle .box { width: 12px; height: 12px; border: 1px solid var(--line-2); flex: none; transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease); }
+  .toggle[aria-pressed="true"] { color: var(--text); }
+  .toggle[aria-pressed="true"] .box { background: var(--brand); border-color: var(--brand); }
+
+  /* Live numbers */
+  #live { display: flex; align-items: flex-end; gap: 28px; height: 48px; }
+  #timeLeft {
+    font-family: var(--font-display, var(--font)); font-weight: 300; font-size: 48px; line-height: 1;
+    color: var(--brand); font-variant-numeric: tabular-nums; min-width: 1.3em;
+  }
+  .lv { display: flex; flex-direction: column; gap: 4px; padding-bottom: 3px; }
+  .lv .num { font-size: 22px; font-weight: 300; }
+
+  /* Words */
+  #typing { position: relative; cursor: text; }
+  #words {
+    position: relative; overflow: hidden;
+    font-size: var(--fs); line-height: 1.6;
+    height: calc(var(--fs) * 1.6 * 3);
+    color: var(--faint);
+    transition: opacity 0.2s var(--ease);
+  }
+  #typing.blurred #words, #typing.blurred #caret { opacity: 0.25; }
+  .w { display: inline-block; margin-right: 0.5em; white-space: pre; }
+  .w.err { text-decoration: underline; text-decoration-color: var(--brand-d); text-decoration-thickness: 2px; text-underline-offset: 0.22em; }
+  .c.ok { color: var(--text); }
+  .c.bad { color: var(--brand); }
+  .c.extra { color: var(--brand-d); }
+  #caret {
+    position: absolute; left: 0; top: 0; width: 2px; height: calc(var(--fs) * 1.2);
+    background: var(--brand); pointer-events: none;
+    transition: left 0.1s var(--ease), top 0.1s var(--ease);
+  }
+  #caret.idle { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  #inp {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; font-size: 16px; border: 0; padding: 0; background: transparent;
+    color: transparent; caret-color: transparent; outline: none;
+    -webkit-user-select: text; user-select: text;
+  }
+  #focusOv {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--text); pointer-events: none; text-align: center; padding: 0 16px;
+  }
+  #focusOv span { padding: 10px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 2px; }
+  #typing.blurred #focusOv { display: flex; }
+  .hint { font-size: 13px; color: var(--muted); }
+
+  /* Results */
+  #results { display: flex; flex-direction: column; gap: 16px; }
+  .res-top { display: flex; align-items: flex-end; gap: 32px; flex-wrap: wrap; }
+  .res-main { display: flex; flex-direction: column; gap: 6px; }
+  #rWpm {
+    font-family: var(--font-display, var(--font)); font-weight: 300; font-size: 84px; line-height: 0.95;
+    color: var(--brand); font-variant-numeric: tabular-nums;
+  }
+  .res-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 8px 28px; padding-bottom: 6px; }
+  .res-grid div { display: flex; flex-direction: column; gap: 4px; }
+  .res-grid b { font-family: var(--font-display, var(--font)); font-weight: 300; font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .res-grid b small { font-size: 15px; color: var(--muted); font-weight: 400; }
+  #chartWrap { position: relative; height: 150px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 0; }
+  #chart { display: block; width: 100%; height: 100%; }
+  .res-foot { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .legend { display: flex; gap: 16px; margin-left: auto; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 12px; height: 2px; }
+  .go-new { color: var(--brand-h); }
+  .go-best .v { color: var(--text); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 148px; height: 40px; padding: 0 20px;
+    font-weight: 600;
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #fff;
+    background: var(--brand); border: 0; border-radius: 0; cursor: pointer;
+    transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-h); }
+  .btn:active { background: var(--brand-d); transform: scale(0.98); }
+  .reveal { animation: reveal 0.3s var(--ease); }
+  @keyframes reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  html.touch .keys-only { display: none !important; }
+  html:not(.touch) .touch-only { display: none !important; }
+
+  @media (max-width: 560px) {
+    #col { gap: 12px; }
+    #live { gap: 20px; height: 40px; }
+    #timeLeft { font-size: 38px; }
+    .lv .num { font-size: 19px; }
+    #rWpm { font-size: 64px; }
+    .res-top { gap: 14px; }
+    .res-grid { grid-template-columns: repeat(2, auto); gap: 10px 24px; justify-content: start; }
+    .res-grid b { font-size: 20px; }
+    #chartWrap { height: 120px; }
+    .legend { margin-left: 0; }
+  }
+  @media (max-height: 520px) {
+    #chartWrap { height: 96px; }
+    #rWpm { font-size: 56px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #caret { transition: none; }
+    .reveal { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="col">
+    <header id="hud">
+      <div class="brand">
+        <svg viewBox="0 0 18 18" aria-hidden="true">
+          <rect x="0" y="2" width="5" height="4" fill="#ffffff"/><rect x="6.5" y="2" width="5" height="4" fill="#ffffff"/><rect x="13" y="2" width="5" height="4" fill="#b83f19"/>
+          <rect x="0" y="7.5" width="7" height="4" fill="#ffffff"/><rect x="8.5" y="7.5" width="9.5" height="4" fill="#ea5426"/>
+          <rect x="3" y="13" width="12" height="4" fill="#ff7a4d"/>
+        </svg>
+        <span>Typing Test</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="lbl">Best WPM</span><span class="num" id="best">0</span></div>
+        <button id="restartBtn" class="icon-btn" type="button" aria-label="Restart">
+          <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M11.5 4.5A5 5 0 1 0 12 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/><path d="M8 4.5h4v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="bar">
+      <div class="seg" role="group" aria-label="Test length in seconds">
+        <span class="lbl unit">Seconds</span>
+        <button type="button" data-t="15">15</button><button type="button" data-t="30">30</button><button type="button" data-t="60">60</button>
+      </div>
+      <button type="button" class="toggle" id="punct" aria-pressed="false"><span class="box"></span>Punctuation and numbers</button>
+    </div>
+
+    <section id="test">
+      <div id="live">
+        <div id="timeLeft">30</div>
+        <div class="lv"><span class="lbl">WPM</span><span class="num" id="liveWpm">0</span></div>
+        <div class="lv"><span class="lbl">Accuracy</span><span class="num" id="liveAcc">100%</span></div>
+      </div>
+      <div id="typing" style="margin-top:16px">
+        <div id="words" aria-hidden="true"></div>
+        <div id="caret" class="idle"></div>
+        <input id="inp" type="text" aria-label="Type the words shown" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="next">
+        <div id="focusOv"><span class="keys-only">Click here or press any key to type.</span><span class="touch-only">Tap here to type.</span></div>
+      </div>
+      <p class="hint keys-only" style="margin-top:16px">Start typing to begin. Tab restarts.</p>
+      <p class="hint touch-only" style="margin-top:12px">Tap the words and start typing.</p>
+    </section>
+
+    <section id="results" hidden>
+      <div class="res-top">
+        <div class="res-main">
+          <span class="lbl">WPM</span>
+          <div id="rWpm">0</div>
+        </div>
+        <div class="res-grid">
+          <div><span class="lbl">Raw</span><b id="rRaw">0</b></div>
+          <div><span class="lbl">Accuracy</span><b id="rAcc">0%</b></div>
+          <div><span class="lbl">Characters</span><b id="rChars">0</b></div>
+          <div><span class="lbl">Time</span><b id="rTime">0s</b></div>
+        </div>
+      </div>
+      <div id="chartWrap"><canvas id="chart" aria-label="Words per minute over the test"></canvas></div>
+      <div class="res-foot">
+        <button class="btn" id="againBtn" type="button">Play again</button>
+        <span class="lbl go-new" id="rNew">New best</span>
+        <span class="lbl go-best" id="rBestRow">Best<span class="v" id="rBest">0</span></span>
+        <div class="legend lbl"><span><i style="background:#ea5426"></i>WPM</span><span><i style="background:rgba(255,255,255,0.4)"></i>Raw</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="words.js"></script>
+<script src="../_shared/bridge.js" data-game="typing-test"></script>
+<script>
+(() => {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: window.parent !== window,
+    ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+  const LIST = (window.TYPING_WORDS && window.TYPING_WORDS.length) ? window.TYPING_WORDS
+    : 'the of and to in is you that it he was for on are as with his they at be this have from'.split(' ');
+
+  const MAX_EXTRA = 10;          // extra letters allowed past the end of a word
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- DOM ----------
+  const $ = (s) => document.querySelector(s);
+  const root = document.documentElement;
+  const app = $('#app');
+  const typing = $('#typing');
+  const wordsEl = $('#words');
+  const caret = $('#caret');
+  const inp = $('#inp');
+  const timeLeftEl = $('#timeLeft');
+  const liveWpmEl = $('#liveWpm');
+  const liveAccEl = $('#liveAcc');
+  const bestEl = $('#best');
+  const testEl = $('#test');
+  const resultsEl = $('#results');
+  const punctBtn = $('#punct');
+  const chart = $('#chart');
+
+  // ---------- Settings ----------
+  function load(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (_) { return d; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  let duration = [15, 30, 60].includes(load('vela:typing-test:time', 30)) ? load('vela:typing-test:time', 30) : 30;
+  let punct = !!load('vela:typing-test:punct', false);
+
+  // ---------- State ----------
+  let state = 'ready';           // ready | running | done
+  let words = [], typed = [], wordEls = [];
+  let wi = 0, cur = '';
+  let firstDom = 0;              // first word still in the DOM (earlier lines are dropped)
+  let capNext = true;
+  let correctKeys = 0, totalKeys = 0;
+  let goodChars = 0;             // letters of fully correct committed words, plus their spaces
+  let rawChars = 0;              // every committed letter, plus spaces
+  let startT = 0, sampled = 0;
+  let history = [], secErrors = [];
+  let best = V.best() || 0;
+  let lastKeyT = 0;
+  let lineH = 40;
+
+  const rand = (n) => Math.floor(Math.random() * n);
+  const pick = () => LIST[rand(LIST.length)];
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ---------- Words ----------
+  function genWord() {
+    let w = pick();
+    if (words.length && w === words[words.length - 1]) w = pick();
+    if (!punct) return w;
+    if (Math.random() < 0.1) {
+      const r = Math.random();
+      w = r < 0.4 ? String(rand(10)) : r < 0.75 ? String(10 + rand(90)) : r < 0.9 ? String(1900 + rand(130)) : String(100 + rand(9900));
+      if (capNext) capNext = false;
+      return w;
+    }
+    if (capNext) { w = w[0].toUpperCase() + w.slice(1); capNext = false; }
+    const r = Math.random();
+    if (r < 0.1) w += ',';
+    else if (r < 0.19) { w += '.'; capNext = true; }
+    else if (r < 0.215) { w += '?'; capNext = true; }
+    else if (r < 0.235) w += ';';
+    else if (r < 0.25) w += ':';
+    else if (r < 0.28) w = '"' + w + '"';
+    else if (r < 0.3) w = '(' + w + ')';
+    else if (r < 0.32) w = w + '-' + pick();
+    else if (r < 0.34) w = w + "'s";
+    return w;
+  }
+
+  function addWords(n) {
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < n; i++) {
+      const w = genWord();
+      words.push(w);
+      const el = document.createElement('span');
+      el.className = 'w';
+      wordEls.push(el);
+      frag.appendChild(el);
+      renderWord(words.length - 1);
+    }
+    wordsEl.appendChild(frag);
+  }
+
+  function renderWord(i) {
+    const el = wordEls[i], t = words[i];
+    const s = i < wi ? typed[i] : i === wi ? cur : null;
+    let html = '';
+    if (s === null) {
+      for (const ch of t) html += '<span class="c">' + esc(ch) + '</span>';
+    } else {
+      const n = Math.max(t.length, s.length);
+      for (let k = 0; k < n; k++) {
+        if (k < s.length) {
+          if (k < t.length) html += '<span class="c ' + (s[k] === t[k] ? 'ok' : 'bad') + '">' + esc(t[k]) + '</span>';
+          else html += '<span class="c extra">' + esc(s[k]) + '</span>';
+        } else {
+          html += '<span class="c">' + esc(t[k]) + '</span>';
+        }
+      }
+    }
+    el.innerHTML = html;
+    el.classList.toggle('err', i < wi && s !== t);
+  }
+
+  // ---------- Caret and lines ----------
+  function measure() {
+    lineH = parseFloat(getComputedStyle(wordsEl).lineHeight) || 40;
+  }
+
+  // Keep the current word on the first or second line: once it reaches the third, drop the first.
+  function scrollLines() {
+    for (let guard = 0; guard < 6; guard++) {
+      const el = wordEls[wi];
+      const first = wordEls[firstDom];
+      if (!el || !first) return;
+      const top0 = first.offsetTop;
+      if (el.offsetTop - top0 < lineH * 1.5) return;
+      while (firstDom < wi && wordEls[firstDom].offsetTop - top0 < lineH * 0.5) {
+        wordEls[firstDom].remove();
+        firstDom++;
+      }
+    }
+  }
+
+  function placeCaret() {
+    const el = wordEls[wi];
+    if (!el) return;
+    const spans = el.children;
+    let x, y;
+    if (!cur.length || !spans.length) {
+      const s = spans[0] || el;
+      x = s.offsetLeft; y = s.offsetTop;
+    } else {
+      const s = spans[Math.min(cur.length, spans.length) - 1];
+      x = s.offsetLeft + s.offsetWidth; y = s.offsetTop;
+    }
+    const ch = caret.offsetHeight || lineH * 0.75;
+    caret.style.left = Math.round(x - 1) + 'px';
+    caret.style.top = Math.round(y + (lineH - ch) / 2) + 'px';
+  }
+
+  function refresh() {
+    renderWord(wi);
+    scrollLines();
+    placeCaret();
+  }
+
+  // ---------- Scoring ----------
+  function errorNow() {
+    if (state !== 'running') return;
+    const s = Math.floor((performance.now() - startT) / 1000);
+    secErrors[s] = (secErrors[s] || 0) + 1;
+  }
+
+  // Counts the letters added going from a to b as keystrokes, right or wrong against the target.
+  function countKeys(a, b) {
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    const t = words[wi];
+    for (let k = p; k < b.length; k++) {
+      totalKeys++;
+      if (k < t.length && b[k] === t[k]) correctKeys++;
+      else errorNow();
+    }
+  }
+
+  function currentGood() {
+    const t = words[wi];
+    return t && t.startsWith(cur) ? cur.length : 0;
+  }
+  function netWpm(sec) { return sec > 0 ? ((goodChars + currentGood()) / 5) * (60 / sec) : 0; }
+  function rawWpm(sec) { return sec > 0 ? ((rawChars + cur.length) / 5) * (60 / sec) : 0; }
+  function accuracy() { return totalKeys ? (correctKeys / totalKeys) * 100 : 100; }
+
+  function commitWord() {
+    const t = words[wi];
+    typed[wi] = cur;
+    totalKeys++;                          // the space
+    if (cur.length >= t.length) correctKeys++; else errorNow();
+    if (cur === t) goodChars += t.length + 1;
+    rawChars += cur.length + 1;
+    renderWord(wi);
+    wi++;
+    cur = '';
+    if (words.length - wi < 40) addWords(60);
+  }
+
+  function goBack(clear) {
+    // Only back into a word that is wrong and still on screen
+    const i = wi - 1;
+    if (i < firstDom || i < 0 || typed[i] === words[i]) return false;
+    wi = i;
+    cur = clear ? '' : typed[i];
+    rawChars -= typed[i].length + 1;
+    inp.value = cur;
+    refresh();
+    return true;
+  }
+
+  // ---------- Input ----------
+  function onInput() {
+    if (state === 'done') { inp.value = ''; return; }
+    let v = inp.value;
+    if (state === 'ready') {
+      if (!v.trim()) { inp.value = ''; return; }
+      start();
+    }
+    lastKeyT = performance.now();
+    if (state === 'running' && lastKeyT - startT >= duration * 1000) { inp.value = cur; finish(); return; }
+    catchUp(lastKeyT);          // seconds that ended before this key are sampled without it
+    caret.classList.remove('idle');
+    for (;;) {
+      const sp = v.search(/\s/);
+      if (sp < 0) break;
+      const before = v.slice(0, sp);
+      v = v.slice(sp + 1);
+      countKeys(cur, before);
+      cur = before;
+      if (cur.length) commitWord();
+    }
+    const t = words[wi];
+    if (v.length > t.length + MAX_EXTRA) v = v.slice(0, t.length + MAX_EXTRA);
+    countKeys(cur, v);
+    cur = v;
+    if (inp.value !== v) inp.value = v;
+    refresh();
+    updateLive();
+  }
+
+  inp.addEventListener('input', onInput);
+  inp.addEventListener('keydown', (e) => {
+    if (state === 'done') return;
+    if (/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(e.key)) { e.preventDefault(); return; }
+    if (e.key === 'Backspace' && inp.value === '' && wi > 0) {
+      if (goBack(e.ctrlKey || e.altKey || e.metaKey)) e.preventDefault();
+    }
+  });
+  // Phone keyboards often report every key as "Unidentified"; catch a delete on an empty field here.
+  inp.addEventListener('beforeinput', (e) => {
+    if (state === 'done' || inp.value !== '' || wi === 0) return;
+    if (e.inputType && e.inputType.startsWith('delete')) {
+      if (goBack(e.inputType === 'deleteWordBackward')) e.preventDefault();
+    }
+  });
+  inp.addEventListener('focus', updateFocus);
+  inp.addEventListener('blur', updateFocus);
+  // Typing always happens at the end of the word: a tap or an arrow key never moves the field's own caret.
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement !== inp) return;
+    const n = inp.value.length;
+    if (inp.selectionStart !== n || inp.selectionEnd !== n) inp.setSelectionRange(n, n);
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') { e.preventDefault(); newTest(); focusInput(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); newTest(); focusInput(); return; }
+    if (state === 'done') {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); newTest(); focusInput(); }
+      return;
+    }
+    // A printable key while the field is not focused: focus it and let the key land there
+    if (document.activeElement !== inp && e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.target && e.target.closest && e.target.closest('button') && (e.key === ' ' || e.key === 'Enter')) return;
+      focusInput();
+    }
+  });
+
+  function focusInput() {
+    if (state === 'done') return;
+    try { inp.focus({ preventScroll: true }); } catch (_) { inp.focus(); }
+  }
+  function updateFocus() {
+    typing.classList.toggle('blurred', document.activeElement !== inp && state !== 'done');
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (e.pointerType === 'touch') root.classList.add('touch');
+    if (e.target.closest && e.target.closest('button')) return;
+    if (state !== 'done') {
+      // Keep the field focused (and the phone keyboard up) whenever the page is tapped
+      if (e.target !== inp) e.preventDefault();
+      focusInput();
+    }
+  }, true);
+
+  // ---------- Flow ----------
+  function newTest() {
+    state = 'ready';
+    words = []; typed = []; wordEls = [];
+    wi = 0; cur = ''; firstDom = 0; capNext = true;
+    correctKeys = 0; totalKeys = 0; goodChars = 0; rawChars = 0;
+    history = []; secErrors = []; sampled = 0;
+    wordsEl.textContent = '';
+    inp.value = '';
+    addWords(120);
+    resultsEl.hidden = true;
+    testEl.hidden = false;
+    timeLeftEl.textContent = duration;
+    liveWpmEl.textContent = '0';
+    liveAccEl.textContent = '100%';
+    caret.classList.add('idle');
+    caret.style.transition = 'none';
+    measure();
+    placeCaret();
+    void caret.offsetWidth;
+    caret.style.transition = '';
+    updateFocus();
+    V.score(0);
+  }
+
+  function start() {
+    state = 'running';
+    startT = performance.now();
+    sampled = 0;
+  }
+
+  function sample(sec) {
+    history.push({ sec, net: netWpm(sec), raw: rawWpm(sec), err: secErrors[sec - 1] || 0 });
+    V.score(Math.round(netWpm(sec)));
+  }
+
+  function updateLive() {
+    if (state !== 'running') return;
+    const sec = (performance.now() - startT) / 1000;
+    liveWpmEl.textContent = sec >= 1 ? Math.round(netWpm(sec)) : '0';
+    liveAccEl.textContent = Math.round(accuracy()) + '%';
+  }
+
+  function finish() {
+    while (sampled < duration) { sampled++; sample(sampled); }
+    state = 'done';
+    inp.blur();
+    updateFocus();
+
+    const net = netWpm(duration), raw = rawWpm(duration), acc = accuracy();
+    // Character breakdown over every word attempted
+    let ok = 0, bad = 0, extra = 0, missed = 0;
+    for (let i = 0; i <= wi && i < words.length; i++) {
+      const t = words[i], s = i < wi ? typed[i] : cur;
+      for (let k = 0; k < s.length; k++) {
+        if (k >= t.length) extra++;
+        else if (s[k] === t[k]) ok++;
+        else bad++;
+      }
+      if (i < wi && s.length < t.length) missed += t.length - s.length;
+    }
+
+    const score = Math.round(net);
+    const isBest = !!V.gameOver(score) && score > 0;
+    best = Math.max(best, V.best() || 0, score);
+    bestEl.textContent = best;
+
+    $('#rWpm').textContent = score;
+    $('#rRaw').textContent = Math.round(raw);
+    $('#rAcc').textContent = Math.round(acc) + '%';
+    $('#rChars').innerHTML = ok + '<small>/' + bad + '/' + extra + '/' + missed + '</small>';
+    $('#rChars').title = 'Correct, incorrect, extra, missed';
+    $('#rTime').textContent = duration + 's';
+    $('#rNew').hidden = !isBest;
+    $('#rBestRow').hidden = isBest;
+    $('#rBest').textContent = best;
+
+    testEl.hidden = true;
+    resultsEl.hidden = false;
+    resultsEl.classList.remove('reveal');
+    if (!reduceMotion) { void resultsEl.offsetWidth; resultsEl.classList.add('reveal'); }
+    drawChart();
+  }
+
+  // ---------- Chart ----------
+  let fontStack = 'system-ui, sans-serif';
+  function readFont() {
+    const v = getComputedStyle(root).getPropertyValue('--font').trim();
+    if (v) fontStack = v;
+  }
+
+  function drawChart() {
+    if (resultsEl.hidden) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const w = chart.clientWidth, h = chart.clientHeight;
+    if (!w || !h) return;
+    chart.width = Math.round(w * dpr);
+    chart.height = Math.round(h * dpr);
+    const c = chart.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+
+    const pts = history;
+    let top = 0;
+    for (const p of pts) top = Math.max(top, p.net, p.raw);
+    // About four gridlines, on round numbers
+    const step = [10, 20, 25, 50, 100, 200, 250, 500].find((s) => s * 4 >= top) || 1000;
+    top = Math.max(step * 2, Math.ceil(top / step) * step);
+
+    c.font = '600 10px ' + fontStack;
+    c.textBaseline = 'middle';
+    const padL = 34, padR = 6, padT = 6, padB = 18;
+    const gx = (sec) => padL + ((sec - 1) / Math.max(1, duration - 1)) * (w - padL - padR);
+    const gy = (v) => padT + (1 - v / top) * (h - padT - padB);
+
+    // grid and y labels
+    c.fillStyle = 'rgba(255,255,255,0.08)';
+    c.textAlign = 'right';
+    for (let v = 0; v <= top; v += step) {
+      const y = Math.round(gy(v));
+      c.fillStyle = 'rgba(255,255,255,0.08)';
+      c.fillRect(padL, y, w - padL - padR, 1);
+      c.fillStyle = 'rgba(255,255,255,0.5)';
+      c.fillText(String(v), padL - 8, y);
+    }
+    // x labels
+    c.textAlign = 'center';
+    c.textBaseline = 'alphabetic';
+    const xs = duration === 15 ? [1, 5, 10, 15] : duration === 30 ? [1, 10, 20, 30] : [1, 15, 30, 45, 60];
+    for (const s of xs) c.fillText(String(s), Math.round(gx(s)), h - 4);
+
+    // errors: short ticks along the floor
+    c.fillStyle = '#b83f19';
+    for (const p of pts) if (p.err) {
+      const x = Math.round(gx(p.sec)), hh = Math.min(10, 3 + p.err * 2);
+      c.fillRect(x - 1, Math.round(gy(0)) - hh, 2, hh);
+    }
+
+    const line = (key, color, width) => {
+      if (!pts.length) return;
+      c.strokeStyle = color;
+      c.lineWidth = width;
+      c.lineJoin = 'miter';
+      c.lineCap = 'butt';
+      c.beginPath();
+      pts.forEach((p, i) => { const x = gx(p.sec), y = gy(p[key]); if (i) c.lineTo(x, y); else c.moveTo(x, y); });
+      c.stroke();
+    };
+    line('raw', 'rgba(255,255,255,0.4)', 1.5);
+    line('net', '#ea5426', 2);
+    c.fillStyle = '#ea5426';
+    for (const p of pts) { const x = Math.round(gx(p.sec)), y = Math.round(gy(p.net)); c.fillRect(x - 2, y - 2, 4, 4); }
+  }
+
+  // ---------- Controls ----------
+  function syncControls() {
+    document.querySelectorAll('.seg button').forEach((b) => b.classList.toggle('on', Number(b.dataset.t) === duration));
+    punctBtn.setAttribute('aria-pressed', punct ? 'true' : 'false');
+  }
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    duration = Number(b.dataset.t);
+    save('vela:typing-test:time', duration);
+    syncControls();
+    newTest();
+    if (!root.classList.contains('touch')) focusInput();
+  }));
+  punctBtn.addEventListener('click', () => {
+    punct = !punct;
+    save('vela:typing-test:punct', punct);
+    syncControls();
+    newTest();
+    if (!root.classList.contains('touch')) focusInput();
+  });
+  $('#restartBtn').addEventListener('click', () => { newTest(); focusInput(); });
+  $('#againBtn').addEventListener('click', () => { newTest(); focusInput(); });
+
+  // The arcade hiding the game ends a running test; a paused timed test would not be a fair result.
+  V.onPause((paused) => { if (paused && state === 'running') newTest(); });
+
+  // ---------- Layout ----------
+  function layout() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const edge = V.embedded || Math.min(W, H) < 520 ? 12 : 24;
+    root.style.setProperty('--edge', edge + 'px');
+    const fs = Math.round(Math.max(20, Math.min(32, W * 0.026 + 8, H * 0.045)));
+    root.style.setProperty('--fs', fs + 'px');
+    app.classList.toggle('top', H < 640 || root.classList.contains('touch'));
+    measure();
+    if (state !== 'done') { scrollLines(); placeCaret(); }
+    else drawChart();
+  }
+  window.addEventListener('resize', layout);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+
+  // ---------- Loop ----------
+  function catchUp(now) {
+    if (state !== 'running') return;
+    const sec = (now - startT) / 1000;
+    while (sampled < Math.min(duration, Math.floor(sec))) { sampled++; sample(sampled); }
+  }
+
+  function frame(now) {
+    if (state === 'running') {
+      const sec = (now - startT) / 1000;
+      catchUp(now);
+      if (sec >= duration) finish();
+      else {
+        timeLeftEl.textContent = Math.max(1, Math.ceil(duration - sec));
+        updateLive();
+        if (now - lastKeyT > 600) caret.classList.add('idle');
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Boot ----------
+  if (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) root.classList.add('touch');
+  readFont();
+  bestEl.textContent = best;
+  syncControls();
+  layout();
+  newTest();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { readFont(); layout(); });
+  if (!V.embedded && !root.classList.contains('touch')) focusInput();
+  updateFocus();
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>

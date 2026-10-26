@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Vela Arcade</title>
+  <meta name="description" content="Browser games by Vela." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Vela Arcade" />
+  <meta property="og:description" content="Browser games by Vela." />
+  <meta name="theme-color" content="#0b0c0f" />
+  <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+  <link rel="preload" href="/fonts/selawk.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/fonts/type.css" />
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="mark" viewBox="0 0 100 100">
+      <path fill-rule="evenodd" fill="currentColor" d="M31 21 L69 21 L89 50 L69 79 L31 79 L11 50 Z M50 27 L38 50 L50 73 L62 50 Z"/>
+    </symbol>
+  </svg>
+
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="/" data-link aria-label="Vela Arcade home">
+        <span class="wm"><img src="/vela-wordmark.png" alt="Vela" /></span>
+        <span class="brand-sub">Arcade</span>
+      </a>
+      <a class="nav-link" href="/online" data-link>Online</a>
+      <a class="nav-link" href="/updates" data-link>Updates</a>
+      <label class="search" aria-label="Search games">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="search" type="search" placeholder="Search games" autocomplete="off" spellcheck="false" />
+        <kbd>/</kbd>
+      </label>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <footer class="footer">
+    <div class="wrap foot-inner">
+      <span class="label">Vela, a <a href="https://meridian.novalabsos.com" target="_blank" rel="noopener">Meridian</a> studio</span>
+      <span class="foot-right">
+        <a class="label" id="version" href="/updates" data-link></a>
+        <span class="label">&copy; 2026</span>
+      </span>
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

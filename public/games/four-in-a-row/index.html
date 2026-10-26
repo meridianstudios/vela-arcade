@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Four in a Row</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --S: 340px;
+    --side: 240px;
+    --gap: 14px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app { display: grid; visibility: hidden; }
+  .app.ready { visibility: visible; }
+  .app.col {
+    grid-template-columns: var(--S);
+    grid-template-rows: auto var(--S);
+    row-gap: var(--gap);
+  }
+  .app.row {
+    grid-template-columns: var(--side) var(--S);
+    grid-template-rows: var(--S);
+    column-gap: calc(var(--gap) * 1.6);
+    align-items: center;
+  }
+
+  .head { display: grid; align-items: center; gap: 0.75em; min-width: 0; }
+  .app.col .head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand brand" "scores actions";
+  }
+  html.vela-embedded .app.col .head { grid-template-areas: "scores actions"; }
+  html.vela-embedded .app.col .brand { display: none; }
+  .app.row .head {
+    grid-row: 1; grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "brand" "scores" "actions";
+    gap: 1em;
+    align-content: center;
+  }
+
+  .brand { grid-area: brand; min-width: 0; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .brand p { margin: 0.6em 0 0; color: var(--muted); font-size: 0.86em; line-height: 1.45; }
+
+  .scores { grid-area: scores; display: flex; gap: 0.5em; min-width: 0; }
+  .app.row .scores { flex-direction: column; }
+  .stat {
+    position: relative;
+    min-width: 0;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .stat.status { flex: 1; }
+  .app.row .stat { padding: 0.65em 0.95em 0.7em; }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .val {
+    display: flex; align-items: center; gap: 0.5em;
+    margin-top: 0.3em;
+    font: 600 1.05em/1.2 var(--font);
+    white-space: nowrap;
+  }
+  .app.row .val { font-size: 1.25em; font-weight: 400; }
+  .chip {
+    flex: none;
+    width: 0.7em; height: 0.7em;
+    border-radius: 1px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--outline);
+  }
+  .chip.thinking { animation: blink 900ms steps(2, jump-none) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .num {
+    display: block;
+    font: 300 2.1em/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1em;
+  }
+  #winsBox { display: none; }
+  .app.row.show-wins #winsBox { display: block; }
+
+  .actions { grid-area: actions; display: flex; gap: 0.5em; justify-content: flex-end; }
+  .app.row .actions { justify-content: stretch; }
+  .app.row .actions .btn { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.76em, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .app.col .btn { height: calc(1.1em + 2.4em + 2px); }
+  .narrow .btn .lbl-undo { display: none; }
+  .narrow .btn { padding: 0 0.95em; }
+
+  /* ---------- board ---------- */
+  .stage { width: var(--S); height: var(--S); position: relative; }
+  .app.col .stage { grid-row: 2; grid-column: 1; }
+  .app.row .stage { grid-row: 1; grid-column: 2; }
+  #cv {
+    display: block;
+    width: var(--S); height: var(--S);
+    touch-action: none;
+    outline: none;
+    cursor: pointer;
+  }
+  #cv.idle { cursor: default; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+    touch-action: none;
+  }
+  .overlay.light { background: rgba(0, 0, 0, 0.6); }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 25em);
+    max-height: 100%;
+    overflow: auto;
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card h2.c-white::before { background: #fff; }
+  .card h2.c-none::before { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .group { margin-top: 1.05em; }
+  .group[hidden] { display: none; }
+  .group .lab { margin-bottom: 0.45em; }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    border: 1px solid var(--outline);
+  }
+  .seg button {
+    height: 2.9em;
+    min-width: 0;
+    padding: 0 0.2em;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 clamp(11px, 0.72em, 12px) var(--font);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .seg button + button { box-shadow: -1px 0 0 var(--line); }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; box-shadow: none; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -3px; }
+  .note { margin: 0.8em 0 0; color: var(--muted); font-size: 0.86em; }
+  .note[hidden] { display: none; }
+  .ov-stats {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div + div { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; }
+  .ov-stats .txt { display: block; margin-top: 0.35em; font: 400 1.3em/1.2 var(--font-display); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .btns .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chip.thinking { animation: none; }
+    .card, .overlay { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app col" id="app">
+  <header class="head" id="head">
+    <div class="brand">
+      <h1>Four in a Row</h1>
+      <p>Tap a column or press 1 to 7. Arrows and Enter also work. U to undo.</p>
+    </div>
+    <div class="scores">
+      <div class="stat status">
+        <span class="lab" id="modeLab">Vs computer</span>
+        <span class="val"><i class="chip" id="chip"></i><span id="statusText">Your turn</span></span>
+      </div>
+      <div class="stat" id="winsBox"><span class="lab">Wins vs Hard</span><span class="num" id="wins">0</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="undoBtn" type="button" aria-label="Undo" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>
+        <span class="lbl-undo">Undo</span>
+      </button>
+      <button class="btn primary" id="newBtn" type="button">New game</button>
+    </div>
+  </header>
+  <main class="stage">
+    <canvas id="cv" tabindex="-1" aria-label="Game board, 7 columns"></canvas>
+  </main>
+</div>
+
+<div class="overlay" id="menu" hidden>
+  <div class="card" role="dialog" aria-labelledby="menuTitle">
+    <h2 id="menuTitle">Four in a Row</h2>
+    <p class="line">Tap a column or press 1 to 7 to drop a disc. Get four in a row to win.</p>
+    <div class="group">
+      <span class="lab">Mode</span>
+      <div class="seg" data-group="mode">
+        <button type="button" data-v="cpu">Vs computer</button>
+        <button type="button" data-v="pvp">Pass and play</button>
+      </div>
+    </div>
+    <div class="group" id="levelGroup">
+      <span class="lab">Level</span>
+      <div class="seg" data-group="level">
+        <button type="button" data-v="0">Easy</button>
+        <button type="button" data-v="1">Normal</button>
+        <button type="button" data-v="2">Hard</button>
+        <button type="button" data-v="3">Expert</button>
+      </div>
+    </div>
+    <div class="group">
+      <span class="lab">First move</span>
+      <div class="seg" data-group="first">
+        <button type="button" data-v="0" id="first0">You</button>
+        <button type="button" data-v="1" id="first1">Computer</button>
+      </div>
+    </div>
+    <p class="note" id="winsNote">Wins vs Hard: 0</p>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Play</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>Resume</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay light" id="endOv" hidden>
+  <div class="card" role="dialog" aria-live="polite">
+    <h2 id="endTitle">Draw</h2>
+    <div class="ov-stats" id="endStats"></div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  The engine is plain text so the same source runs in a Web Worker (built from
+  a Blob), on the main thread as a fallback, and in node for the unit tests.
+-->
+<script type="text/plain" id="engine-src">
+var Engine = (function () {
+  'use strict';
+  /*
+   * Bitboard layout (Pascal Pons style): column c, row r (0 = bottom) is bit
+   * c*7 + r, with one empty sentinel bit on top of each column. That is 49
+   * bits, more than JS bitwise ops hold, so the board is split in two 32-bit
+   * words: A holds columns 0-3 (bits 0-27), B holds columns 4-6 (bits 0-20).
+   * A position is (p, mask): p = stones of the player to move, mask = all
+   * stones. Playing a move: p ^= mask; mask |= move.
+   */
+  var W = 7, H = 6, SIZE = 42;
+  var MA = 0x0FFFFFFF, MB = 0x001FFFFF;
+  var COL_A = [], COL_B = [], BOT_COL_A = [], BOT_COL_B = [], TOP_A = [], TOP_B = [];
+  for (var c0 = 0; c0 < W; c0++) {
+    var inA = c0 < 4, sh = 7 * (inA ? c0 : c0 - 4);
+    COL_A.push(inA ? 0x3F << sh : 0);
+    COL_B.push(inA ? 0 : 0x3F << sh);
+    BOT_COL_A.push(inA ? 1 << sh : 0);
+    BOT_COL_B.push(inA ? 0 : 1 << sh);
+    TOP_A.push(inA ? 1 << (sh + 5) : 0);
+    TOP_B.push(inA ? 0 : 1 << (sh + 5));
+  }
+  var BOT_A = BOT_COL_A[0] | BOT_COL_A[1] | BOT_COL_A[2] | BOT_COL_A[3];
+  var BOT_B = BOT_COL_B[4] | BOT_COL_B[5] | BOT_COL_B[6];
+  var BOARD_A = COL_A[0] | COL_A[1] | COL_A[2] | COL_A[3];
+  var BOARD_B = COL_B[4] | COL_B[5] | COL_B[6];
+  // Rows 1, 3, 5 counted from the bottom (index 0, 2, 4) and rows 2, 4, 6.
+  var ODD_A = 0, ODD_B = 0, EVEN_A = 0, EVEN_B = 0;
+  (function () {
+    for (var c = 0; c < W; c++) for (var r = 0; r < H; r++) {
+      var a = c < 4, bit = 1 << (7 * (a ? c : c - 4) + r);
+      if (r % 2 === 0) { if (a) ODD_A |= bit; else ODD_B |= bit; }
+      else { if (a) EVEN_A |= bit; else EVEN_B |= bit; }
+    }
+  })();
+  var ORDER = [3, 2, 4, 1, 5, 0, 6];
+  var WIN = 100000, INF = 1000000, MATE = WIN - 100;
+
+  function popc(x) {
+    x = x - ((x >>> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+    return Math.imul((x + (x >>> 4)) & 0x0F0F0F0F, 0x01010101) >>> 24;
+  }
+
+  // 49-bit shifts across the two words; results land in RA, RB.
+  var RA = 0, RB = 0;
+  function shr(a, b, s) { RA = ((a >>> s) | (b << (28 - s))) & MA; RB = b >>> s; }
+  function shl(a, b, s) { RB = ((b << s) | (a >>> (28 - s))) & MB; RA = (a << s) & MA; }
+
+  // Empty cells that would complete four for the stones (pa, pb). Into WA, WB.
+  var WA = 0, WB = 0;
+  function winDir(pa, pb, s) {
+    shl(pa, pb, s); var l1a = RA, l1b = RB;
+    shl(pa, pb, 2 * s); var l2a = RA, l2b = RB;
+    shl(pa, pb, 3 * s); var l3a = RA, l3b = RB;
+    shr(pa, pb, s); var r1a = RA, r1b = RB;
+    shr(pa, pb, 2 * s); var r2a = RA, r2b = RB;
+    shr(pa, pb, 3 * s); var r3a = RA, r3b = RB;
+    var xa = l1a & l2a, xb = l1b & l2b;
+    WA |= (xa & l3a) | (xa & r1a); WB |= (xb & l3b) | (xb & r1b);
+    xa = r1a & r2a; xb = r1b & r2b;
+    WA |= (xa & l1a) | (xa & r3a); WB |= (xb & l1b) | (xb & r3b);
+  }
+  function winning(pa, pb, ma, mb) {
+    WA = (pa << 1) & (pa << 2) & (pa << 3);
+    WB = (pb << 1) & (pb << 2) & (pb << 3);
+    winDir(pa, pb, 7); winDir(pa, pb, 6); winDir(pa, pb, 8);
+    WA &= BOARD_A & ~ma; WB &= BOARD_B & ~mb;
+  }
+
+  // True when the stones contain four in a row in any direction.
+  var DIRS = [1, 7, 6, 8];
+  function aligned(pa, pb) {
+    for (var i = 0; i < 4; i++) {
+      var s = DIRS[i];
+      shr(pa, pb, s);
+      var a = pa & RA, b = pb & RB;
+      shr(a, b, 2 * s);
+      if ((a & RA) | (b & RB)) return true;
+    }
+    return false;
+  }
+
+  // Replay a list of columns. Returns null on an illegal move.
+  function fromMoves(moves) {
+    var pa = 0, pb = 0, ma = 0, mb = 0;
+    for (var i = 0; i < moves.length; i++) {
+      var c = moves[i];
+      if (!(c >= 0 && c < W) || ((ma & TOP_A[c]) | (mb & TOP_B[c]))) return null;
+      pa ^= ma; pb ^= mb;
+      if (c < 4) ma |= ma + BOT_COL_A[c]; else mb |= mb + BOT_COL_B[c];
+    }
+    return { pa: pa, pb: pb, ma: ma, mb: mb, n: moves.length };
+  }
+
+  // Index of the move that first made four in a row, or -1.
+  function winnerOf(moves) {
+    var pa = 0, pb = 0, ma = 0, mb = 0;
+    for (var i = 0; i < moves.length; i++) {
+      var c = moves[i];
+      var mvA = (ma + BOT_COL_A[c]) & COL_A[c], mvB = (mb + BOT_COL_B[c]) & COL_B[c];
+      if (aligned(pa | mvA, pb | mvB)) return i;
+      pa ^= ma; pb ^= mb; ma |= mvA; mb |= mvB;
+    }
+    return -1;
+  }
+
+  // Grid check for the UI: grid[c][r], 0 empty. Cells in every line of four
+  // or more through (c, r), or null.
+  function findWin(grid, c, r) {
+    var v = grid[c] && grid[c][r];
+    if (!v) return null;
+    var dirs = [[1, 0], [0, 1], [1, 1], [1, -1]], out = [], seen = {};
+    for (var d = 0; d < 4; d++) {
+      var dx = dirs[d][0], dy = dirs[d][1], line = [[c, r]];
+      for (var s = -1; s <= 1; s += 2) {
+        var x = c + dx * s, y = r + dy * s;
+        while (x >= 0 && x < W && y >= 0 && y < H && grid[x][y] === v) { line.push([x, y]); x += dx * s; y += dy * s; }
+      }
+      if (line.length >= 4) {
+        for (var k = 0; k < line.length; k++) {
+          var id = line[k][0] * 8 + line[k][1];
+          if (!seen[id]) { seen[id] = 1; out.push(line[k]); }
+        }
+      }
+    }
+    return out.length ? out : null;
+  }
+
+  /* ---------- search ---------- */
+  var TT_SIZE = 1048573; // prime
+  var ttKey = null, ttVal, ttDepth, ttFlag, ttMove;
+  function ensureTT() {
+    if (ttKey) return;
+    ttKey = new Float64Array(TT_SIZE);
+    ttVal = new Int32Array(TT_SIZE);
+    ttDepth = new Int8Array(TT_SIZE);
+    ttFlag = new Uint8Array(TT_SIZE); // 0 empty, 1 exact, 2 lower bound, 3 upper bound
+    ttMove = new Int8Array(TT_SIZE);
+  }
+  function reset() { if (ttFlag) ttFlag.fill(0); }
+
+  var nodes = 0, deadline = 0, aborted = false;
+  var now = (typeof performance !== 'undefined' && performance.now) ? function () { return performance.now(); } : Date.now;
+  var ordCol = new Int8Array(48 * 8), ordScore = new Int32Array(48 * 8);
+
+  function centre(a, b) {
+    return 3 * popc(a & COL_A[3]) +
+      2 * (popc(a & COL_A[2]) + popc(b & COL_B[4])) +
+      (popc(a & COL_A[1]) + popc(b & COL_B[5]));
+  }
+
+  // Static score for the player to move. Threats (empty cells that finish a
+  // four) count most; threats on the rows that suit each side's parity count
+  // extra; centre stones break ties.
+  function evaluate(pa, pb, ma, mb, n, myA, myB, opA, opB) {
+    var s = 6 * (popc(myA) + popc(myB) - popc(opA) - popc(opB));
+    var meFirst = (n & 1) === 0;
+    var fA = meFirst ? myA : opA, fB = meFirst ? myB : opB;
+    var sA = meFirst ? opA : myA, sB = meFirst ? opB : myB;
+    var par = 3 * (popc(fA & ODD_A & ~BOT_A) + popc(fB & ODD_B & ~BOT_B)) - 3 * (popc(sA & EVEN_A) + popc(sB & EVEN_B));
+    s += meFirst ? par : -par;
+    var oa = pa ^ ma, ob = pb ^ mb;
+    s += centre(pa, pb) - centre(oa, ob);
+    return s;
+  }
+
+  function negamax(pa, pb, ma, mb, n, depth, alpha, beta) {
+    nodes++;
+    if ((nodes & 1023) === 0 && now() > deadline) aborted = true;
+    if (aborted) return 0;
+
+    var posA = (ma + BOT_A) & BOARD_A, posB = (mb + BOT_B) & BOARD_B;
+    winning(pa, pb, ma, mb);
+    var myA = WA, myB = WB;
+    if ((myA & posA) | (myB & posB)) return WIN - n - 1;
+
+    winning(pa ^ ma, pb ^ mb, ma, mb);
+    var opA = WA, opB = WB;
+    var fA = posA & opA, fB = posB & opB;
+    if (fA | fB) {
+      if (popc(fA) + popc(fB) > 1) return -(WIN - n - 2);
+      posA = fA; posB = fB;
+    }
+    var nxA = posA & ~(opA >>> 1), nxB = posB & ~(opB >>> 1);
+    if ((nxA | nxB) === 0) return -(WIN - n - 2);
+    if (n >= SIZE - 2) return 0;
+
+    var hi = WIN - n - 3;
+    if (beta > hi) { beta = hi; if (alpha >= beta) return beta; }
+    var lo = -(WIN - n - 4);
+    if (alpha < lo) { alpha = lo; if (alpha >= beta) return alpha; }
+
+    if (depth <= 0) return evaluate(pa, pb, ma, mb, n, myA, myB, opA, opB);
+
+    var key = (pa + ma) + (pb + mb) * 268435456;
+    var idx = key % TT_SIZE;
+    var ttm = -1;
+    if (ttFlag[idx] !== 0 && ttKey[idx] === key) {
+      ttm = ttMove[idx];
+      if (ttDepth[idx] >= depth) {
+        var tv = ttVal[idx], tf = ttFlag[idx];
+        if (tf === 1) return tv;
+        if (tf === 2) { if (tv >= beta) return tv; if (tv > alpha) alpha = tv; }
+        else { if (tv <= alpha) return tv; if (tv < beta) beta = tv; }
+      }
+    }
+
+    // Order: table move, then moves that create the most threats, centre first.
+    var base = n * 8, cnt = 0, i, j, c, mvA, mvB, sc;
+    for (i = 0; i < W; i++) {
+      c = ORDER[i];
+      mvA = nxA & COL_A[c]; mvB = nxB & COL_B[c];
+      if ((mvA | mvB) === 0) continue;
+      if (c === ttm) sc = 1 << 24;
+      else { winning(pa | mvA, pb | mvB, ma | mvA, mb | mvB); sc = (popc(WA) + popc(WB)) * 16 + (W - i); }
+      j = cnt++;
+      while (j > 0 && ordScore[base + j - 1] < sc) {
+        ordScore[base + j] = ordScore[base + j - 1]; ordCol[base + j] = ordCol[base + j - 1]; j--;
+      }
+      ordScore[base + j] = sc; ordCol[base + j] = c;
+    }
+
+    var a0 = alpha, best = -INF, bestC = ordCol[base], v;
+    for (i = 0; i < cnt; i++) {
+      c = ordCol[base + i];
+      mvA = nxA & COL_A[c]; mvB = nxB & COL_B[c];
+      var npa = pa ^ ma, npb = pb ^ mb, nma = ma | mvA, nmb = mb | mvB;
+      if (i === 0) v = -negamax(npa, npb, nma, nmb, n + 1, depth - 1, -beta, -alpha);
+      else {
+        v = -negamax(npa, npb, nma, nmb, n + 1, depth - 1, -alpha - 1, -alpha);
+        if (v > alpha && v < beta && !aborted) v = -negamax(npa, npb, nma, nmb, n + 1, depth - 1, -beta, -alpha);
+      }
+      if (aborted) return 0;
+      if (v > best) {
+        best = v; bestC = c;
+        if (v > alpha) { alpha = v; if (alpha >= beta) break; }
+      }
+    }
+
+    ttKey[idx] = key; ttVal[idx] = best; ttDepth[idx] = depth; ttMove[idx] = bestC;
+    ttFlag[idx] = best <= a0 ? 3 : (best >= beta ? 2 : 1);
+    return best;
+  }
+
+  var LEVELS = [
+    { depth: 2, time: 150, mistake: 0.35, anyMove: true },   // Easy
+    { depth: 6, time: 250, mistake: 0.1 },                    // Normal
+    { depth: 12, time: 400, mistake: 0 },                     // Hard
+    { depth: 42, time: 1500, mistake: 0 }                     // Expert
+  ];
+
+  // Pick a column for the player to move after `moves`.
+  function search(moves, level, opts) {
+    ensureTT();
+    opts = opts || {};
+    var L = LEVELS[level] || LEVELS[2];
+    var depthCap = opts.depth || L.depth, timeMs = opts.time || L.time;
+    var mistake = opts.mistake !== undefined ? opts.mistake : L.mistake;
+    var rnd = opts.random || Math.random;
+    var t0 = now();
+    nodes = 0; aborted = false; deadline = t0 + timeMs;
+
+    var p = fromMoves(moves);
+    if (!p) return { col: -1 };
+    var pa = p.pa, pb = p.pb, ma = p.ma, mb = p.mb, n = p.n, i, c;
+    if (winnerOf(moves) >= 0 || n >= SIZE) return { col: -1 };
+
+    var legal = [];
+    for (i = 0; i < W; i++) { c = ORDER[i]; if (!((ma & TOP_A[c]) | (mb & TOP_B[c]))) legal.push(c); }
+    if (!legal.length) return { col: -1 };
+
+    var posA = (ma + BOT_A) & BOARD_A, posB = (mb + BOT_B) & BOARD_B;
+    winning(pa, pb, ma, mb);
+    for (i = 0; i < legal.length; i++) {
+      c = legal[i];
+      if ((WA & posA & COL_A[c]) | (WB & posB & COL_B[c])) return { col: c, score: WIN - n - 1, depth: 1, nodes: 0, reason: 'win' };
+    }
+    winning(pa ^ ma, pb ^ mb, ma, mb);
+    var opA = WA, opB = WB;
+    var fA = posA & opA, fB = posB & opB;
+    var forced = [];
+    for (i = 0; i < legal.length; i++) { c = legal[i]; if ((fA & COL_A[c]) | (fB & COL_B[c])) forced.push(c); }
+    var nA = posA, nB = posB;
+    if (forced.length) { nA = fA; nB = fB; }
+    nA &= ~(opA >>> 1); nB &= ~(opB >>> 1);
+    if (forced.length > 1) { nA = 0; nB = 0; }
+    var safe = [];
+    for (i = 0; i < legal.length; i++) { c = legal[i]; if ((nA & COL_A[c]) | (nB & COL_B[c])) safe.push(c); }
+
+    if (mistake > 0 && rnd() < mistake) {
+      var pool = L.anyMove || !safe.length ? legal : safe;
+      return { col: pool[Math.floor(rnd() * pool.length)], depth: 0, nodes: 0, reason: 'mistake' };
+    }
+    if (!safe.length) return { col: forced.length ? forced[0] : legal[0], score: -(WIN - n - 2), depth: 1, nodes: 0, reason: 'lost' };
+    if (safe.length === 1) return { col: safe[0], depth: 1, nodes: 0, reason: forced.length ? 'block' : 'only' };
+
+    var order = safe.slice(), bestCol = order[0], bestScore = 0, done = 0;
+    var maxD = Math.min(depthCap, SIZE - n);
+
+    for (var d = 1; d <= maxD; d++) {
+      var alpha = -INF, beta = INF, itBest = -INF, itCol = order[0], v, searched = 0;
+      for (i = 0; i < order.length; i++) {
+        c = order[i];
+        var mvA = posA & COL_A[c], mvB = posB & COL_B[c];
+        var npa = pa ^ ma, npb = pb ^ mb, nma = ma | mvA, nmb = mb | mvB;
+        if (i === 0) v = -negamax(npa, npb, nma, nmb, n + 1, d - 1, -beta, -alpha);
+        else {
+          v = -negamax(npa, npb, nma, nmb, n + 1, d - 1, -alpha - 1, -alpha);
+          if (v > alpha && !aborted) v = -negamax(npa, npb, nma, nmb, n + 1, d - 1, -beta, -alpha);
+        }
+        if (aborted) break;
+        searched++;
+        if (v > itBest) { itBest = v; itCol = c; }
+        if (v > alpha) alpha = v;
+      }
+      if (aborted) {
+        // A move proven better than the previous best in the cut-off pass still counts.
+        if (searched > 1 && itCol !== order[0]) { bestCol = itCol; bestScore = itBest; }
+        break;
+      }
+      bestCol = itCol; bestScore = itBest; done = d;
+      order.splice(order.indexOf(itCol), 1); order.unshift(itCol);
+      if (itBest > MATE || itBest < -MATE) break;
+      if (now() - t0 > timeMs * 0.45) break;
+    }
+    return { col: bestCol, score: bestScore, depth: done, nodes: nodes, ms: Math.round(now() - t0) };
+  }
+
+  return {
+    W: W, H: H, LEVELS: LEVELS, WIN: WIN,
+    search: search, reset: reset, findWin: findWin, winnerOf: winnerOf, fromMoves: fromMoves
+  };
+})();
+</script>
+
+<script src="../_shared/bridge.js" data-game="four-in-a-row"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  const ENGINE_SRC = document.getElementById('engine-src').textContent;
+  const Engine = new Function(ENGINE_SRC + '\nreturn Engine;')();
+
+  const COLS = 7, ROWS = 6;
+  const ORANGE = 1, WHITE = 2;
+  const LEVEL_NAMES = ['Easy', 'Normal', 'Hard', 'Expert'];
+  const HARD = 2;
+  const MIN_THINK = [600, 550, 350, 300];  // ms, so the reply never feels instant
+  const C_ORANGE = '#ea5426', C_WHITE = '#ffffff';
+  const C_PANEL = '#16181c', C_HOLE = '#0b0c0f', C_HOLE_HI = '#15171c';
+  const KEY_SAVE = 'vela:four-in-a-row:save';
+  const KEY_SET = 'vela:four-in-a-row:settings';
+  const KEY_WINS = 'vela:four-in-a-row:hard-wins';
+
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const other = (col) => (col === ORANGE ? WHITE : ORANGE);
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const now = () => performance.now();
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), cv = $('cv'), ctx = cv.getContext('2d');
+  const modeLab = $('modeLab'), statusText = $('statusText'), chipEl = $('chip'), winsEl = $('wins');
+  const undoBtn = $('undoBtn'), newBtn = $('newBtn');
+  const menu = $('menu'), endOv = $('endOv');
+  const playBtn = $('playBtn'), resumeBtn = $('resumeBtn');
+
+  /* ---------- storage ---------- */
+  function readJSON(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }
+  function writeJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  function removeKey(k) { try { localStorage.removeItem(k); } catch (_) {} }
+  function readWins() { try { return Math.max(0, parseInt(localStorage.getItem(KEY_WINS), 10) || 0); } catch (_) { return 0; } }
+
+  function validSettings(s) {
+    return s && (s.mode === 'cpu' || s.mode === 'pvp') && [0, 1, 2, 3].includes(s.level) && (s.first === 0 || s.first === 1);
+  }
+  let settings = readJSON(KEY_SET);
+  if (!validSettings(settings)) settings = { mode: 'cpu', level: 1, first: 0 };
+  let draft = Object.assign({}, settings);  // what the menu shows
+  let hardWins = readWins();
+
+  /* ---------- game state ---------- */
+  let game = null;
+  let anim = null;           // falling disc
+  let thinking = false;
+  let paused = false;
+  let menuOpen = false, endOpen = false;
+  let cursor = -1;           // column under the pointer or keyboard
+  let pointerKind = 'mouse';
+  let dirty = true;
+  let endTimer = 0;
+
+  function emptyGrid() { const g = []; for (let c = 0; c < COLS; c++) g.push(new Array(ROWS).fill(0)); return g; }
+
+  function makeGame(s) {
+    return {
+      mode: s.mode, level: s.level, first: s.first,
+      // Vs computer: you are orange, the computer white. First move picks who starts.
+      firstColor: s.first === 0 ? ORANGE : WHITE,
+      grid: emptyGrid(), history: [], over: null,
+    };
+  }
+
+  const heightOf = (c) => { let r = 0; while (r < ROWS && game.grid[c][r]) r++; return r; };
+  const colorToMove = () => (game.history.length % 2 === 0 ? game.firstColor : other(game.firstColor));
+  const isCpuTurn = () => game.mode === 'cpu' && !game.over && colorToMove() === WHITE;
+  const humanCanAct = () => !!game && !game.over && !anim && !thinking && !isCpuTurn() && !menuOpen && !endOpen && !paused;
+
+  function humanMovesMade() {
+    const n = game.history.length;
+    if (game.mode === 'pvp') return n;
+    return game.firstColor === ORANGE ? Math.ceil(n / 2) : Math.floor(n / 2);
+  }
+  function canUndo() {
+    if (!game || game.over || anim || menuOpen || endOpen) return false;
+    if (game.mode === 'pvp') return game.history.length > 0;
+    return humanMovesMade() > 0;
+  }
+
+  function save() {
+    if (!game || game.over || !game.history.length) { removeKey(KEY_SAVE); return; }
+    writeJSON(KEY_SAVE, { v: 1, mode: game.mode, level: game.level, first: game.first, h: game.history });
+  }
+
+  function loadSaved() {
+    const d = readJSON(KEY_SAVE);
+    if (!d || d.v !== 1 || !validSettings({ mode: d.mode, level: d.level, first: d.first })) return null;
+    if (!Array.isArray(d.h) || !d.h.length || d.h.length >= 42) return null;
+    if (!d.h.every((c) => Number.isInteger(c) && c >= 0 && c < COLS)) return null;
+    if (!Engine.fromMoves(d.h) || Engine.winnerOf(d.h) >= 0) return null;
+    const g = makeGame(d);
+    d.h.forEach((c, i) => {
+      const col = i % 2 === 0 ? g.firstColor : other(g.firstColor);
+      let r = 0; while (g.grid[c][r]) r++;
+      g.grid[c][r] = col;
+    });
+    g.history = d.h.slice();
+    return g;
+  }
+
+  /* ---------- computer player (Web Worker from an inline Blob) ---------- */
+  const WORKER_GLUE = '\nself.onmessage = function (e) { var d = e.data; var r = Engine.search(d.moves, d.level); ' +
+    'self.postMessage({ id: d.id, col: r.col, depth: r.depth, score: r.score, nodes: r.nodes, ms: r.ms }); };\n';
+  let worker = null, workerUrl = '', workerFailed = false, inFlight = false;
+  let searchId = 0, searchStart = 0, thinkTimer = 0;
+
+  function ensureWorker() {
+    if (worker || workerFailed) return worker;
+    try {
+      workerUrl = URL.createObjectURL(new Blob([ENGINE_SRC, WORKER_GLUE], { type: 'text/javascript' }));
+      worker = new Worker(workerUrl);
+      worker.onmessage = (e) => { inFlight = false; deliver(e.data); };
+      worker.onerror = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        workerFailed = true;
+        killWorker();
+        if (thinking) runOnMainThread(searchId);
+      };
+    } catch (_) {
+      workerFailed = true;
+      worker = null;
+    }
+    return worker;
+  }
+  function killWorker() {
+    if (worker) { try { worker.terminate(); } catch (_) {} }
+    worker = null; inFlight = false;
+    if (workerUrl) { try { URL.revokeObjectURL(workerUrl); } catch (_) {} workerUrl = ''; }
+  }
+  function runOnMainThread(id) {
+    const moves = game.history.slice(), level = game.level;
+    setTimeout(() => {
+      if (id !== searchId) return;
+      const r = Engine.search(moves, level);
+      deliver({ id, col: r.col });
+    }, 30);
+  }
+
+  function computerMove() {
+    if (!isCpuTurn() || thinking || anim || menuOpen) return;
+    thinking = true;
+    const id = ++searchId;
+    searchStart = now();
+    const w = ensureWorker();
+    if (w) { inFlight = true; w.postMessage({ id, moves: game.history.slice(), level: game.level }); }
+    else runOnMainThread(id);
+    hud();
+  }
+
+  function deliver(msg) {
+    if (!msg || msg.id !== searchId || !thinking) return;
+    const wait = Math.max(0, MIN_THINK[game.level] - (now() - searchStart));
+    clearTimeout(thinkTimer);
+    thinkTimer = setTimeout(() => {
+      thinkTimer = 0;
+      if (msg.id !== searchId || !thinking) return;
+      thinking = false;
+      let c = msg.col;
+      if (!(c >= 0 && c < COLS) || heightOf(c) >= ROWS) {
+        c = [3, 2, 4, 1, 5, 0, 6].find((k) => heightOf(k) < ROWS);
+      }
+      if (c === undefined) { hud(); return; }
+      drop(c);
+    }, wait);
+  }
+
+  function cancelThinking() {
+    if (!thinking) return;
+    searchId++;
+    thinking = false;
+    clearTimeout(thinkTimer); thinkTimer = 0;
+    if (inFlight) killWorker();  // stop a long search; a fresh worker starts next time
+  }
+
+  /* ---------- moves ---------- */
+  let geo = { S: 300, T: 36, G: 4, Y0: 40, inset: 3, grav: 4000, dpr: 1 };
+  const holeX = (c) => geo.G + c * (geo.T + geo.G);
+  const holeY = (r) => geo.Y0 + geo.G + (ROWS - 1 - r) * (geo.T + geo.G);
+  let prevX = -1;
+
+  function drop(c) {
+    const r = heightOf(c);
+    if (r >= ROWS) return false;
+    const color = colorToMove();
+    game.grid[c][r] = color;
+    game.history.push(c);
+    const a = anim = { c, r, color, y: 0, v: 0, target: holeY(r), bounced: false };
+    if (reduceMotion) anim.y = anim.target;
+    dirty = true;
+    hud();
+    if (reduceMotion) { land(); return true; }
+    // if frames stall (hidden or throttled page) the move still completes
+    clearTimeout(animGuard);
+    animGuard = setTimeout(() => { if (anim === a) { a.y = a.target; land(); } }, 1500);
+    return true;
+  }
+
+  let animGuard = 0, queued = -1;
+
+  function land() {
+    clearTimeout(animGuard);
+    const a = anim;
+    anim = null;
+    dirty = true;
+    const q = queued;
+    queued = -1;
+    const cells = Engine.findWin(game.grid, a.c, a.r);
+    if (cells) { endGame(a.color, cells); return; }
+    if (game.history.length >= COLS * ROWS) { endGame(0, []); return; }
+    save();
+    hud();
+    if (isCpuTurn()) computerMove();
+    else if (q >= 0) humanDrop(q);
+  }
+
+  function humanDrop(c) {
+    // one tap or key during a falling disc is kept and played when it lands
+    if (anim && game && !game.over && !menuOpen && !endOpen && !paused) { queued = c; return; }
+    if (!humanCanAct()) return;
+    if (c < 0 || c >= COLS) return;
+    if (heightOf(c) >= ROWS) { shakeColumn(c); return; }
+    drop(c);
+    if (pointerKind === 'touch') cursor = -1;
+  }
+
+  let shake = null;
+  function shakeColumn(c) { if (!reduceMotion) shake = { c, t0: now() }; dirty = true; }
+
+  function popMove() {
+    const c = game.history.pop();
+    if (c === undefined) return;
+    let r = ROWS - 1;
+    while (r >= 0 && !game.grid[c][r]) r--;
+    if (r >= 0) game.grid[c][r] = 0;
+  }
+
+  function undo() {
+    if (paused || !canUndo()) return;
+    if (game.mode === 'pvp') popMove();
+    else if (thinking) { cancelThinking(); popMove(); }
+    else { popMove(); popMove(); }
+    dirty = true;
+    save();
+    hud();
+    if (isCpuTurn()) computerMove();
+  }
+
+  function endGame(winner, cells) {
+    game.over = { winner, cells, t0: now() };
+    save();
+    if (game.mode === 'cpu' && game.level === HARD && winner === ORANGE) {
+      hardWins = readWins() + 1;
+      try { localStorage.setItem(KEY_WINS, String(hardWins)); } catch (_) {}
+    }
+    hud();
+    clearTimeout(endTimer);
+    endTimer = setTimeout(showEnd, reduceMotion ? 400 : 1300);
+  }
+
+  function resultText() {
+    const w = game.over.winner;
+    if (!w) return 'Draw';
+    if (game.mode === 'cpu') return w === ORANGE ? 'You win' : 'You lose';
+    return w === ORANGE ? 'Orange wins' : 'White wins';
+  }
+
+  function startGame(s) {
+    cancelThinking();
+    clearTimeout(endTimer);
+    anim = null; shake = null; queued = -1; clearTimeout(animGuard);
+    settings = Object.assign({}, s);
+    writeJSON(KEY_SET, settings);
+    game = makeGame(settings);
+    hideMenu(); hideEnd();
+    save();
+    dirty = true;
+    hud();
+    if (isCpuTurn()) computerMove();
+    focusBoard();
+  }
+
+  /* ---------- HUD ---------- */
+  function hud() {
+    if (!game) return;
+    modeLab.textContent = game.mode === 'cpu' ? 'Vs computer, ' + LEVEL_NAMES[game.level] : 'Pass and play';
+    let text, chip;
+    if (game.over) { text = resultText(); chip = game.over.winner; }
+    else {
+      chip = colorToMove();
+      if (game.mode === 'cpu') text = chip === ORANGE ? 'Your turn' : "Computer's turn";
+      else text = (chip === ORANGE ? 'Orange' : 'White') + ' to play';
+    }
+    statusText.textContent = text;
+    chipEl.style.background = chip === ORANGE ? C_ORANGE : chip === WHITE ? C_WHITE : 'transparent';
+    chipEl.style.boxShadow = chip ? 'none' : '';
+    chipEl.classList.toggle('thinking', thinking);
+    undoBtn.disabled = !canUndo();
+    app.classList.toggle('show-wins', game.mode === 'cpu' && game.level === HARD);
+    winsEl.textContent = hardWins;
+    cv.classList.toggle('idle', !humanCanAct());
+  }
+
+  /* ---------- menu ---------- */
+  function syncMenu() {
+    menu.querySelectorAll('.seg').forEach((seg) => {
+      const g = seg.dataset.group;
+      seg.querySelectorAll('button').forEach((b) => {
+        const v = g === 'mode' ? b.dataset.v : Number(b.dataset.v);
+        b.setAttribute('aria-pressed', String(draft[g] === v));
+      });
+    });
+    const cpu = draft.mode === 'cpu';
+    $('levelGroup').hidden = !cpu;
+    $('first0').textContent = cpu ? 'You' : 'Orange';
+    $('first1').textContent = cpu ? 'Computer' : 'White';
+    const note = $('winsNote');
+    note.hidden = !cpu;
+    note.textContent = 'Wins vs Hard: ' + hardWins;
+    resumeBtn.hidden = !(game && !game.over && game.history.length > 0);
+  }
+
+  menu.querySelectorAll('.seg button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const g = b.parentNode.dataset.group;
+      draft[g] = g === 'mode' ? b.dataset.v : Number(b.dataset.v);
+      syncMenu();
+    });
+  });
+
+  function openOverlay(el) {
+    el.hidden = false;
+    if (reduceMotion) el.classList.add('show');
+    else requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  }
+  function closeOverlay(el) { el.classList.remove('show'); el.hidden = true; }
+
+  function showMenu() {
+    queued = -1;
+    cancelThinking();
+    hideEnd();
+    draft = Object.assign({}, settings);
+    menuOpen = true;
+    syncMenu();
+    openOverlay(menu);
+    hud();
+    setTimeout(() => { try { playBtn.focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideMenu() { menuOpen = false; closeOverlay(menu); }
+
+  function resume() {
+    if (!game || game.over) return;
+    hideMenu();
+    hud();
+    if (isCpuTurn()) computerMove();
+    focusBoard();
+  }
+
+  function showEnd() {
+    if (!game || !game.over || menuOpen) return;
+    const w = game.over.winner;
+    const title = $('endTitle');
+    title.textContent = resultText();
+    title.className = w === WHITE ? 'c-white' : w === ORANGE ? '' : 'c-none';
+    const stats = $('endStats');
+    stats.textContent = '';
+    const add = (label, value, isNum) => {
+      const d = document.createElement('div');
+      const l = document.createElement('span'); l.className = 'lab'; l.textContent = label;
+      const v = document.createElement('span'); v.className = isNum ? 'num' : 'txt'; v.textContent = value;
+      d.append(l, v); stats.appendChild(d);
+    };
+    add('Moves', game.history.length, true);
+    if (game.mode === 'cpu' && game.level === HARD) add('Wins vs Hard', hardWins, true);
+    else if (game.mode === 'cpu') add('Level', LEVEL_NAMES[game.level], false);
+    else add('Mode', 'Pass and play', false);
+    endOpen = true;
+    openOverlay(endOv);
+    hud();
+    setTimeout(() => { try { $('againBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideEnd() { endOpen = false; closeOverlay(endOv); }
+
+  playBtn.addEventListener('click', () => startGame(draft));
+  resumeBtn.addEventListener('click', resume);
+  $('againBtn').addEventListener('click', () => startGame(settings));
+  $('menuBtn').addEventListener('click', showMenu);
+  newBtn.addEventListener('click', showMenu);
+  undoBtn.addEventListener('click', undo);
+
+  function focusBoard() { try { cv.focus({ preventScroll: true }); } catch (_) {} }
+
+  /* ---------- drawing ---------- */
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+  }
+
+  function drawDisc(x, y, color, alpha) {
+    const d = geo.inset, s = geo.T - 2 * d;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color === ORANGE ? C_ORANGE : C_WHITE;
+    rrect(x + d, y + d, s, s, 2);
+    ctx.fill();
+    // flat face with a darker lower lip, like the 2048 tiles
+    const lip = Math.max(1, Math.round(geo.T * 0.05));
+    ctx.fillStyle = color === ORANGE ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.12)';
+    ctx.fillRect(x + d, y + d + s - lip, s, lip);
+    ctx.globalAlpha = 1;
+  }
+
+  // Outline that draws itself clockwise; p from 0 to 1.
+  function partialRect(x, y, w, h, p) {
+    if (p <= 0) return;
+    const pts = [[x + w, y], [x + w, y + h], [x, y + h], [x, y]];
+    const lens = [w, h, w, h];
+    let left = 2 * (w + h) * Math.min(1, p);
+    let cx = x, cy = y;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    for (let i = 0; i < 4 && left > 0; i++) {
+      const L = lens[i], k = Math.min(1, left / L);
+      const nx = cx + (pts[i][0] - cx) * k, ny = cy + (pts[i][1] - cy) * k;
+      ctx.lineTo(nx, ny);
+      cx = pts[i][0]; cy = pts[i][1];
+      left -= L;
+    }
+    if (p >= 1) ctx.closePath();
+    ctx.stroke();
+  }
+
+  function previewVisible() {
+    return cursor >= 0 && humanCanAct() && heightOf(cursor) < ROWS;
+  }
+
+  function render(t) {
+    const { S, T, Y0, dpr } = geo;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, S, S);
+    if (!game) return;
+
+    let shx = 0, shc = -1;
+    if (shake) {
+      const k = (t - shake.t0) / 220;
+      if (k >= 1) shake = null;
+      else { shc = shake.c; shx = Math.round(Math.sin(k * Math.PI * 4) * (1 - k) * 3); }
+    }
+
+    // panel
+    ctx.fillStyle = C_PANEL;
+    ctx.fillRect(0, Y0, S, S - Y0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, Y0 + 0.5, S - 1, S - Y0 - 1);
+
+    const showPrev = previewVisible();
+    for (let c = 0; c < COLS; c++) {
+      const ox = c === shc ? shx : 0;
+      for (let r = 0; r < ROWS; r++) {
+        ctx.fillStyle = showPrev && c === cursor && !game.grid[c][r] ? C_HOLE_HI : C_HOLE;
+        ctx.fillRect(holeX(c) + ox, holeY(r), T, T);
+      }
+    }
+
+    const over = game.over;
+    const fade = over ? clamp(0, (t - over.t0) / 260, 1) : 0;
+    const winSet = new Set(over ? over.cells.map((p) => p[0] * 8 + p[1]) : []);
+    for (let c = 0; c < COLS; c++) {
+      const ox = c === shc ? shx : 0;
+      for (let r = 0; r < ROWS; r++) {
+        const v = game.grid[c][r];
+        if (!v || (anim && anim.c === c && anim.r === r)) continue;
+        const dim = over && !winSet.has(c * 8 + r) ? 1 - 0.68 * fade : 1;
+        drawDisc(holeX(c) + ox, holeY(r), v, dim);
+      }
+    }
+
+    // last move marker
+    const h = game.history;
+    if (!over && h.length && !anim) {
+      const c = h[h.length - 1], r = heightOf(c) - 1;
+      if (r >= 0) {
+        const m = Math.max(4, Math.round(T * 0.14));
+        ctx.fillStyle = game.grid[c][r] === ORANGE ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.22)';
+        ctx.fillRect(holeX(c) + Math.round((T - m) / 2) + (c === shc ? shx : 0), holeY(r) + Math.round((T - m) / 2), m, m);
+      }
+    }
+
+    if (anim) drawDisc(holeX(anim.c), anim.y, anim.color, 1);
+
+    // winning line: crisp 2px outline that draws itself, one disc after another
+    if (over && over.cells.length) {
+      const e = Math.max(1, Math.floor(geo.inset / 2));
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'miter';
+      ctx.lineCap = 'square';
+      const cells = over.cells.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      cells.forEach((p, i) => {
+        const k = reduceMotion ? 1 : clamp(0, (t - over.t0 - 120 - i * 70) / 260, 1);
+        const v = game.grid[p[0]][p[1]];
+        ctx.strokeStyle = v === ORANGE ? C_WHITE : C_ORANGE;
+        const x = holeX(p[0]) + geo.inset - e, y = holeY(p[1]) + geo.inset - e, s = T - 2 * geo.inset + 2 * e;
+        partialRect(x, y, s, s, k);
+      });
+    }
+
+    if (showPrev) {
+      if (prevX < 0) prevX = holeX(cursor);
+      drawDisc(Math.round(prevX), 0, colorToMove(), 1);
+    }
+  }
+
+  let lastT = now();
+  function frame(t) {
+    const dt = Math.min(0.05, Math.max(0, (t - lastT) / 1000));
+    lastT = t;
+    let active = false;
+    if (anim && !reduceMotion) {
+      anim.v += geo.grav * dt;
+      anim.y += anim.v * dt;
+      if (anim.y >= anim.target) {
+        if (!anim.bounced && anim.v > 0) {
+          anim.y = anim.target;
+          anim.v = -anim.v * 0.2;   // small settle bounce
+          anim.bounced = true;
+        } else {
+          anim.y = anim.target;
+          land();
+        }
+      }
+      active = true;
+    }
+    if (cursor >= 0) {
+      const tx = holeX(cursor);
+      if (prevX < 0 || reduceMotion) prevX = tx;
+      else if (Math.abs(prevX - tx) > 0.4) { prevX += (tx - prevX) * (1 - Math.exp(-dt * 30)); active = true; }
+      else if (prevX !== tx) { prevX = tx; active = true; }
+    }
+    if (shake) active = true;
+    if (game && game.over && t - game.over.t0 < 1200) active = true;
+    if (active || dirty) { render(t); dirty = false; }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- layout: everything sized from the viewport ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(10, m * 0.035, 28);
+    const gap = clamp(10, m * 0.025, 20);
+    const fs = clamp(12, m / 40, 18);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.setProperty('--gap', gap + 'px');
+
+    app.classList.add('col'); app.classList.remove('row', 'narrow');
+    const wCol = Math.max(200, vw - 2 * pad);
+    app.style.width = wCol + 'px';
+    app.style.setProperty('--S', wCol + 'px');
+    if (wCol < 400) app.classList.add('narrow');
+    const headH = head.offsetHeight;
+    const sCol = Math.min(vw - 2 * pad, vh - 2 * pad - headH - gap);
+
+    const side = clamp(200, m * 0.42, 300);
+    const sRow = Math.min(vh - 2 * pad, vw - 2 * pad - side - gap * 1.6);
+    const useRow = sRow > sCol * 1.06 && vw >= 560;
+    const fit = Math.floor(clamp(150, useRow ? sRow : sCol, 820));
+
+    // whole pixels: S = 7T + 8G, the top G + T strip holds the preview disc
+    let T = Math.floor(fit / (7 + 8 * 0.12)), G;
+    for (;;) { G = Math.max(3, Math.round(T * 0.12)); if (7 * T + 8 * G <= fit || T < 10) break; T--; }
+    const S = 7 * T + 8 * G;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    geo = {
+      S, T, G, Y0: T + G, dpr,
+      inset: Math.max(2, Math.round(T * 0.09)),
+      // fall six rows in about 0.36 s
+      grav: 2 * (T + G + G + 5 * (T + G)) / (0.36 * 0.36),
+    };
+    if (anim) anim.target = holeY(anim.r);
+    prevX = cursor >= 0 ? holeX(cursor) : -1;
+
+    app.classList.toggle('row', useRow);
+    app.classList.toggle('col', !useRow);
+    app.classList.toggle('narrow', !useRow && S < 400);
+    app.style.setProperty('--S', S + 'px');
+    app.style.setProperty('--side', side + 'px');
+    app.style.width = (useRow ? S + side + gap * 1.6 : S) + 'px';
+    cv.width = Math.round(S * dpr);
+    cv.height = Math.round(S * dpr);
+    dirty = true;
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- input ---------- */
+  function colAt(clientX, strict) {
+    const rect = cv.getBoundingClientRect();
+    const x = (clientX - rect.left) * (geo.S / rect.width);
+    if (strict && (x < -geo.T * 0.5 || x > geo.S + geo.T * 0.5)) return -1;
+    return clamp(0, Math.floor((x - geo.G / 2) / (geo.T + geo.G)), COLS - 1);
+  }
+
+  let press = null;
+  cv.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pointerKind = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+    press = { id: e.pointerId };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    const c = colAt(e.clientX, false);
+    if (c !== cursor) { cursor = c; dirty = true; }
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (press && e.pointerId !== press.id) return;
+    if (!press && e.pointerType !== 'mouse') return;
+    pointerKind = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+    const c = colAt(e.clientX, false);
+    if (c !== cursor) { cursor = c; dirty = true; }
+  });
+  cv.addEventListener('pointerup', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    press = null;
+    const c = colAt(e.clientX, true);
+    if (c >= 0) humanDrop(c);
+    if (e.pointerType !== 'mouse') cursor = -1;
+    dirty = true;
+  });
+  cv.addEventListener('pointercancel', () => { press = null; if (pointerKind === 'touch') cursor = -1; dirty = true; });
+  cv.addEventListener('pointerleave', (e) => {
+    if (e.pointerType === 'mouse' && !press) { cursor = -1; dirty = true; }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      if (!menuOpen && !endOpen) { e.preventDefault(); undo(); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) return;
+    if (menuOpen) {
+      if (e.key === 'Escape' && !resumeBtn.hidden) { e.preventDefault(); resume(); }
+      else if (e.key === 'Enter' && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); startGame(draft); }
+      return;
+    }
+    if (endOpen) {
+      if (e.key === 'Enter' && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); startGame(settings); }
+      return;
+    }
+    const k = e.key;
+    if (k >= '1' && k <= '7') {
+      e.preventDefault();
+      pointerKind = 'key';
+      cursor = Number(k) - 1; dirty = true;
+      humanDrop(cursor);
+      return;
+    }
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      e.preventDefault();
+      pointerKind = 'key';
+      if (cursor < 0) cursor = 3;
+      else cursor = clamp(0, cursor + (k === 'ArrowLeft' ? -1 : 1), COLS - 1);
+      dirty = true;
+      return;
+    }
+    if (k === 'Enter' || k === ' ') {
+      e.preventDefault();
+      if (e.repeat) return;
+      pointerKind = 'key';
+      if (cursor < 0) { cursor = 3; dirty = true; }
+      humanDrop(cursor);
+      return;
+    }
+    if ((k === 'u' || k === 'U') && !e.repeat) { undo(); return; }
+    if ((k === 'n' || k === 'N') && !e.repeat) { showMenu(); return; }
+    if (k === 'Escape') { e.preventDefault(); showMenu(); }
+  });
+
+  // No scrolling, rubber-banding or pull-to-refresh while playing.
+  document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => { e.preventDefault(); });
+
+  // Keys work after any click or tap inside the frame.
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+
+  V.onPause((p) => { paused = !!p; dirty = true; if (game) hud(); });
+
+  /* ---------- boot ---------- */
+  layout();
+  const saved = loadSaved();
+  if (saved) {
+    game = saved;
+    settings = { mode: saved.mode, level: saved.level, first: saved.first };
+    hud();
+    if (isCpuTurn()) computerMove();
+  } else {
+    game = makeGame(settings);
+    hud();
+    showMenu();
+  }
+  app.classList.add('ready');
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>

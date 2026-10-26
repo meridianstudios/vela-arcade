@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Falling Blocks</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --board-bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-h: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --pp: 8px;            /* panel padding, set from JS */
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout (grid set from JS) ---------- */
+  #app { display: grid; visibility: hidden; align-items: start; }
+  #app.ready { visibility: visible; }
+  #left, #right { display: flex; flex-direction: column; gap: var(--gap, 10px); min-width: 0; }
+  #left { grid-area: left; }
+  #right { grid-area: right; }
+  #boardCell { grid-area: board; }
+  #pad { grid-area: pad; }
+
+  .title {
+    margin: 0;
+    font: 600 0.95em/1.4 var(--font);
+    letter-spacing: 0.22em; text-transform: uppercase; white-space: nowrap;
+  }
+  #app.wide .title { display: flex; align-items: flex-start; font-size: 0.85em; letter-spacing: 0.14em; white-space: normal; }
+  #app.wide .title::before { flex: none; margin-top: 0.4em; }
+  .title::before {
+    content: ""; display: inline-block;
+    width: 0.62em; height: 0.62em; margin-right: 0.62em;
+    background: var(--brand); vertical-align: 0.02em;
+  }
+
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.72em, 12px)/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel {
+    display: block; width: 100%;
+    padding: var(--pp);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+  }
+  .panel canvas { display: block; margin-top: calc(var(--pp) * 0.7); }
+  button.panel { cursor: pointer; transition: border-color 150ms var(--ease), background-color 150ms var(--ease); }
+  button.panel:hover { border-color: rgba(255, 255, 255, 0.3); }
+  button.panel:active { background: var(--surface-2); }
+  button.panel:focus-visible, .btn:focus-visible, .pb:focus-visible { outline: 1px solid var(--brand-h); outline-offset: 2px; }
+
+  #stats { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 2px; }
+  .stat { position: relative; padding: calc(var(--pp) * 0.75) var(--pp); }
+  .stat + .stat { border-top: 1px solid var(--line); }
+  .num {
+    display: block;
+    font: 600 1.25em/1.15 var(--font-display, var(--font));
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.12em;
+    white-space: nowrap;
+  }
+  #app.wide .num { font-size: 1.9em; font-weight: 300; }
+  .num.bump { animation: bump 300ms var(--ease); }
+  @keyframes bump { 0% { color: var(--brand-h); } 100% { color: var(--text); } }
+  .plus {
+    position: absolute; right: var(--pp); top: calc(var(--pp) * 0.6);
+    font: 600 0.75em var(--font);
+    color: var(--brand-h);
+    pointer-events: none;
+    animation: rise 650ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+  @keyframes rise { from { opacity: 1; transform: translateY(0.4em); } to { opacity: 0; transform: translateY(-1.2em); } }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 2.9em; padding: 0 1.1em;
+    border-radius: 0; border: 1px solid var(--outline); background: transparent;
+    font: 600 clamp(11px, 0.74em, 13px) var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background-color 150ms var(--ease), border-color 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-h); border-color: var(--brand-h); }
+  .btn.primary:active { background: var(--brand-d); border-color: var(--brand-d); }
+  .btn svg { width: 1.2em; height: 1.2em; flex: none; }
+  #pauseBtn { width: 100%; background: var(--surface); border-color: var(--line); }
+  #pauseBtn:hover { border-color: rgba(255, 255, 255, 0.3); }
+
+  /* ---------- board ---------- */
+  #board {
+    position: relative;
+    background: var(--board-bg);
+    box-shadow: 0 0 0 1px var(--line);
+    border-radius: 0;
+    touch-action: none;
+    outline: none;
+  }
+  #cv { display: block; }
+  /* stepped so the board only sits on whole pixels and the canvas stays crisp */
+  #board.hit { animation: hit 180ms step-end; }
+  @keyframes hit {
+    25% { transform: translate(0, 3px); }
+    55% { transform: translate(-1px, -1px); }
+    80% { transform: translate(1px, 0); }
+  }
+
+  #pops {
+    position: absolute; left: 0; right: 0; top: 26%;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    pointer-events: none; z-index: 2;
+  }
+  .pop {
+    padding: 0.4em 0.7em;
+    background: #000; border: 1px solid var(--line);
+    font: 600 clamp(11px, 0.72em, 12px)/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+    animation: pop 1000ms var(--ease) forwards;
+  }
+  .pop.lines { background: var(--brand); border-color: var(--brand); }
+  @keyframes pop {
+    0% { opacity: 0; transform: translateY(6px); }
+    15% { opacity: 1; transform: none; }
+    75% { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateY(-6px); }
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center; padding: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    visibility: hidden; opacity: 0; pointer-events: none;
+    transition: opacity 200ms var(--ease), visibility 0s linear 200ms;
+  }
+  .overlay.show { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity 200ms var(--ease); }
+  .card {
+    width: 100%; max-width: 17em; text-align: center;
+    background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--brand);
+    border-radius: 0;
+    padding: 1.3em 1.1em 1.2em;
+    transform: translateY(12px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .name {
+    font-weight: 700; font-size: 1.15em; line-height: 1.25;
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .line { margin: 0.9em 0 0; font-size: 0.86em; line-height: 1.5; color: var(--muted); }
+  .card .btn { margin-top: 1.1em; min-width: 9em; }
+  .card .btns { display: flex; flex-direction: column; gap: 0.5em; margin-top: 1.1em; }
+  .card .btns .btn { margin-top: 0; width: 100%; }
+  .go-score {
+    margin-top: 0.3em;
+    font: 300 2.6em/1.05 var(--font-display, var(--font));
+    font-variant-numeric: tabular-nums;
+  }
+  .go-best { margin-top: 0.8em; }
+  .go-best .v { color: var(--text); margin-left: 0.5em; font-variant-numeric: tabular-nums; }
+  .tag {
+    display: none; margin: 0.7em auto 0; width: max-content;
+    padding: 0.45em 0.6em; background: var(--brand); color: #fff;
+    font: 600 0.62em/1 var(--font); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .tag.show { display: block; }
+
+  /* ---------- touch buttons ---------- */
+  #pad { display: none; gap: 4px; }
+  html.touch #pad { display: flex; }
+  .pb {
+    flex: 1 1 0; min-width: 0;
+    display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    touch-action: none; cursor: pointer; padding: 0;
+    font: 600 11px/1 var(--font); letter-spacing: 0.1em; text-transform: uppercase;
+    transition: background-color 120ms var(--ease), border-color 120ms var(--ease);
+  }
+  .pb svg { width: 22px; height: 22px; display: block; }
+  .pb.flip svg { transform: scaleX(-1); }
+  .pb.down { background: var(--brand); border-color: var(--brand); color: #fff; transition: none; }
+  .pb.sep { margin-left: 6px; }
+
+  html.touch .keys-only { display: none !important; }
+  html:not(.touch) .touch-only { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #board.hit { animation: none; }
+    .pop { animation-name: popfade; }
+    @keyframes popfade { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+    .card { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <h1 class="title" id="title">Falling Blocks</h1>
+    <div id="stats">
+      <div class="stat" id="scoreBox"><span class="lab">Score</span><span class="num" id="score">0</span></div>
+      <div class="stat"><span class="lab">Level</span><span class="num" id="level">1</span></div>
+      <div class="stat"><span class="lab">Lines</span><span class="num" id="lines">0</span></div>
+    </div>
+  </div>
+
+  <div id="boardCell">
+    <div id="board" tabindex="-1" aria-label="Game board">
+      <canvas id="cv"></canvas>
+      <div id="pops" aria-live="polite"></div>
+
+      <div class="overlay show" id="startOv">
+        <div class="card">
+          <div class="name">Falling Blocks</div>
+          <p class="line keys-only">Arrows move, Up rotates, Space drops, C holds, P pauses.</p>
+          <p class="line touch-only">Drag to move, tap to rotate, swipe down to drop.</p>
+          <button class="btn primary" id="playBtn" type="button">Play</button>
+        </div>
+      </div>
+
+      <div class="overlay" id="pauseOv">
+        <div class="card">
+          <div class="lab">Paused</div>
+          <div class="btns">
+            <button class="btn primary" id="resumeBtn" type="button">Resume</button>
+            <button class="btn" id="restartBtn" type="button">New game</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="overOv">
+        <div class="card" role="dialog" aria-live="polite">
+          <div class="lab">Game over</div>
+          <div class="go-score" id="goScore">0</div>
+          <div class="tag" id="goNew">New best</div>
+          <div class="lab go-best">Best<span class="v" id="goBest">0</span></div>
+          <button class="btn primary" id="againBtn" type="button">Play again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="right">
+    <button class="panel" id="holdBox" type="button" aria-label="Hold piece"><span class="lab">Hold</span><canvas id="holdCv"></canvas></button>
+    <div class="panel" id="nextBox"><span class="lab">Next</span><canvas id="nextCv"></canvas></div>
+    <button class="btn" id="pauseBtn" type="button" aria-label="Pause">
+      <svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2" width="3" height="10" fill="currentColor"/><rect x="8.5" y="2" width="3" height="10" fill="currentColor"/></svg>
+      <span>Pause</span>
+    </button>
+  </div>
+
+  <div id="pad" aria-hidden="true">
+    <button class="pb" data-act="left" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M15 5L8 12L15 19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+    <button class="pb" data-act="down" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M5 9L12 16L19 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+    <button class="pb" data-act="right" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M9 5L16 12L9 19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+    <button class="pb sep" data-act="hold" type="button" tabindex="-1">Hold</button>
+    <button class="pb sep flip" data-act="ccw" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 19A7 7 0 1 1 19 12" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 9L19 12.5L22.5 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+    <button class="pb" data-act="cw" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 19A7 7 0 1 1 19 12" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 9L19 12.5L22.5 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+    <button class="pb" data-act="hard" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M6 5L12 11L18 5M6 11L12 17L18 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/><path d="M5 20.5H19" stroke="currentColor" stroke-width="2.2"/></svg></button>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="falling-blocks"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: window.parent !== window,
+    ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const W = 10;            // columns
+  const H = 40;            // total rows, 20 hidden above the field
+  const VIS = 20;          // visible rows
+  const TOP = H - VIS;     // first visible row index
+  const TYPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+  // Spawn orientation inside its bounding box (x right, y down).
+  const BASE = {
+    I: [4, [[0, 1], [1, 1], [2, 1], [3, 1]]],
+    J: [3, [[0, 0], [0, 1], [1, 1], [2, 1]]],
+    L: [3, [[2, 0], [0, 1], [1, 1], [2, 1]]],
+    O: [2, [[0, 0], [1, 0], [0, 1], [1, 1]]],
+    S: [3, [[1, 0], [2, 0], [0, 1], [1, 1]]],
+    T: [3, [[1, 0], [0, 1], [1, 1], [2, 1]]],
+    Z: [3, [[0, 0], [1, 0], [1, 1], [2, 1]]],
+  };
+
+  // SHAPES[type][rot]: rot 0 spawn, 1 right (clockwise), 2 upside down, 3 left.
+  // SRS rotation is plain rotation inside the bounding box.
+  const SHAPES = {};
+  TYPES.forEach((t) => {
+    const n = BASE[t][0];
+    const rots = [BASE[t][1]];
+    for (let r = 1; r < 4; r++) rots.push(rots[r - 1].map(([x, y]) => [n - 1 - y, x]));
+    SHAPES[t] = rots;
+  });
+
+  // SRS wall kicks, written as in the guideline (x right, y UP). Converted on use.
+  const KICKS = {
+    '01': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+    '10': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+    '12': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+    '21': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+    '23': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+    '32': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+    '30': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+    '03': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+  };
+  const KICKS_I = {
+    '01': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+    '10': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+    '12': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+    '21': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+    '23': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+    '32': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+    '30': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+    '03': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+  };
+
+  function emptyRow() { return new Array(W).fill(0); }
+  function emptyBoard() { const b = []; for (let y = 0; y < H; y++) b.push(emptyRow()); return b; }
+
+  function collides(board, type, rot, x, y) {
+    const s = SHAPES[type][rot];
+    for (let i = 0; i < 4; i++) {
+      const cx = x + s[i][0], cy = y + s[i][1];
+      if (cx < 0 || cx >= W || cy < 0 || cy >= H) return true;
+      if (board[cy][cx]) return true;
+    }
+    return false;
+  }
+
+  // dir +1 clockwise, -1 counter-clockwise. Returns the moved piece (with the
+  // kick test index used) or null when every test fails.
+  function tryRotate(board, p, dir) {
+    const to = (p.rot + dir + 4) % 4;
+    const tests = p.type === 'O' ? [[0, 0]] : (p.type === 'I' ? KICKS_I : KICKS)['' + p.rot + to];
+    for (let i = 0; i < tests.length; i++) {
+      const nx = p.x + tests[i][0], ny = p.y - tests[i][1];
+      if (!collides(board, p.type, to, nx, ny)) return { type: p.type, rot: to, x: nx, y: ny, kick: i };
+    }
+    return null;
+  }
+
+  function fullRows(board) {
+    const rows = [];
+    for (let y = 0; y < H; y++) if (board[y].every((v) => v)) rows.push(y);
+    return rows;
+  }
+
+  function clearRows(board, rows) {
+    const keep = board.filter((_, y) => rows.indexOf(y) < 0);
+    while (keep.length < H) keep.unshift(emptyRow());
+    return keep;
+  }
+
+  function makeBag(rand) {
+    let bag = [];
+    return function next() {
+      if (!bag.length) {
+        bag = TYPES.slice();
+        for (let i = bag.length - 1; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          const t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+        }
+      }
+      return bag.pop();
+    };
+  }
+
+  // Guideline gravity: seconds per row.
+  function gravityFor(level) {
+    const l = Math.min(level, 20) - 1;
+    return Math.pow(0.8 - l * 0.007, l);
+  }
+
+  const LINE_POINTS = [0, 100, 300, 500, 800];
+  // st = { b2b: last clear was 4 lines, combo: -1 when no chain }
+  function scoreClear(n, level, st) {
+    if (!n) return { points: 0, b2b: st.b2b, combo: -1, labels: [] };
+    const hard = n === 4;
+    let points = LINE_POINTS[n] * level;
+    const labels = [n === 1 ? '1 line' : n + ' lines'];
+    if (hard && st.b2b) { points = Math.floor(points * 1.5); labels.push('Back to back'); }
+    const combo = st.combo + 1;
+    if (combo > 0) { points += 50 * combo * level; labels.push('Combo ' + combo); }
+    return { points, b2b: hard, combo, labels };
+  }
+
+  function spawnPiece(type) {
+    return { type, rot: 0, x: type === 'O' ? 4 : 3, y: type === 'I' ? TOP - 1 : TOP };
+  }
+
+  function dropDistance(board, p) {
+    let d = 0;
+    while (!collides(board, p.type, p.rot, p.x, p.y + d + 1)) d++;
+    return d;
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- config ---------- */
+  const STEP = 1 / 120;          // fixed logic step, seconds
+  const DAS = 0.17;
+  const ARR = 0.05;
+  const LOCK_DELAY = 0.5;
+  const MAX_RESETS = 15;
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const CLEAR_T = reduceMotion ? 0.12 : 0.24;
+  const QUEUE_LEN = 5;
+
+  // Seven flat shades from the orange, white and grey family.
+  const COLORS = {
+    I: '#ffffff', O: '#c9cbd1', T: '#ea5426', S: '#ff7a4d', Z: '#b83f19', J: '#8a8f99', L: '#ffb08f',
+  };
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.round(((n >> 16) & 255) * k), g = Math.round(((n >> 8) & 255) * k), b = Math.round((n & 255) * k);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  const EDGE = {};
+  TYPES.forEach((t) => { EDGE[t] = shade(COLORS[t], 0.68); });
+  const DEAD = '#3a3d44', DEAD_EDGE = '#2a2c31';
+  const EMPTY = '#121418';
+  const BOARD_BG = '#0b0c0f';
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const app = $('app'), leftCol = $('left'), rightCol = $('right');
+  const boardEl = $('board'), cv = $('cv'), bctx = cv.getContext('2d');
+  const holdBox = $('holdBox'), holdCv = $('holdCv'), hctx = holdCv.getContext('2d');
+  const nextBox = $('nextBox'), nextCv = $('nextCv'), nctx = nextCv.getContext('2d');
+  const statsEl = $('stats'), pauseBtn = $('pauseBtn'), titleEl = $('title'), pad = $('pad');
+  const scoreEl = $('score'), levelEl = $('level'), linesEl = $('lines'), scoreBox = $('scoreBox');
+  const popsEl = $('pops');
+  const startOv = $('startOv'), pauseOv = $('pauseOv'), overOv = $('overOv');
+
+  /* ---------- state ---------- */
+  let board = emptyBoard();
+  let piece = null;
+  let holdType = null, holdUsed = false;
+  let queue = [];
+  let nextFromBag = makeBag(Math.random);
+  let score = 0, level = 1, lines = 0, b2b = false, combo = -1;
+  let state = 'start';          // start | play | paused | over
+  let phase = 'piece';          // piece | clear
+  let clearing = null, clearT = 0;
+  let gravAcc = 0, lockTimer = 0, lockResets = 0, lowestY = 0;
+  let actions = [];
+  const held = { left: false, right: false };
+  let softKey = false, softPad = false;
+  let dasDir = null, dasT = 0, arrT = 0;
+  let sideDirty = true;
+  let overTimer = 0, overShownAt = 0;
+
+  /* ---------- core rules ---------- */
+  function takeNext() {
+    while (queue.length < QUEUE_LEN + 1) queue.push(nextFromBag());
+    const t = queue.shift();
+    while (queue.length < QUEUE_LEN) queue.push(nextFromBag());
+    sideDirty = true;
+    return t;
+  }
+
+  function spawn(type) {
+    let p = spawnPiece(type);
+    if (collides(board, p.type, p.rot, p.x, p.y)) {
+      p.y -= 1;   // one row of grace in the hidden area
+      if (collides(board, p.type, p.rot, p.x, p.y)) { piece = null; gameOver(); return; }
+    }
+    piece = p;
+    gravAcc = 0; lockTimer = 0; lockResets = 0; lowestY = p.y;
+    sideDirty = true;
+  }
+
+  function spawnNext() { holdUsed = false; spawn(takeNext()); }
+
+  function grounded() { return !!piece && collides(board, piece.type, piece.rot, piece.x, piece.y + 1); }
+
+  function moved() {
+    if (lockResets < MAX_RESETS) {
+      if (lockTimer > 0 || grounded()) lockResets++;
+      lockTimer = 0;
+    }
+  }
+
+  function shift(dx) {
+    if (!piece || phase !== 'piece') return false;
+    if (collides(board, piece.type, piece.rot, piece.x + dx, piece.y)) return false;
+    piece.x += dx;
+    moved();
+    return true;
+  }
+
+  function stepDown() {
+    if (!piece || collides(board, piece.type, piece.rot, piece.x, piece.y + 1)) return false;
+    piece.y++;
+    if (piece.y > lowestY) { lowestY = piece.y; lockResets = 0; lockTimer = 0; }
+    return true;
+  }
+
+  function rotate(dir) {
+    if (!piece || phase !== 'piece') return;
+    const r = tryRotate(board, piece, dir);
+    if (!r) return;
+    piece = { type: r.type, rot: r.rot, x: r.x, y: r.y };
+    moved();
+  }
+
+  function hardDrop() {
+    if (!piece || phase !== 'piece') return;
+    const d = dropDistance(board, piece);
+    piece.y += d;
+    if (d) addScore(2 * d, false);
+    hit();
+    lockPiece();
+  }
+
+  function doHold() {
+    if (!piece || phase !== 'piece' || holdUsed) return;
+    const t = piece.type;
+    holdUsed = true;
+    if (holdType) { const h = holdType; holdType = t; spawn(h); }
+    else { holdType = t; spawn(takeNext()); }
+    sideDirty = true;
+  }
+
+  function lockPiece() {
+    const s = SHAPES[piece.type][piece.rot];
+    const idx = TYPES.indexOf(piece.type) + 1;
+    let above = true;
+    for (let i = 0; i < 4; i++) {
+      const x = piece.x + s[i][0], y = piece.y + s[i][1];
+      board[y][x] = idx;
+      if (y >= TOP) above = false;
+    }
+    piece = null;
+    const rows = fullRows(board);
+    const res = scoreClear(rows.length, level, { b2b, combo });
+    b2b = res.b2b; combo = res.combo;
+    if (rows.length) {
+      lines += rows.length;
+      addScore(res.points, true);
+      const lv = 1 + Math.floor(lines / 10);
+      const labels = res.labels.slice();
+      if (lv > level) { level = lv; labels.push('Level ' + level); }
+      labels.forEach((t, i) => pop(t, i === 0));
+      updateHud();
+      phase = 'clear'; clearing = rows; clearT = 0;
+      return;
+    }
+    if (above) { gameOver(); return; }   // locked fully above the field
+    spawnNext();
+  }
+
+  function doAction(a) {
+    switch (a) {
+      case 'L': shift(-1); break;
+      case 'R': shift(1); break;
+      case 'D1': if (piece && phase === 'piece' && stepDown()) addScore(1, false); break;
+      case 'cw': rotate(1); break;
+      case 'ccw': rotate(-1); break;
+      case 'hard': hardDrop(); break;
+      case 'hold': doHold(); break;
+    }
+  }
+
+  function updateDas(dt) {
+    if (!dasDir) return;
+    const dx = dasDir === 'left' ? -1 : 1;
+    if (dasT < DAS) {
+      dasT += dt;
+      if (dasT >= DAS) { arrT = dasT - DAS; shift(dx); }
+    } else {
+      arrT += dt;
+      while (arrT >= ARR) {
+        arrT -= ARR;
+        if (!shift(dx)) { arrT = 0; break; }
+      }
+    }
+  }
+
+  function tick(dt) {
+    if (phase === 'clear') {
+      actions.length = 0;
+      updateDas(dt);
+      clearT += dt;
+      if (clearT >= CLEAR_T) {
+        board = clearRows(board, clearing);
+        clearing = null;
+        phase = 'piece';
+        spawnNext();
+      }
+      return;
+    }
+    while (actions.length) {
+      doAction(actions.shift());
+      if (state !== 'play' || phase !== 'piece' || !piece) { actions.length = 0; return; }
+    }
+    updateDas(dt);
+    if (!piece) return;
+
+    const g = gravityFor(level);
+    const soft = softKey || softPad;
+    const interval = soft ? g / 20 : g;
+    if (!grounded()) {
+      gravAcc += dt / interval;
+      while (gravAcc >= 1) {
+        gravAcc -= 1;
+        if (!stepDown()) { gravAcc = 0; break; }
+        if (soft) addScore(1, false);
+      }
+    } else {
+      gravAcc = 0;
+    }
+    if (grounded()) {
+      lockTimer += dt;
+      if (lockTimer >= LOCK_DELAY) lockPiece();
+    }
+  }
+
+  /* ---------- HUD ---------- */
+  let shownScore = -1;
+  function addScore(n, big) {
+    if (!n) return;
+    score += n;
+    if (big) {
+      scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump');
+      const p = document.createElement('span');
+      p.className = 'plus';
+      p.textContent = '+' + n.toLocaleString('en-US');
+      scoreBox.appendChild(p);
+      setTimeout(() => p.remove(), 700);
+    }
+    updateHud();
+  }
+
+  function updateHud() {
+    if (score !== shownScore) {
+      shownScore = score;
+      scoreEl.textContent = score.toLocaleString('en-US');
+      V.score(score);
+    }
+    levelEl.textContent = level;
+    linesEl.textContent = lines;
+  }
+
+  function pop(text, strong) {
+    const el = document.createElement('div');
+    el.className = 'pop' + (strong ? ' lines' : '');
+    el.textContent = text;
+    popsEl.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+    setTimeout(() => el.remove(), 1400);
+  }
+
+  function hit() {
+    if (reduceMotion) return;
+    boardEl.classList.remove('hit'); void boardEl.offsetWidth; boardEl.classList.add('hit');
+  }
+  boardEl.addEventListener('animationend', (e) => { if (e.target === boardEl) boardEl.classList.remove('hit'); });
+
+  /* ---------- flow ---------- */
+  function showOv(ov) {
+    [startOv, pauseOv, overOv].forEach((o) => o.classList.toggle('show', o === ov));
+    const b = ov && ov.querySelector('.btn.primary');
+    if (b) setTimeout(() => { try { b.focus({ preventScroll: true }); } catch (_) {} }, 50);
+  }
+
+  function releaseAll() {
+    held.left = held.right = false;
+    dasDir = null; softKey = softPad = false;
+    actions.length = 0;
+    pad.querySelectorAll('.pb.down').forEach((b) => b.classList.remove('down'));
+    gesture = null;
+  }
+
+  function reset() {
+    clearTimeout(overTimer);
+    board = emptyBoard();
+    piece = null; holdType = null; holdUsed = false;
+    nextFromBag = makeBag(Math.random);
+    queue = [];
+    score = 0; level = 1; lines = 0; b2b = false; combo = -1;
+    phase = 'piece'; clearing = null;
+    shownScore = -1;
+    popsEl.textContent = '';
+    releaseAll();
+    while (queue.length < QUEUE_LEN) queue.push(nextFromBag());
+    updateHud();
+    sideDirty = true;
+  }
+
+  function start() {
+    if (state === 'play') return;
+    if (state === 'paused' && score > 0) V.gameOver(score); // an abandoned run still counts toward best
+    reset();
+    state = 'play';
+    showOv(null);
+    spawnNext();
+    lastT = 0; acc = 0;
+    try { boardEl.focus({ preventScroll: true }); } catch (_) {}
+  }
+
+  function pause() {
+    if (state !== 'play') return;
+    state = 'paused';
+    releaseAll();
+    showOv(pauseOv);
+    pauseBtn.setAttribute('aria-label', 'Resume');
+  }
+
+  function resume() {
+    if (state !== 'paused') return;
+    state = 'play';
+    showOv(null);
+    lastT = 0; acc = 0;
+    pauseBtn.setAttribute('aria-label', 'Pause');
+  }
+
+  function togglePause() { if (state === 'play') pause(); else if (state === 'paused') resume(); }
+
+  function gameOver() {
+    if (state === 'over') return;
+    state = 'over';
+    piece = null;
+    releaseAll();
+    const isBest = V.gameOver(score);
+    $('goScore').textContent = score.toLocaleString('en-US');
+    $('goBest').textContent = Math.max(V.best(), score).toLocaleString('en-US');
+    $('goNew').classList.toggle('show', !!isBest && score > 0);
+    hit();
+    overTimer = setTimeout(() => { if (state === 'over') { showOv(overOv); overShownAt = performance.now(); } }, 650);
+  }
+
+  /* ---------- drawing ---------- */
+  const geo = { dpr: 1, D: 20, g: 1, c: 20, m: 12 };
+
+  function cell(ctx, px, py, s, e, main, edge) {
+    ctx.fillStyle = edge;
+    ctx.fillRect(px, py, s, s);
+    ctx.fillStyle = main;
+    ctx.fillRect(px + e, py + e, s - 2 * e, s - 2 * e);
+  }
+
+  function renderBoard() {
+    const D = geo.D, g = geo.g, ctx = bctx, s = D - g;
+    ctx.fillStyle = BOARD_BG;
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    const dead = state === 'over';
+    for (let y = 0; y < VIS; y++) {
+      const row = board[TOP + y];
+      for (let x = 0; x < W; x++) {
+        const v = row[x];
+        const px = g + x * D, py = g + y * D;
+        if (!v) { ctx.fillStyle = EMPTY; ctx.fillRect(px, py, s, s); continue; }
+        const t = TYPES[v - 1];
+        if (dead) cell(ctx, px, py, s, g, DEAD, DEAD_EDGE);
+        else cell(ctx, px, py, s, g, COLORS[t], EDGE[t]);
+      }
+    }
+
+    // Line clear: white flash, then the rows pinch shut.
+    if (clearing) {
+      const k = clearT / CLEAR_T;
+      ctx.fillStyle = '#ffffff';
+      for (const ry of clearing) {
+        const y = ry - TOP;
+        if (y < 0) continue;
+        const py = g + y * D;
+        if (k < 0.55 || reduceMotion) {
+          for (let x = 0; x < W; x++) ctx.fillRect(g + x * D, py, s, s);
+        } else {
+          const f = 1 - (k - 0.55) / 0.45;
+          const h = Math.max(g, Math.round(s * f));
+          ctx.fillRect(g, py + Math.round((s - h) / 2), W * D - g, h);
+        }
+      }
+    }
+
+    if (piece && state !== 'over') {
+      const sh = SHAPES[piece.type][piece.rot];
+      const gy = piece.y + dropDistance(board, piece);
+      // ghost: 1px outline only
+      if (gy !== piece.y) {
+        ctx.strokeStyle = COLORS[piece.type];
+        ctx.lineWidth = g;
+        for (let i = 0; i < 4; i++) {
+          const y = gy + sh[i][1] - TOP;
+          if (y < 0) continue;
+          const px = g + (piece.x + sh[i][0]) * D, py = g + y * D;
+          ctx.strokeRect(px + g / 2, py + g / 2, s - g, s - g);
+        }
+      }
+      for (let i = 0; i < 4; i++) {
+        const y = piece.y + sh[i][1] - TOP;
+        if (y < 0) continue;
+        cell(ctx, g + (piece.x + sh[i][0]) * D, g + y * D, s, g, COLORS[piece.type], EDGE[piece.type]);
+      }
+    }
+  }
+
+  // Piece centred in a box, mini cells of size M device px.
+  function drawMini(ctx, type, cx, cy, M, e, dim) {
+    const sh = SHAPES[type][0];
+    let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+    sh.forEach(([x, y]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); });
+    const w = (x1 - x0 + 1) * M, h = (y1 - y0 + 1) * M;
+    const ox = Math.round(cx - w / 2), oy = Math.round(cy - h / 2);
+    sh.forEach(([x, y]) => {
+      cell(ctx, ox + (x - x0) * M, oy + (y - y0) * M, M - e, e, dim ? DEAD : COLORS[type], dim ? DEAD_EDGE : EDGE[type]);
+    });
+  }
+
+  function renderSide() {
+    sideDirty = false;
+    const M = Math.max(4, Math.round(geo.m * geo.dpr)), e = geo.g;
+    hctx.clearRect(0, 0, holdCv.width, holdCv.height);
+    if (holdType) drawMini(hctx, holdType, holdCv.width / 2, holdCv.height / 2, M, e, holdUsed && state === 'play');
+    nctx.clearRect(0, 0, nextCv.width, nextCv.height);
+    const slot = nextCv.height / QUEUE_LEN;
+    const list = state === 'start' ? [] : queue.slice(0, QUEUE_LEN);
+    list.forEach((t, i) => drawMini(nctx, t, nextCv.width / 2, slot * i + slot / 2, M, e, false));
+  }
+
+  /* ---------- layout ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  let wide = false;
+
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight, mn = Math.min(vw, vh);
+    const dpr = window.devicePixelRatio || 1;
+    const outer = clamp(8, mn * 0.03, 24);
+    const gap = Math.round(clamp(6, mn * 0.02, 14));
+    const touch = root.classList.contains('touch');
+    const embedded = root.classList.contains('vela-embedded');
+    const padH = touch ? Math.round(clamp(42, vh * 0.07, 56)) : 0;
+    const padRow = touch ? padH + gap : 0;
+    const titleRow = embedded ? 0 : 24 + gap;
+    const SIDE_N = 4.3, SIDE_W = 5.2;
+
+    const cN = Math.min((vw - 2 * outer - gap) / (10 + SIDE_N), (vh - 2 * outer - titleRow - padRow) / 20.1);
+    const cW = Math.min((vw - 2 * outer - 2 * gap) / (10 + 2 * SIDE_W), (vh - 2 * outer - padRow) / 20.1);
+    wide = cW > cN || (cW >= cN * 0.97 && vw > vh * 1.1);
+    const cRaw = clamp(7, wide ? cW : cN, 46);
+    const D = Math.max(6, Math.floor(cRaw * dpr));
+    const g = Math.max(1, Math.round(dpr));
+    const c = D / dpr;
+    geo.dpr = dpr; geo.D = D; geo.g = g; geo.c = c;
+
+    cv.width = W * D + g; cv.height = VIS * D + g;
+    const bw = cv.width / dpr, bh = cv.height / dpr;
+    cv.style.width = bw + 'px'; cv.style.height = bh + 'px';
+    boardEl.style.width = bw + 'px'; boardEl.style.height = bh + 'px';
+
+    const fs = clamp(11, c * 0.5, 16);
+    root.style.fontSize = fs + 'px';
+    const pp = Math.round(clamp(5, c * 0.3, 12));
+    root.style.setProperty('--pp', pp + 'px');
+    root.style.setProperty('--gap', gap + 'px');
+
+    const sideW = Math.floor((wide ? SIDE_W : SIDE_N) * c);
+    app.classList.toggle('wide', wide);
+    app.style.columnGap = app.style.rowGap = gap + 'px';
+    titleEl.style.display = embedded ? 'none' : '';
+
+    if (wide) {
+      leftCol.append(titleEl, holdBox, statsEl, pauseBtn);
+      rightCol.append(nextBox);
+      leftCol.style.display = '';
+      app.style.gridTemplateColumns = sideW + 'px ' + bw + 'px ' + sideW + 'px';
+      app.style.gridTemplateAreas = '"left board right"' + (touch ? ' "pad pad pad"' : '');
+    } else {
+      leftCol.append(titleEl);
+      rightCol.append(holdBox, nextBox, statsEl, pauseBtn);
+      leftCol.style.display = embedded ? 'none' : '';
+      app.style.gridTemplateColumns = bw + 'px ' + sideW + 'px';
+      app.style.gridTemplateAreas = (embedded ? '' : '"left left" ') + '"board right"' + (touch ? ' "pad pad"' : '');
+    }
+    pad.style.height = padH + 'px';
+
+    // Mini piece size, shrunk until the side column fits beside the board.
+    const inner = sideW - 2 * pp - 2;
+    let m = Math.min(inner / 4.6, c * (wide ? 0.78 : 0.66));
+    for (let i = 0; i < 4; i++) {
+      sizeSide(m, inner);
+      const colH = Math.max(leftCol.scrollHeight * (wide ? 1 : 0), rightCol.scrollHeight);
+      if (colH <= bh + 0.5 || m < 5) break;
+      const fixed = colH - (holdCv.offsetHeight + nextCv.offsetHeight);
+      const room = bh - fixed;
+      const want = (holdCv.offsetHeight + nextCv.offsetHeight);
+      m = Math.max(4, m * Math.min(0.97, room / want));
+    }
+    sideDirty = true;
+  }
+
+  function sizeSide(m, inner) {
+    geo.m = m;
+    const dpr = geo.dpr;
+    const w = Math.max(10, Math.floor(inner * dpr));
+    holdCv.width = w; holdCv.height = Math.round(m * 2.6 * dpr);
+    nextCv.width = w; nextCv.height = Math.round(m * 2.6 * QUEUE_LEN * dpr);
+    holdCv.style.width = nextCv.style.width = w / dpr + 'px';
+    holdCv.style.height = holdCv.height / dpr + 'px';
+    nextCv.style.height = nextCv.height / dpr + 'px';
+  }
+
+  let resizeRaf = 0;
+  function onResize() { cancelAnimationFrame(resizeRaf); resizeRaf = requestAnimationFrame(layout); }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  function markTouch() {
+    if (root.classList.contains('touch')) return;
+    root.classList.add('touch');
+    layout();
+  }
+
+  /* ---------- keyboard ---------- */
+  function dirDown(dir) {
+    if (held[dir] && dasDir === dir) return;
+    held[dir] = true;
+    dasDir = dir; dasT = 0; arrT = 0;
+    actions.push(dir === 'left' ? 'L' : 'R');
+  }
+  function dirUp(dir) {
+    held[dir] = false;
+    if (dasDir !== dir) return;
+    const other = dir === 'left' ? 'right' : 'left';
+    if (held[other]) { dasDir = other; dasT = 0; arrT = 0; } else dasDir = null;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.altKey) return;
+    const c = e.code, k = e.key;
+    const isStartKey = k === 'Enter' || c === 'Space';
+    if (state === 'start' || state === 'over') {
+      if (isStartKey) {
+        e.preventDefault();
+        // a short guard so a drop key still held at game over does not restart at once
+        if (!e.repeat && (state === 'start' || (overOv.classList.contains('show') && performance.now() - overShownAt > 450))) start();
+      }
+      return;
+    }
+    if (c === 'KeyP' || c === 'Escape') { e.preventDefault(); if (!e.repeat) togglePause(); return; }
+    if (state === 'paused') {
+      if (isStartKey) { e.preventDefault(); if (!e.repeat) resume(); }
+      return;
+    }
+    // playing (Ctrl is a rotate key, so Ctrl held with other game keys still counts)
+    let act = null;
+    switch (c) {
+      case 'ArrowLeft': e.preventDefault(); if (!e.repeat) dirDown('left'); return;
+      case 'ArrowRight': e.preventDefault(); if (!e.repeat) dirDown('right'); return;
+      case 'ArrowDown': e.preventDefault(); softKey = true; return;
+      case 'Space': act = 'hard'; break;
+      case 'ArrowUp': case 'KeyX': act = 'cw'; break;
+      case 'KeyZ': case 'ControlLeft': case 'ControlRight': act = 'ccw'; break;
+      case 'KeyC': case 'ShiftLeft': case 'ShiftRight': act = 'hold'; break;
+    }
+    if (act) {
+      e.preventDefault();
+      if (!e.repeat) actions.push(act);
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft') dirUp('left');
+    else if (e.code === 'ArrowRight') dirUp('right');
+    else if (e.code === 'ArrowDown') softKey = false;
+  });
+
+  window.addEventListener('blur', () => { if (state === 'play') pause(); else releaseAll(); });
+
+  /* ---------- touch on the board ---------- */
+  let gesture = null;
+  boardEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;      // mouse players use the keyboard
+    if (state !== 'play' || e.target.closest('.overlay.show')) return;
+    markTouch();
+    gesture = {
+      id: e.pointerId, x0: e.clientX, y0: e.clientY, ax: e.clientX, ay: e.clientY,
+      t0: performance.now(), axis: null, done: false, samples: [{ t: performance.now(), y: e.clientY }],
+    };
+    try { boardEl.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  function recentSpeed(now) {
+    const s = gesture.samples;
+    let i = s.length - 1;
+    while (i > 0 && now - s[i - 1].t < 90) i--;
+    const a = s[Math.max(0, i - 1)], b = s[s.length - 1];
+    const dt = b.t - a.t;
+    return dt > 0 ? (b.y - a.y) / dt : 0;
+  }
+
+  boardEl.addEventListener('pointermove', (e) => {
+    if (!gesture || e.pointerId !== gesture.id || gesture.done || state !== 'play') return;
+    const now = performance.now();
+    const cs = geo.c;
+    const x = e.clientX, y = e.clientY;
+    const dx = x - gesture.x0, dy = y - gesture.y0;
+    gesture.samples.push({ t: now, y });
+    if (gesture.samples.length > 12) gesture.samples.shift();
+    if (!gesture.axis && Math.hypot(dx, dy) > Math.max(8, cs * 0.4)) {
+      gesture.axis = Math.abs(dx) > Math.abs(dy) ? 'h' : (dy > 0 ? 'v' : 'up');
+    }
+    if (gesture.axis === 'h') {
+      while (x - gesture.ax >= cs) { actions.push('R'); gesture.ax += cs; }
+      while (x - gesture.ax <= -cs) { actions.push('L'); gesture.ax -= cs; }
+    } else if (gesture.axis === 'v') {
+      if (dy > cs * 1.5 && recentSpeed(now) > 0.9) { actions.push('hard'); gesture.done = true; return; }
+      while (y - gesture.ay >= cs) { actions.push('D1'); gesture.ay += cs; }
+    }
+  });
+
+  function endGesture(e) {
+    if (!gesture || e.pointerId !== gesture.id) return;
+    const g = gesture;
+    gesture = null;
+    if (e.type !== 'pointerup' || g.done || state !== 'play') return;
+    const now = performance.now();
+    if (!g.axis) {
+      if (now - g.t0 < 350) actions.push('cw');
+    } else if (g.axis === 'v') {
+      g.samples.push({ t: now, y: e.clientY });
+      const dy = e.clientY - g.y0, dx = Math.abs(e.clientX - g.x0);
+      const quick = now - g.t0 < 260 && dy > geo.c * 2 && dy > dx * 2;
+      if (quick || (dy > geo.c && recentSpeedOf(g, now) > 0.65)) actions.push('hard');
+    }
+  }
+  function recentSpeedOf(g, now) { const keep = gesture; gesture = g; const v = recentSpeed(now); gesture = keep; return v; }
+  boardEl.addEventListener('pointerup', endGesture);
+  boardEl.addEventListener('pointercancel', endGesture);
+
+  /* ---------- on-screen buttons ---------- */
+  pad.querySelectorAll('.pb').forEach((b) => {
+    const act = b.dataset.act;
+    let on = false;
+    const press = (e) => {
+      e.preventDefault();
+      markTouch();
+      try { b.setPointerCapture(e.pointerId); } catch (_) {}
+      b.classList.add('down');
+      if (state !== 'play') return;
+      on = true;
+      if (act === 'left' || act === 'right') dirDown(act);
+      else if (act === 'down') softPad = true;
+      else actions.push(act);
+    };
+    const release = () => {
+      b.classList.remove('down');
+      if (!on) return;
+      on = false;
+      if (act === 'left' || act === 'right') dirUp(act);
+      else if (act === 'down') softPad = false;
+    };
+    b.addEventListener('pointerdown', press);
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('lostpointercapture', release);
+    b.addEventListener('contextmenu', (e) => e.preventDefault());
+  });
+
+  holdBox.addEventListener('click', () => { holdBox.blur(); if (state === 'play') actions.push('hold'); });
+  pauseBtn.addEventListener('click', () => { pauseBtn.blur(); if (state === 'play' || state === 'paused') togglePause(); });
+  $('playBtn').addEventListener('click', start);
+  $('resumeBtn').addEventListener('click', resume);
+  $('restartBtn').addEventListener('click', () => { start(); });
+  $('againBtn').addEventListener('click', start);
+
+  // No page scroll, pull to refresh or double-tap zoom.
+  document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => { e.preventDefault(); });
+  document.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (e.pointerType === 'touch') markTouch();
+  }, true);
+
+  // The arcade pausing us freezes the run; the player resumes when ready.
+  V.onPause((p) => { if (p) pause(); });
+
+  /* ---------- main loop ---------- */
+  let lastT = 0, acc = 0;
+  function frame(t) {
+    let dt = lastT ? (t - lastT) / 1000 : 0;
+    lastT = t;
+    if (dt > 0.25) dt = 0.25;
+    if (dt < 0) dt = 0;
+    if ((window.devicePixelRatio || 1) !== geo.dpr) layout();
+    if (state === 'play') {
+      acc += dt;
+      while (acc >= STEP && state === 'play') { acc -= STEP; tick(STEP); }
+    }
+    renderBoard();
+    if (sideDirty) renderSide();
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- boot ---------- */
+  if (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches) root.classList.add('touch');
+  reset();
+  layout();
+  app.classList.add('ready');
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>

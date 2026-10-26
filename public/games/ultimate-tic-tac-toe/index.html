@@ -1,0 +1,1296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Ultimate Tic-Tac-Toe</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --S: 340px;
+    --side: 240px;
+    --gap: 14px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app { display: grid; visibility: hidden; }
+  .app.ready { visibility: visible; }
+  .app.col {
+    grid-template-columns: var(--S);
+    grid-template-rows: auto var(--S);
+    row-gap: var(--gap);
+  }
+  .app.row {
+    grid-template-columns: var(--side) var(--S);
+    grid-template-rows: var(--S);
+    column-gap: calc(var(--gap) * 1.6);
+    align-items: center;
+  }
+
+  .head { display: grid; align-items: center; gap: 0.75em; min-width: 0; }
+  .app.col .head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand brand" "scores actions";
+  }
+  html.vela-embedded .app.col .head { grid-template-areas: "scores actions"; }
+  html.vela-embedded .app.col .brand { display: none; }
+  .app.row .head {
+    grid-row: 1; grid-column: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "brand" "scores" "actions";
+    gap: 1em;
+    align-content: center;
+  }
+
+  .brand { grid-area: brand; min-width: 0; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .brand p { margin: 0.6em 0 0; color: var(--muted); font-size: 0.86em; line-height: 1.45; }
+
+  .scores { grid-area: scores; display: flex; gap: 0.5em; min-width: 0; }
+  .app.row .scores { flex-direction: column; }
+  .stat {
+    position: relative;
+    min-width: 0;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .stat.status { flex: 1; }
+  .app.row .stat { padding: 0.65em 0.95em 0.7em; }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .val {
+    display: flex; align-items: center; gap: 0.5em;
+    margin-top: 0.3em;
+    font: 600 1.05em/1.2 var(--font);
+    white-space: nowrap;
+  }
+  .app.row .val { font-size: 1.25em; font-weight: 400; }
+  .chip {
+    flex: none;
+    width: 0.7em; height: 0.7em;
+    border-radius: 1px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--outline);
+  }
+  .chip.thinking { animation: blink 900ms steps(2, jump-none) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .num {
+    display: block;
+    font: 300 2.1em/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1em;
+  }
+  #winsBox { display: none; }
+  .app.row.show-wins #winsBox { display: block; }
+
+  .actions { grid-area: actions; display: flex; gap: 0.5em; justify-content: flex-end; }
+  .app.row .actions { justify-content: stretch; }
+  .app.row .actions .btn { flex: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.76em, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .app.col .btn { height: calc(1.1em + 2.4em + 2px); }
+  .narrow .btn .lbl-undo { display: none; }
+  .narrow .btn { padding: 0 0.95em; }
+
+  /* ---------- board ---------- */
+  .stage { width: var(--S); height: var(--S); position: relative; }
+  .app.col .stage { grid-row: 2; grid-column: 1; }
+  .app.row .stage { grid-row: 1; grid-column: 2; }
+  #cv {
+    display: block;
+    width: var(--S); height: var(--S);
+    touch-action: none;
+    outline: none;
+    cursor: pointer;
+  }
+  #cv.idle { cursor: default; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+    touch-action: none;
+  }
+  .overlay.light { background: rgba(0, 0, 0, 0.6); }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 25em);
+    max-height: 100%;
+    overflow: auto;
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card h2.c-white::before { background: #fff; }
+  .card h2.c-none::before { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .group { margin-top: 1.05em; }
+  .group[hidden] { display: none; }
+  .group .lab { margin-bottom: 0.45em; }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    border: 1px solid var(--outline);
+  }
+  .seg button {
+    height: 2.9em;
+    min-width: 0;
+    padding: 0 0.2em;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 clamp(11px, 0.72em, 12px) var(--font);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .seg button + button { box-shadow: -1px 0 0 var(--line); }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; box-shadow: none; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -3px; }
+  .note { margin: 0.8em 0 0; color: var(--muted); font-size: 0.86em; line-height: 1.4; }
+  .note[hidden] { display: none; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div:nth-child(even) { border-left: 1px solid var(--line); }
+  .ov-stats > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; }
+  .ov-stats .txt { display: block; margin-top: 0.35em; font: 400 1.3em/1.2 var(--font-display); }
+  .ov-stats .tag { display: block; margin-top: 0.3em; font: 600 11px/1.2 var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-hover); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .btns .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chip.thinking { animation: none; }
+    .card, .overlay { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app col" id="app">
+  <header class="head" id="head">
+    <div class="brand">
+      <h1>Ultimate Tic-Tac-Toe</h1>
+      <p>Tap a square in a highlighted board. Arrows and Enter also work. U to undo.</p>
+    </div>
+    <div class="scores">
+      <div class="stat status">
+        <span class="lab" id="modeLab">Vs computer</span>
+        <span class="val"><i class="chip" id="chip"></i><span id="statusText">Your turn</span></span>
+      </div>
+      <div class="stat" id="winsBox"><span class="lab">Win streak vs Hard</span><span class="num" id="wins">0</span></div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="undoBtn" type="button" aria-label="Undo" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>
+        <span class="lbl-undo">Undo</span>
+      </button>
+      <button class="btn primary" id="newBtn" type="button">New game</button>
+    </div>
+  </header>
+  <main class="stage">
+    <canvas id="cv" tabindex="-1" aria-label="Game board, nine small boards"></canvas>
+  </main>
+</div>
+
+<div class="overlay" id="menu" hidden>
+  <div class="card" role="dialog" aria-labelledby="menuTitle">
+    <h2 id="menuTitle">Ultimate Tic-Tac-Toe</h2>
+    <p class="line">Nine small boards in one big one. The square you play in sends your opponent to the matching board. Win three boards in a row.</p>
+    <div class="group">
+      <span class="lab">Mode</span>
+      <div class="seg" data-group="mode">
+        <button type="button" data-v="cpu">Vs computer</button>
+        <button type="button" data-v="pvp">Pass and play</button>
+      </div>
+    </div>
+    <div class="group" id="levelGroup">
+      <span class="lab">Level</span>
+      <div class="seg" data-group="level">
+        <button type="button" data-v="0">Easy</button>
+        <button type="button" data-v="1">Normal</button>
+        <button type="button" data-v="2">Hard</button>
+      </div>
+    </div>
+    <div class="group" id="firstGroup">
+      <span class="lab">You play</span>
+      <div class="seg" data-group="first">
+        <button type="button" data-v="0">X, first</button>
+        <button type="button" data-v="1">O, second</button>
+      </div>
+    </div>
+    <p class="note" id="winsNote">Win streak vs Hard: 0</p>
+    <p class="note" id="abandonNote" hidden>Starting a new game ends your Hard game in progress and resets the win streak.</p>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Play</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>Resume</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay light" id="endOv" hidden>
+  <div class="card" role="dialog" aria-live="polite">
+    <h2 id="endTitle">Draw</h2>
+    <div class="ov-stats" id="endStats"></div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  The engine is plain text so the same source runs in a Web Worker (built from
+  a Blob), on the main thread as a fallback, and in node for tests.
+-->
+<script type="text/plain" id="engine-src">
+var Engine = (function () {
+  'use strict';
+  /*
+   * Cell m = b*9 + c: small board b (0..8, row by row), cell c inside it.
+   * cells: 0 empty, 1 X, 2 O. boards: 0 open, 1 X won, 2 O won, 3 full.
+   * next: the board the player to move must use, or -1 for any open board.
+   */
+  var LINES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 3, 6, 1, 4, 7, 2, 5, 8, 0, 4, 8, 2, 4, 6];
+  var CELL_LINES = [];
+  for (var c0 = 0; c0 < 9; c0++) {
+    CELL_LINES.push([]);
+    for (var l0 = 0; l0 < 8; l0++) if (LINES[l0 * 3] === c0 || LINES[l0 * 3 + 1] === c0 || LINES[l0 * 3 + 2] === c0) CELL_LINES[c0].push(l0 * 3);
+  }
+
+  function State() {
+    this.cells = new Int8Array(81); this.boards = new Int8Array(9); this.count = new Int8Array(9);
+    this.next = -1; this.turn = 1; this.winner = 0; this.over = false; this.open = 9;
+  }
+  State.prototype.copyFrom = function (s) {
+    this.cells.set(s.cells); this.boards.set(s.boards); this.count.set(s.count);
+    this.next = s.next; this.turn = s.turn; this.winner = s.winner; this.over = s.over; this.open = s.open;
+    return this;
+  };
+
+  function lineAt(arr, off, c, p) {
+    var ls = CELL_LINES[c];
+    for (var i = 0; i < ls.length; i++) {
+      var l = ls[i];
+      if (arr[off + LINES[l]] === p && arr[off + LINES[l + 1]] === p && arr[off + LINES[l + 2]] === p) return l / 3;
+    }
+    return -1;
+  }
+
+  function play(s, m) {
+    var b = (m / 9) | 0, c = m - b * 9, p = s.turn;
+    s.cells[m] = p; s.count[b]++;
+    if (lineAt(s.cells, b * 9, c, p) >= 0) {
+      s.boards[b] = p; s.open--;
+      if (lineAt(s.boards, 0, b, p) >= 0) { s.winner = p; s.over = true; }
+    } else if (s.count[b] === 9) { s.boards[b] = 3; s.open--; }
+    if (!s.over && s.open === 0) s.over = true;
+    s.next = s.boards[c] === 0 ? c : -1;
+    s.turn = 3 - p;
+  }
+
+  function legal(s, out) {
+    if (s.over) return 0;
+    var n = 0, o, i;
+    if (s.next >= 0) {
+      o = s.next * 9;
+      for (i = 0; i < 9; i++) if (!s.cells[o + i]) out[n++] = o + i;
+      return n;
+    }
+    for (var b = 0; b < 9; b++) {
+      if (s.boards[b]) continue;
+      o = b * 9;
+      for (i = 0; i < 9; i++) if (!s.cells[o + i]) out[n++] = o + i;
+    }
+    return n;
+  }
+
+  // Replay a list of moves. Returns null on an illegal one.
+  var BUF = new Int8Array(81);
+  function fromMoves(moves) {
+    var s = new State();
+    for (var i = 0; i < moves.length; i++) {
+      var m = moves[i], k = legal(s, BUF), ok = false;
+      for (var j = 0; j < k; j++) if (BUF[j] === m) { ok = true; break; }
+      if (!ok) return null;
+      play(s, m);
+    }
+    return s;
+  }
+
+  var now = (typeof performance !== 'undefined' && performance.now) ? function () { return performance.now(); } : Date.now;
+
+  /* ---------- Monte Carlo tree search ---------- */
+  function Node(parent, move, player) {
+    this.parent = parent; this.move = move; this.player = player;
+    this.kids = []; this.untried = null; this.n = 0; this.w = 0;
+  }
+  function movesOf(s) { var k = legal(s, BUF), a = new Array(k); for (var i = 0; i < k; i++) a[i] = BUF[i]; return a; }
+
+  // A move that wins the whole game for the player to move, or -1.
+  var TMP = null;
+  function winningMove(s, list) {
+    if (!TMP) TMP = new State();
+    for (var i = 0; i < list.length; i++) {
+      TMP.copyFrom(s); play(TMP, list[i]);
+      if (TMP.over && TMP.winner === s.turn) return list[i];
+    }
+    return -1;
+  }
+
+  function mcts(root, opts) {
+    var rnd = opts.random || Math.random, C = opts.c || 0.6;
+    var tEnd = now() + (opts.time || 300), maxIter = opts.iters || 1e9;
+    var top = new Node(null, -1, 3 - root.turn);
+    top.untried = movesOf(root);
+    var buf = new Int8Array(81), s = new State(), it = 0;
+    while (it < maxIter) {
+      if ((it & 31) === 0 && now() > tEnd) break;
+      it++;
+      s.copyFrom(root);
+      var node = top;
+      while (node.untried.length === 0 && node.kids.length) {
+        var kids = node.kids, lg = Math.log(node.n), best = null, bv = -1e9;
+        for (var i = 0; i < kids.length; i++) {
+          var ch = kids[i], v = ch.w / ch.n + C * Math.sqrt(lg / ch.n);
+          if (v > bv) { bv = v; best = ch; }
+        }
+        node = best;
+        play(s, node.move);
+      }
+      if (node.untried.length) {
+        var u = node.untried, j = (rnd() * u.length) | 0, m = u[j];
+        u[j] = u[u.length - 1]; u.pop();
+        var p = s.turn;
+        play(s, m);
+        var child = new Node(node, m, p);
+        child.untried = s.over ? [] : movesOf(s);
+        node.kids.push(child);
+        node = child;
+      }
+      while (!s.over) { var k = legal(s, buf); play(s, buf[(rnd() * k) | 0]); }
+      var w = s.winner;
+      for (; node; node = node.parent) {
+        node.n++;
+        if (w === node.player) node.w += 1; else if (w === 0) node.w += 0.5;
+      }
+    }
+    var pick = null;
+    for (var q = 0; q < top.kids.length; q++) if (!pick || top.kids[q].n > pick.n) pick = top.kids[q];
+    return { move: pick ? pick.move : -1, iters: it, rate: pick ? pick.w / pick.n : 0 };
+  }
+
+  var LEVELS = [
+    { name: 'Easy' },
+    { name: 'Normal', iters: 400, time: 150 },
+    { name: 'Hard', time: 300 }
+  ];
+
+  // Pick a move for the player to move after `moves`.
+  function choose(moves, level, opts) {
+    opts = opts || {};
+    var rnd = opts.random || Math.random;
+    var s = fromMoves(moves);
+    if (!s || s.over) return { move: -1 };
+    var list = movesOf(s);
+    if (list.length === 1) return { move: list[0], reason: 'only' };
+    var win = winningMove(s, list);
+    if (win >= 0) return { move: win, reason: 'win' };
+    if (level <= 0) {
+      // Easy: grabs a small board half the time, otherwise plays anywhere.
+      if (rnd() < 0.5) {
+        var t = new State();
+        for (var i = 0; i < list.length; i++) {
+          t.copyFrom(s); play(t, list[i]);
+          var b = (list[i] / 9) | 0;
+          if (t.boards[b] === s.turn) return { move: list[i], reason: 'board' };
+        }
+      }
+      return { move: list[(rnd() * list.length) | 0], reason: 'random' };
+    }
+    var L = LEVELS[level] || LEVELS[2];
+    var r = mcts(s, { time: opts.time || L.time, iters: opts.iters || L.iters, c: opts.c, random: rnd });
+    return { move: r.move, iters: r.iters, rate: r.rate };
+  }
+
+  return { State: State, play: play, legal: legal, fromMoves: fromMoves, choose: choose, lineAt: lineAt, LEVELS: LEVELS, LINES: LINES };
+})();
+</script>
+
+<script src="../_shared/bridge.js" data-game="ultimate-tic-tac-toe"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  const ENGINE_SRC = document.getElementById('engine-src').textContent;
+  const Engine = new Function(ENGINE_SRC + '\nreturn Engine;')();
+
+  const X = 1, O = 2;
+  const LEVEL_NAMES = ['Easy', 'Normal', 'Hard'];
+  const HARD = 2;
+  const MIN_THINK = [500, 450, 350];   // ms, so the reply never feels instant
+  const C_X = '#ffffff', C_O = '#ea5426';
+  const C_PANEL = '#16181c', C_OPEN = '#1f2227', C_LAST = '#2a2d33';
+  const KEY_SAVE = 'vela:ultimate-tic-tac-toe:save';
+  const KEY_SET = 'vela:ultimate-tic-tac-toe:settings';
+  const KEY_STREAK = 'vela:ultimate-tic-tac-toe:hard-streak';
+
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const now = () => performance.now();
+  const easeOut = (k) => 1 - Math.pow(1 - clamp(0, k, 1), 3);
+  const colorOf = (p) => (p === X ? C_X : C_O);
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), cv = $('cv'), ctx = cv.getContext('2d');
+  const statusText = $('statusText'), chipEl = $('chip');
+  const undoBtn = $('undoBtn'), newBtn = $('newBtn');
+  const menu = $('menu'), endOv = $('endOv');
+  const playBtn = $('playBtn'), resumeBtn = $('resumeBtn');
+
+  /* ---------- storage ---------- */
+  function readJSON(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }
+  function writeJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} }
+  function removeKey(k) { try { localStorage.removeItem(k); } catch (_) {} }
+  function readStreak() { try { return Math.max(0, parseInt(localStorage.getItem(KEY_STREAK), 10) || 0); } catch (_) { return 0; } }
+  function writeStreak(n) { try { localStorage.setItem(KEY_STREAK, String(n)); } catch (_) {} }
+
+  function validSettings(s) {
+    return s && (s.mode === 'cpu' || s.mode === 'pvp') && [0, 1, 2].includes(s.level) && (s.first === 0 || s.first === 1);
+  }
+  let settings = readJSON(KEY_SET);
+  if (!validSettings(settings)) settings = { mode: 'cpu', level: 1, first: 0 };
+  let draft = Object.assign({}, settings);
+  let streak = readStreak();
+
+  /* ---------- game state ---------- */
+  let game = null;
+  let thinking = false;
+  let paused = false;
+  let menuOpen = false, endOpen = false;
+  let hover = -1;            // cell under the pointer or keyboard cursor
+  let pointerKind = 'mouse';
+  let selBoard = -1;         // board picked with a number key when any board is open
+  let dirty = true;
+  let endTimer = 0;
+  let lastEndBest = false;
+
+  function makeGame(s) {
+    return {
+      mode: s.mode, level: s.level, first: s.first,
+      // Vs computer the human is X when moving first, O otherwise.
+      human: s.first === 0 ? X : O,
+      st: new Engine.State(), history: [],
+      placeT: new Float64Array(81), boardT: new Float64Array(9),
+      over: null,
+    };
+  }
+
+  const BUF = new Int8Array(81);
+  function legalSet() {
+    const k = Engine.legal(game.st, BUF), set = new Set();
+    for (let i = 0; i < k; i++) set.add(BUF[i]);
+    return set;
+  }
+  function allowedBoards() {
+    const s = game.st, out = [];
+    if (s.over) return out;
+    if (s.next >= 0) return [s.next];
+    for (let b = 0; b < 9; b++) if (!s.boards[b]) out.push(b);
+    return out;
+  }
+
+  const isCpuTurn = () => game.mode === 'cpu' && !game.over && game.st.turn !== game.human;
+  const humanCanAct = () => !!game && !game.over && !thinking && !isCpuTurn() && !menuOpen && !endOpen && !paused;
+  function humanMovesMade() {
+    const n = game.history.length;
+    if (game.mode === 'pvp') return n;
+    return game.human === X ? Math.ceil(n / 2) : Math.floor(n / 2);
+  }
+  const hardInProgress = () => !!game && !game.over && game.mode === 'cpu' && game.level === HARD && humanMovesMade() > 0;
+  function canUndo() {
+    if (!game || game.over || menuOpen || endOpen) return false;
+    if (game.mode === 'pvp') return game.history.length > 0;
+    if (game.level === HARD) return false;   // keeps the win streak honest
+    return humanMovesMade() > 0;
+  }
+
+  function save() {
+    if (!game || game.over || !game.history.length) { removeKey(KEY_SAVE); return; }
+    writeJSON(KEY_SAVE, { v: 1, mode: game.mode, level: game.level, first: game.first, h: game.history });
+  }
+
+  function rebuild(s, hist) {
+    const g = makeGame(s);
+    const st = Engine.fromMoves(hist);
+    if (!st) return null;
+    g.st = st;
+    g.history = hist.slice();
+    return g;
+  }
+
+  function loadSaved() {
+    const d = readJSON(KEY_SAVE);
+    if (!d || d.v !== 1) return null;
+    const s = { mode: d.mode, level: d.level, first: d.first };
+    if (!validSettings(s) || !Array.isArray(d.h) || !d.h.length) return null;
+    if (!d.h.every((m) => Number.isInteger(m) && m >= 0 && m < 81)) return null;
+    const g = rebuild(s, d.h);
+    if (!g || g.st.over) return null;
+    return g;
+  }
+
+  /* ---------- computer player (Web Worker from an inline Blob) ---------- */
+  const WORKER_GLUE = '\nself.onmessage = function (e) { var d = e.data; var r = Engine.choose(d.moves, d.level); ' +
+    'self.postMessage({ id: d.id, move: r.move }); };\n';
+  let worker = null, workerUrl = '', workerFailed = false, inFlight = false;
+  let searchId = 0, searchStart = 0, thinkTimer = 0;
+
+  function ensureWorker() {
+    if (worker || workerFailed) return worker;
+    try {
+      workerUrl = URL.createObjectURL(new Blob([ENGINE_SRC, WORKER_GLUE], { type: 'text/javascript' }));
+      worker = new Worker(workerUrl);
+      worker.onmessage = (e) => { inFlight = false; deliver(e.data); };
+      worker.onerror = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        workerFailed = true;
+        killWorker();
+        if (thinking) runOnMainThread(searchId);
+      };
+    } catch (_) {
+      workerFailed = true;
+      worker = null;
+    }
+    return worker;
+  }
+  function killWorker() {
+    if (worker) { try { worker.terminate(); } catch (_) {} }
+    worker = null; inFlight = false;
+    if (workerUrl) { try { URL.revokeObjectURL(workerUrl); } catch (_) {} workerUrl = ''; }
+  }
+  function runOnMainThread(id) {
+    const moves = game.history.slice(), level = game.level;
+    setTimeout(() => {
+      if (id !== searchId) return;
+      deliver({ id, move: Engine.choose(moves, level).move });
+    }, 30);
+  }
+
+  function computerMove() {
+    if (!isCpuTurn() || thinking || menuOpen) return;
+    thinking = true;
+    const id = ++searchId;
+    searchStart = now();
+    const w = ensureWorker();
+    if (w) { inFlight = true; w.postMessage({ id, moves: game.history.slice(), level: game.level }); }
+    else runOnMainThread(id);
+    hud();
+  }
+
+  function deliver(msg) {
+    if (!msg || msg.id !== searchId || !thinking) return;
+    const wait = Math.max(0, MIN_THINK[game.level] - (now() - searchStart));
+    clearTimeout(thinkTimer);
+    const fire = () => {
+      thinkTimer = 0;
+      if (msg.id !== searchId || !thinking) return;
+      if (paused) { thinkTimer = setTimeout(fire, 200); return; }
+      thinking = false;
+      const legal = legalSet();
+      let m = msg.move;
+      if (!legal.has(m)) m = legal.size ? legal.values().next().value : -1;
+      if (m < 0) { hud(); return; }
+      place(m);
+    };
+    thinkTimer = setTimeout(fire, wait);
+  }
+
+  function cancelThinking() {
+    if (!thinking) return;
+    searchId++;
+    thinking = false;
+    clearTimeout(thinkTimer); thinkTimer = 0;
+    if (inFlight) killWorker();
+  }
+
+  /* ---------- moves ---------- */
+  function place(m) {
+    const st = game.st, b = Math.floor(m / 9), before = st.boards[b];
+    Engine.play(st, m);
+    game.history.push(m);
+    const t = reduceMotion ? -1e9 : now();
+    game.placeT[m] = t;
+    if (!before && st.boards[b]) game.boardT[b] = t;
+    selBoard = -1;
+    dirty = true;
+    if (st.over) { endGame(); return; }
+    save();
+    hud();
+    if (isCpuTurn()) computerMove();
+  }
+
+  let shake = null;
+  function humanPlay(m) {
+    if (!humanCanAct() || m < 0) return;
+    if (!legalSet().has(m)) {
+      const b = Math.floor(m / 9);
+      if (!reduceMotion) shake = { b: game.st.next >= 0 ? game.st.next : b, t0: now() };
+      dirty = true;
+      return;
+    }
+    place(m);
+    if (pointerKind === 'touch') hover = -1;
+  }
+
+  function undo() {
+    if (paused || !canUndo()) return;
+    cancelThinking();
+    const h = game.history.slice();
+    const s = { mode: game.mode, level: game.level, first: game.first };
+    if (game.mode === 'pvp') h.pop();
+    else {
+      // back to the human's last turn
+      const humanToMove = (len) => (len % 2 === 0 ? X : O) === game.human;
+      h.pop();
+      while (h.length && !humanToMove(h.length)) h.pop();
+    }
+    game = rebuild(s, h) || makeGame(s);
+    selBoard = -1;
+    dirty = true;
+    save();
+    hud();
+    if (isCpuTurn()) computerMove();
+  }
+
+  function winLine() {
+    const st = game.st, w = st.winner;
+    if (!w) return [];
+    for (let l = 0; l < 8; l++) {
+      const a = Engine.LINES[l * 3], b = Engine.LINES[l * 3 + 1], c = Engine.LINES[l * 3 + 2];
+      if (st.boards[a] === w && st.boards[b] === w && st.boards[c] === w) return [a, b, c];
+    }
+    return [];
+  }
+
+  function endGame() {
+    const w = game.st.winner;
+    game.over = { winner: w, line: winLine(), t0: now() };
+    lastEndBest = false;
+    if (game.mode === 'cpu' && game.level === HARD) {
+      streak = w === game.human ? readStreak() + 1 : 0;
+      writeStreak(streak);
+      lastEndBest = V.gameOver(streak) && streak > 0;
+    }
+    save();
+    hud();
+    clearTimeout(endTimer);
+    endTimer = setTimeout(showEnd, reduceMotion ? 400 : 1300);
+  }
+
+  function resultText() {
+    const w = game.over.winner;
+    if (!w) return 'Draw';
+    if (game.mode === 'cpu') return w === game.human ? 'You win' : 'You lose';
+    return w === X ? 'X wins' : 'O wins';
+  }
+
+  function startGame(s) {
+    if (hardInProgress()) { streak = 0; writeStreak(0); }
+    cancelThinking();
+    clearTimeout(endTimer);
+    shake = null; hover = -1; selBoard = -1;
+    settings = Object.assign({}, s);
+    writeJSON(KEY_SET, settings);
+    game = makeGame(settings);
+    hideMenu(); hideEnd();
+    save();
+    dirty = true;
+    hud();
+    if (isCpuTurn()) computerMove();
+    focusBoard();
+  }
+
+  /* ---------- HUD ---------- */
+  function hud() {
+    if (!game) return;
+    $('modeLab').textContent = game.mode === 'cpu' ? 'Vs computer, ' + LEVEL_NAMES[game.level] : 'Pass and play';
+    let text, chip;
+    if (game.over) { text = resultText(); chip = game.over.winner; }
+    else {
+      chip = game.st.turn;
+      if (game.mode === 'cpu') text = chip === game.human ? 'Your turn' : "Computer's turn";
+      else text = (chip === X ? 'X' : 'O') + ' to play';
+    }
+    statusText.textContent = text;
+    chipEl.style.background = chip === X ? C_X : chip === O ? C_O : 'transparent';
+    chipEl.style.boxShadow = chip ? 'none' : '';
+    chipEl.classList.toggle('thinking', thinking);
+    undoBtn.disabled = !canUndo();
+    app.classList.toggle('show-wins', game.mode === 'cpu' && game.level === HARD);
+    $('wins').textContent = streak;
+    cv.classList.toggle('idle', !humanCanAct());
+    dirty = true;
+  }
+
+  /* ---------- menu ---------- */
+  function syncMenu() {
+    menu.querySelectorAll('.seg').forEach((seg) => {
+      const g = seg.dataset.group;
+      seg.querySelectorAll('button').forEach((b) => {
+        const v = g === 'mode' ? b.dataset.v : Number(b.dataset.v);
+        b.setAttribute('aria-pressed', String(draft[g] === v));
+      });
+    });
+    const cpu = draft.mode === 'cpu';
+    $('levelGroup').hidden = !cpu;
+    $('firstGroup').hidden = !cpu;
+    const note = $('winsNote');
+    note.hidden = !(cpu && draft.level === HARD);
+    note.textContent = 'Win streak vs Hard: ' + streak;
+    $('abandonNote').hidden = !hardInProgress();
+    resumeBtn.hidden = !(game && !game.over && game.history.length > 0);
+  }
+
+  menu.querySelectorAll('.seg button').forEach((b) => {
+    b.addEventListener('click', () => {
+      const g = b.parentNode.dataset.group;
+      draft[g] = g === 'mode' ? b.dataset.v : Number(b.dataset.v);
+      syncMenu();
+    });
+  });
+
+  function openOverlay(el) {
+    el.hidden = false;
+    if (reduceMotion) el.classList.add('show');
+    else requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  }
+  function closeOverlay(el) { el.classList.remove('show'); el.hidden = true; }
+
+  function showMenu() {
+    cancelThinking();
+    hideEnd();
+    draft = Object.assign({}, settings);
+    menuOpen = true;
+    syncMenu();
+    openOverlay(menu);
+    hud();
+    setTimeout(() => { try { playBtn.focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideMenu() { menuOpen = false; closeOverlay(menu); }
+
+  function resume() {
+    if (!game || game.over) return;
+    hideMenu();
+    hud();
+    if (isCpuTurn()) computerMove();
+    focusBoard();
+  }
+
+  function showEnd() {
+    if (!game || !game.over || menuOpen) return;
+    const w = game.over.winner;
+    const title = $('endTitle');
+    title.textContent = resultText();
+    title.className = w === X ? 'c-white' : w === O ? '' : 'c-none';
+    const stats = $('endStats');
+    stats.textContent = '';
+    const add = (label, value, isNum, tag) => {
+      const d = document.createElement('div');
+      const l = document.createElement('span'); l.className = 'lab'; l.textContent = label;
+      const v = document.createElement('span'); v.className = isNum ? 'num' : 'txt'; v.textContent = value;
+      d.append(l, v);
+      if (tag) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = tag; d.appendChild(t); }
+      stats.appendChild(d);
+    };
+    if (game.mode === 'cpu' && game.level === HARD) {
+      add('Win streak', streak, true);
+      add('Best', Math.max(V.best(), streak), true, lastEndBest ? 'New best' : '');
+    } else {
+      add('Moves', game.history.length, true);
+      if (game.mode === 'cpu') add('Level', LEVEL_NAMES[game.level], false);
+      else add('Mode', 'Pass and play', false);
+    }
+    endOpen = true;
+    openOverlay(endOv);
+    hud();
+    setTimeout(() => { try { $('againBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideEnd() { endOpen = false; closeOverlay(endOv); }
+
+  playBtn.addEventListener('click', () => startGame(draft));
+  resumeBtn.addEventListener('click', resume);
+  $('againBtn').addEventListener('click', () => startGame(settings));
+  $('menuBtn').addEventListener('click', showMenu);
+  newBtn.addEventListener('click', showMenu);
+  undoBtn.addEventListener('click', undo);
+
+  function focusBoard() { try { cv.focus({ preventScroll: true }); } catch (_) {} }
+
+  /* ---------- geometry ---------- */
+  // S = 3 * BS + 2 * BG; each small board is 3 cells of CS.
+  let geo = { S: 300, BS: 96, BG: 6, CS: 32, dpr: 1 };
+  const boardX = (b) => (b % 3) * (geo.BS + geo.BG);
+  const boardY = (b) => Math.floor(b / 3) * (geo.BS + geo.BG);
+  const cellX = (m) => boardX(Math.floor(m / 9)) + (m % 9 % 3) * geo.CS;
+  const cellY = (m) => boardY(Math.floor(m / 9)) + Math.floor(m % 9 / 3) * geo.CS;
+  const toGrid = (m) => { const b = Math.floor(m / 9), c = m % 9; return [Math.floor(b / 3) * 3 + Math.floor(c / 3), (b % 3) * 3 + c % 3]; };
+  const fromGrid = (r, c) => (Math.floor(r / 3) * 3 + Math.floor(c / 3)) * 9 + (r % 3) * 3 + c % 3;
+
+  /* ---------- drawing ---------- */
+  function drawMark(p, x, y, size, k, alpha) {
+    if (k <= 0) return;
+    const lw = Math.max(2, Math.round(size * 0.12));
+    const pad = size * 0.24, s2 = size - 2 * pad;
+    const cx = x + size / 2, cy = y + size / 2;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = colorOf(p);
+    ctx.lineWidth = lw;
+    ctx.lineCap = p === X ? 'square' : 'butt';
+    const sc = 0.6 + 0.4 * easeOut(k), h = (s2 / 2) * sc - (p === X ? lw / 2 : 0);
+    ctx.beginPath();
+    if (p === X) {
+      ctx.moveTo(cx - h, cy - h); ctx.lineTo(cx + h, cy + h);
+      ctx.moveTo(cx + h, cy - h); ctx.lineTo(cx - h, cy + h);
+    } else {
+      ctx.arc(cx, cy, h - lw / 2, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // Big mark across a won board; draws itself in.
+  function drawBigMark(p, x, y, size, k) {
+    if (k <= 0) return;
+    const lw = Math.max(3, Math.round(size * 0.08));
+    const pad = size * 0.18, h = size / 2 - pad;
+    const cx = x + size / 2, cy = y + size / 2;
+    ctx.strokeStyle = colorOf(p);
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    if (p === X) {
+      ctx.lineCap = 'square';
+      const k1 = clamp(0, k * 2, 1), k2 = clamp(0, k * 2 - 1, 1);
+      const a = h - lw / 2;
+      ctx.moveTo(cx - a, cy - a); ctx.lineTo(cx - a + 2 * a * k1, cy - a + 2 * a * k1);
+      if (k2 > 0) { ctx.moveTo(cx + a, cy - a); ctx.lineTo(cx + a - 2 * a * k2, cy - a + 2 * a * k2); }
+    } else {
+      ctx.lineCap = 'butt';
+      ctx.arc(cx, cy, h - lw / 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k);
+    }
+    ctx.stroke();
+  }
+
+  // Outline that draws itself clockwise; p from 0 to 1.
+  function partialRect(x, y, w, h, p) {
+    if (p <= 0) return;
+    const pts = [[x + w, y], [x + w, y + h], [x, y + h], [x, y]];
+    const lens = [w, h, w, h];
+    let left = 2 * (w + h) * Math.min(1, p);
+    let cx = x, cy = y;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    for (let i = 0; i < 4 && left > 0; i++) {
+      const L = lens[i], k = Math.min(1, left / L);
+      ctx.lineTo(cx + (pts[i][0] - cx) * k, cy + (pts[i][1] - cy) * k);
+      cx = pts[i][0]; cy = pts[i][1];
+      left -= L;
+    }
+    if (p >= 1) ctx.closePath();
+    ctx.stroke();
+  }
+
+  function render(t) {
+    const { S, BS, CS, dpr } = geo;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, S, S);
+    if (!game) return;
+    const st = game.st, over = game.over;
+    const live = humanCanAct() || (thinking && !over);
+    const allowed = new Set(over ? [] : allowedBoards());
+    const fade = over ? clamp(0, (t - over.t0) / 300, 1) : 0;
+    const winSet = new Set(over ? over.line : []);
+    const last = game.history.length ? game.history[game.history.length - 1] : -1;
+    const legal = humanCanAct() ? legalSet() : new Set();
+
+    let shx = 0, shb = -1;
+    if (shake) {
+      const k = (t - shake.t0) / 220;
+      if (k >= 1) shake = null;
+      else { shb = shake.b; shx = Math.round(Math.sin(k * Math.PI * 4) * (1 - k) * 3); }
+    }
+
+    for (let b = 0; b < 9; b++) {
+      const bx = boardX(b) + (b === shb ? shx : 0), by = boardY(b);
+      const owner = st.boards[b];
+      const isAllowed = allowed.has(b) && live;
+      const dimBoard = over && !winSet.has(b) ? 1 - 0.55 * fade : 1;
+      ctx.globalAlpha = dimBoard;
+      ctx.fillStyle = isAllowed ? C_OPEN : C_PANEL;
+      ctx.fillRect(bx, by, BS, BS);
+      ctx.globalAlpha = 1;
+
+      // last move square
+      if (last >= 0 && Math.floor(last / 9) === b && !over) {
+        ctx.fillStyle = C_LAST;
+        ctx.fillRect(cellX(last) + (b === shb ? shx : 0), cellY(last), CS, CS);
+      }
+
+      // cell hairlines
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.globalAlpha = dimBoard * (owner ? 0.5 : 1);
+      for (let i = 1; i < 3; i++) {
+        ctx.fillRect(bx + i * CS, by + 3, 1, BS - 6);
+        ctx.fillRect(bx + 3, by + i * CS, BS - 6, 1);
+      }
+      ctx.globalAlpha = 1;
+
+      // marks
+      const markAlpha = (owner ? (owner === 3 ? 0.4 : 0.22) : 1) * dimBoard;
+      for (let c = 0; c < 9; c++) {
+        const m = b * 9 + c, p = st.cells[m];
+        if (!p) continue;
+        const k = (t - game.placeT[m]) / 180;
+        drawMark(p, cellX(m) + (b === shb ? shx : 0), cellY(m), CS, Math.min(1, Math.max(0.01, k)), markAlpha);
+      }
+
+      // won board
+      if (owner === X || owner === O) {
+        const k = reduceMotion ? 1 : clamp(0, (t - game.boardT[b] - 140) / 320, 1);
+        ctx.globalAlpha = over && !winSet.has(b) ? 1 - 0.55 * fade : 1;
+        drawBigMark(owner, bx, by, BS, k);
+        ctx.globalAlpha = 1;
+      }
+
+      // allowed outline
+      if (isAllowed) {
+        ctx.strokeStyle = C_O;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'miter';
+        ctx.strokeRect(bx + 1, by + 1, BS - 2, BS - 2);
+      }
+    }
+
+    // preview
+    if (hover >= 0 && legal.has(hover)) {
+      drawMark(st.turn, cellX(hover), cellY(hover), CS, 1, 0.35);
+    }
+    // keyboard cursor
+    if (pointerKind === 'key' && hover >= 0 && humanCanAct()) {
+      ctx.strokeStyle = '#ff7a4d';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cellX(hover) + 2.5, cellY(hover) + 2.5, CS - 5, CS - 5);
+    }
+
+    // winning line of boards
+    if (over && over.line.length) {
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'miter';
+      ctx.lineCap = 'square';
+      ctx.strokeStyle = colorOf(over.winner);
+      over.line.forEach((b, i) => {
+        const k = reduceMotion ? 1 : clamp(0, (t - over.t0 - 200 - i * 90) / 300, 1);
+        partialRect(boardX(b) + 1, boardY(b) + 1, BS - 2, BS - 2, k);
+      });
+    }
+  }
+
+  function frame(t) {
+    let active = !!shake;
+    if (game) {
+      const h = game.history;
+      if (h.length && t - game.placeT[h[h.length - 1]] < 700) active = true;
+      if (game.over && t - game.over.t0 < 1200) active = true;
+    }
+    if (active || dirty) { render(t); dirty = false; }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- layout: everything sized from the viewport ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(10, m * 0.035, 28);
+    const gap = clamp(10, m * 0.025, 20);
+    const fs = clamp(12, m / 40, 18);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.setProperty('--gap', gap + 'px');
+
+    app.classList.add('col'); app.classList.remove('row', 'narrow');
+    const wCol = Math.max(200, vw - 2 * pad);
+    app.style.width = wCol + 'px';
+    app.style.setProperty('--S', wCol + 'px');
+    if (wCol < 400) app.classList.add('narrow');
+    const headH = head.offsetHeight;
+    const sCol = Math.min(vw - 2 * pad, vh - 2 * pad - headH - gap);
+
+    const side = clamp(200, m * 0.42, 300);
+    const sRow = Math.min(vh - 2 * pad, vw - 2 * pad - side - gap * 1.6);
+    const useRow = sRow > sCol * 1.06 && vw >= 560;
+    const fit = Math.floor(clamp(150, useRow ? sRow : sCol, 820));
+
+    // whole pixels: S = 9 CS + 2 BG
+    const BG = Math.max(4, Math.round(fit * 0.025));
+    const CS = Math.floor((fit - 2 * BG) / 9);
+    const BS = 3 * CS, S = 3 * BS + 2 * BG;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    geo = { S, BS, BG, CS, dpr };
+
+    app.classList.toggle('row', useRow);
+    app.classList.toggle('col', !useRow);
+    app.classList.toggle('narrow', !useRow && S < 400);
+    app.style.setProperty('--S', S + 'px');
+    app.style.setProperty('--side', side + 'px');
+    app.style.width = (useRow ? S + side + gap * 1.6 : S) + 'px';
+    cv.width = Math.round(S * dpr);
+    cv.height = Math.round(S * dpr);
+    dirty = true;
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- input ---------- */
+  function cellAt(clientX, clientY) {
+    const rect = cv.getBoundingClientRect();
+    const px = (clientX - rect.left) * (geo.S / rect.width), py = (clientY - rect.top) * (geo.S / rect.height);
+    if (px < -geo.CS * 0.3 || py < -geo.CS * 0.3 || px > geo.S + geo.CS * 0.3 || py > geo.S + geo.CS * 0.3) return -1;
+    const step = geo.BS + geo.BG;
+    const bx = clamp(0, Math.floor((px + geo.BG / 2) / step), 2), by = clamp(0, Math.floor((py + geo.BG / 2) / step), 2);
+    const cx = clamp(0, Math.floor((px - bx * step) / geo.CS), 2), cy = clamp(0, Math.floor((py - by * step) / geo.CS), 2);
+    return (by * 3 + bx) * 9 + cy * 3 + cx;
+  }
+
+  let press = null;
+  cv.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pointerKind = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+    press = { id: e.pointerId };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    const h = cellAt(e.clientX, e.clientY);
+    if (h !== hover) { hover = h; dirty = true; }
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (press && e.pointerId !== press.id) return;
+    if (!press && e.pointerType !== 'mouse') return;
+    pointerKind = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+    const h = cellAt(e.clientX, e.clientY);
+    if (h !== hover) { hover = h; dirty = true; }
+  });
+  cv.addEventListener('pointerup', (e) => {
+    if (!press || e.pointerId !== press.id) return;
+    press = null;
+    const h = cellAt(e.clientX, e.clientY);
+    if (h >= 0) humanPlay(h);
+    if (e.pointerType !== 'mouse') hover = -1;
+    dirty = true;
+  });
+  cv.addEventListener('pointercancel', () => { press = null; if (pointerKind === 'touch') hover = -1; dirty = true; });
+  cv.addEventListener('pointerleave', (e) => {
+    if (e.pointerType === 'mouse' && !press) { hover = -1; dirty = true; }
+  });
+
+  function cursorStart() {
+    const ab = allowedBoards();
+    const b = ab.length === 1 ? ab[0] : 4;
+    return b * 9 + 4;
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      if (!menuOpen && !endOpen) { e.preventDefault(); undo(); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) return;
+    if (menuOpen) {
+      if (e.key === 'Escape' && !resumeBtn.hidden) { e.preventDefault(); resume(); }
+      else if (e.key === 'Enter' && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); startGame(draft); }
+      return;
+    }
+    if (endOpen) {
+      if (e.key === 'Enter' && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) { e.preventDefault(); startGame(settings); }
+      return;
+    }
+    const k = e.key;
+    const dirs = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+    if (dirs[k]) {
+      e.preventDefault();
+      pointerKind = 'key';
+      if (hover < 0) hover = cursorStart();
+      else {
+        const g = toGrid(hover);
+        hover = fromGrid(clamp(0, g[0] + dirs[k][0], 8), clamp(0, g[1] + dirs[k][1], 8));
+      }
+      dirty = true;
+      return;
+    }
+    if (k >= '1' && k <= '9') {
+      e.preventDefault();
+      if (!humanCanAct()) return;
+      pointerKind = 'key';
+      const d = Number(k) - 1, ab = allowedBoards();
+      if (ab.length === 1) { hover = ab[0] * 9 + d; humanPlay(hover); }
+      else if (selBoard >= 0) { hover = selBoard * 9 + d; humanPlay(hover); }
+      else if (ab.includes(d)) { selBoard = d; hover = d * 9 + 4; }
+      dirty = true;
+      return;
+    }
+    if (k === 'Enter' || k === ' ') {
+      e.preventDefault();
+      if (e.repeat) return;
+      pointerKind = 'key';
+      if (hover < 0) { hover = cursorStart(); dirty = true; return; }
+      humanPlay(hover);
+      dirty = true;
+      return;
+    }
+    if ((k === 'u' || k === 'U') && !e.repeat) { undo(); return; }
+    if ((k === 'n' || k === 'N') && !e.repeat) { showMenu(); return; }
+    if (k === 'Escape') {
+      e.preventDefault();
+      if (selBoard >= 0) { selBoard = -1; dirty = true; return; }
+      showMenu();
+    }
+  });
+
+  // No scrolling, rubber-banding or pull-to-refresh while playing.
+  document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => { e.preventDefault(); });
+
+  // Keys work after any click or tap inside the frame.
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+
+  V.onPause((p) => { paused = !!p; dirty = true; if (game) hud(); });
+
+  /* ---------- boot ---------- */
+  layout();
+  const saved = loadSaved();
+  if (saved) {
+    game = saved;
+    settings = { mode: saved.mode, level: saved.level, first: saved.first };
+    hud();
+    if (isCpuTurn()) computerMove();
+  } else {
+    game = makeGame(settings);
+    hud();
+    showMenu();
+  }
+  app.classList.add('ready');
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pong</title>
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --s1: #16181c;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-2: rgba(255, 255, 255, 0.22);
+    --text: #fff;
+    --dim: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-l: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #stage {
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    outline: 1px solid var(--line);
+  }
+  canvas { display: block; }
+  #ui {
+    position: absolute;
+    left: 0; top: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .ov {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s;
+  }
+  .ov.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.25s var(--ease), visibility 0s;
+  }
+  .card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 22px 24px 24px;
+    text-align: left;
+    transform: translateY(14px);
+    transition: transform 0.3s var(--ease);
+  }
+  .ov.show .card { transform: none; }
+  .label {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .name {
+    font: 300 44px/1 var(--font-display, sans-serif);
+    letter-spacing: -0.01em;
+  }
+  .controls { color: var(--dim); font-size: 13px; font-weight: 400; line-height: 1.5; margin: 10px 0 18px; min-height: 39px; }
+  .opt { margin-bottom: 14px; }
+  .opt .label { display: block; margin-bottom: 8px; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0;
+    min-width: 0;
+    font: 600 12px/1 var(--font, sans-serif);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: transparent;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    padding: 11px 4px;
+    margin-left: -1px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .seg button:first-child { margin-left: 0; }
+  .seg button:hover { color: #fff; border-color: rgba(255, 255, 255, 0.4); z-index: 1; }
+  .seg button.on { background: var(--brand); border-color: var(--brand); color: #fff; z-index: 2; }
+  .seg button:focus { outline: none; }
+  .seg button:focus-visible { outline: 1px solid #fff; outline-offset: -3px; z-index: 3; }
+  .btn {
+    display: block;
+    width: 100%;
+    font: 600 13px/1 var(--font, sans-serif);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #fff;
+    background: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 0;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-l); border-color: var(--brand-l); }
+  .btn:active { background: var(--brand-d); border-color: var(--brand-d); transform: scale(0.985); }
+  .btn:focus { outline: none; }
+  .btn:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+  .btn.ghost { background: transparent; border-color: var(--line-2); }
+  .btn.ghost:hover { background: transparent; border-color: rgba(255, 255, 255, 0.5); }
+  .btn.ghost:active { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.5); }
+  .btn + .btn { margin-top: 8px; }
+  .play { margin-top: 18px; }
+  .rows { margin: 16px 0 18px; border-bottom: 1px solid var(--line); }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--line);
+    padding: 11px 0;
+  }
+  .row b { font: 600 16px/1 var(--font-display, sans-serif); font-variant-numeric: tabular-nums; }
+  .row.big b { font: 300 28px/1 var(--font-display, sans-serif); }
+  .row.win .label { color: var(--brand-l); }
+  .badge {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-l);
+    margin-left: 10px;
+  }
+  .gap { height: 18px; }
+  #pauseBtn {
+    position: absolute;
+    width: 34px; height: 34px;
+    margin: -17px 0 0 -17px;
+    background: #000;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    cursor: pointer;
+    display: none;
+    transition: border-color 0.15s var(--ease);
+  }
+  #pauseBtn.on { display: block; }
+  #pauseBtn:hover { border-color: rgba(255, 255, 255, 0.5); }
+  #pauseBtn:focus { outline: none; }
+  #pauseBtn i { position: absolute; top: 11px; width: 3px; height: 10px; background: var(--dim); }
+  #pauseBtn i:first-child { left: 12px; }
+  #pauseBtn i:last-child { left: 17px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ov, .ov.show, .card, .btn, .seg button { transition: none; }
+    .card { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" aria-label="Pong game"></canvas>
+  <button id="pauseBtn" type="button" aria-label="Pause"><i></i><i></i></button>
+  <div id="ui">
+    <section id="ovStart" class="ov show">
+      <div class="card">
+        <div class="name">Pong</div>
+        <p class="controls" id="ctrlText"></p>
+        <div class="opt">
+          <span class="label">Players</span>
+          <div class="seg" data-key="players">
+            <button type="button" data-v="1">1 player</button>
+            <button type="button" data-v="2">2 players</button>
+          </div>
+        </div>
+        <div class="opt" id="optDiff">
+          <span class="label">Computer</span>
+          <div class="seg" data-key="diff">
+            <button type="button" data-v="easy">Easy</button>
+            <button type="button" data-v="normal">Normal</button>
+            <button type="button" data-v="hard">Hard</button>
+          </div>
+        </div>
+        <div class="opt">
+          <span class="label">First to</span>
+          <div class="seg" data-key="target">
+            <button type="button" data-v="7">7</button>
+            <button type="button" data-v="11">11</button>
+          </div>
+        </div>
+        <button class="btn play" id="btnPlay" type="button">Play</button>
+      </div>
+    </section>
+
+    <section id="ovPause" class="ov">
+      <div class="card">
+        <div class="label">Paused</div>
+        <div class="gap"></div>
+        <button class="btn" id="btnResume" type="button">Resume</button>
+        <button class="btn ghost" id="btnPauseMode" type="button">Change mode</button>
+      </div>
+    </section>
+
+    <section id="ovOver" class="ov">
+      <div class="card">
+        <div class="name" id="overTitle">You win</div>
+        <div class="rows" id="overRows"></div>
+        <button class="btn" id="btnAgain" type="button">Play again</button>
+        <button class="btn ghost" id="btnMode" type="button">Change mode</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="pong"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Bridge (with a standalone fallback if the bridge failed to load) ----------
+  const V = window.Vela || (() => {
+    const key = 'vela:best:pong';
+    const rb = () => { try { return Number(localStorage.getItem(key)) || 0; } catch (_) { return 0; } };
+    return {
+      embedded: false, ready() {}, score() {}, best: rb, onPause() {},
+      gameOver(n) { const p = rb(); if (n > p) { try { localStorage.setItem(key, String(n)); } catch (_) {} } return n > p; },
+    };
+  })();
+
+  // ---------- Constants ----------
+  // Game space is always landscape: x runs from the left goal to the right goal.
+  // On portrait screens it is drawn rotated so the left paddle sits at the bottom.
+  const W = 800, H = 460;
+  const STEP = 1 / 120;
+  const PT = 12, PL = 84, PX = 24;          // paddle thickness, length, gap from the goal edge
+  const LFACE = PX + PT;                    // left paddle front face
+  const RFACE = W - PX - PT;                // right paddle front face
+  const BR = 6, BS = 12;                    // square ball half size, size
+  const SPEED0 = 400, SPEED_INC = 20, SPEED_MAX = 980;
+  const MAX_ANG = 0.96;                     // about 55 degrees, keeps |vx| >= 57% of speed
+  const KEY_SPEED = 640;
+  const PTR_SPEED = 3200;
+  const TOUCH_GAIN = 1.3;
+  const COUNT_T = 1.2, POINT_T = 0.9, FLASH_T = 0.9;
+  const DIFF = {
+    easy:   { react: 0.30, speed: 280, err: 70, aimMin: 0,  aimMax: 0,  name: 'Easy' },
+    normal: { react: 0.17, speed: 410, err: 44, aimMin: 0,  aimMax: 12, name: 'Normal' },
+    hard:   { react: 0.09, speed: 560, err: 22, aimMin: 14, aimMax: 30, name: 'Hard' },
+  };
+  const C = { orange: '#ea5426', light: '#ff7a4d', dim: 'rgba(255,255,255,0.6)' };
+  const rootStyle = getComputedStyle(document.documentElement);
+  const FONT = rootStyle.getPropertyValue('--font').trim() || '"Segoe UI", system-ui, sans-serif';
+  const FONT_D = rootStyle.getPropertyValue('--font-display').trim() || FONT;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // ---------- Storage ----------
+  const OPTS_KEY = 'vela:pong:options', STREAK_KEY = 'vela:pong:streaks';
+  function loadJSON(key, def) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? Object.assign({}, def, v) : def; }
+    catch (_) { return def; }
+  }
+  function saveJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (_) {} }
+  const opts = loadJSON(OPTS_KEY, { players: 1, diff: 'normal', target: 7 });
+  if (opts.players !== 1 && opts.players !== 2) opts.players = 1;
+  if (!DIFF[opts.diff]) opts.diff = 'normal';
+  if (opts.target !== 7 && opts.target !== 11) opts.target = 7;
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), cv = $('c'), ctx = cv.getContext('2d'), ui = $('ui'), pauseBtn = $('pauseBtn');
+  const ovStart = $('ovStart'), ovPause = $('ovPause'), ovOver = $('ovOver');
+
+  let rot = false;        // portrait: rotated playfield
+  let cssK = 1, devK = 1, dpr = 1;
+
+  function resize() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const wasRot = rot;
+    rot = vh > vw;
+    const LW = rot ? H : W, LH = rot ? W : H;
+    const pad = V.embedded ? 0 : Math.round(Math.min(24, Math.min(vw, vh) * 0.03));
+    const s = Math.max(0.1, Math.min((vw - pad * 2) / LW, (vh - pad * 2) / LH));
+    const cw = Math.max(1, Math.floor(LW * s)), ch = Math.max(1, Math.floor(LH * s));
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    stage.style.width = cw + 'px';
+    stage.style.height = ch + 'px';
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+    cv.width = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+    cssK = cw / LW;
+    devK = cv.width / LW;
+    const u = Math.max(0.5, Math.min(1.15, cw / 380, ch / 450));
+    ui.style.width = (cw / u) + 'px';
+    ui.style.height = (ch / u) + 'px';
+    ui.style.transform = 'scale(' + u + ')';
+    const p = toScreen(W / 2, 26);
+    pauseBtn.style.left = (p.x * cssK) + 'px';
+    pauseBtn.style.top = (p.y * cssK) + 'px';
+    if (wasRot !== rot) { drags.clear(); updateTexts(); }
+  }
+
+  // game point -> screen logical point (before scale)
+  function toScreen(x, y) { return rot ? { x: y, y: W - x } : { x, y }; }
+  function unitsPerCss() { const r = cv.getBoundingClientRect(); return (rot ? H : W) / (r.width || 1); }
+  function toGame(cx, cy) {
+    const r = cv.getBoundingClientRect();
+    const u = (rot ? H : W) / (r.width || 1);
+    const sx = (cx - r.left) * u, sy = (cy - r.top) * u;
+    return rot ? { x: W - sy, y: sx } : { x: sx, y: sy };
+  }
+
+  // ---------- State ----------
+  let state = 'title';    // title, count, play, point, over
+  let paused = false, pausedBy = null;
+  let mode = { players: 1, diff: 'normal', target: 7 };
+  let stateT = 0, overT = 0, serveDir = 1, rally = 0, winner = -1;
+  let parts = [];
+  const mkPaddle = () => ({ y: H / 2, prevY: H / 2, vy: 0, target: H / 2, squash: 0, score: 0, flash: 0 });
+  const P = [mkPaddle(), mkPaddle()];
+  const ball = { x: W / 2, y: H / 2, px: W / 2, py: H / 2, vx: 0, vy: 0, speed: SPEED0 };
+  const ai = { target: H / 2, think: 0, pending: false, toward: false };
+  const keys = { lu: false, ld: false, ru: false, rd: false };
+  const drags = new Map();
+  let lastPointer = matchMedia('(hover: none) and (pointer: coarse)').matches ? 'touch' : 'mouse';
+
+  const active = () => state === 'count' || state === 'play' || state === 'point';
+  const sideName = (s) => (s === 0 ? (rot ? 'Bottom player' : 'Left player') : (rot ? 'Top player' : 'Right player'));
+
+  // ---------- Game flow ----------
+  function newGame() {
+    mode = { players: opts.players, diff: opts.diff, target: opts.target };
+    hideAll();
+    paused = false; pausedBy = null;
+    for (const p of P) { p.y = p.prevY = p.target = H / 2; p.vy = 0; p.squash = 0; p.score = 0; p.flash = 0; }
+    parts = [];
+    drags.clear();
+    ai.target = H / 2; ai.pending = false; ai.toward = false;
+    serveDir = Math.random() < 0.5 ? -1 : 1;
+    winner = -1;
+    startCount();
+  }
+
+  function startCount() {
+    state = 'count';
+    stateT = COUNT_T;
+    rally = 0;
+    ball.x = ball.px = W / 2;
+    ball.y = ball.py = H / 2 + (Math.random() < 0.5 ? -1 : 1) * rand(60, 130);
+    ball.vx = ball.vy = 0;
+    ball.speed = SPEED0;
+  }
+
+  function serve() {
+    state = 'play';
+    const a = rand(-0.32, 0.32);
+    ball.speed = SPEED0;
+    ball.vx = serveDir * SPEED0 * Math.cos(a);
+    ball.vy = SPEED0 * Math.sin(a);
+  }
+
+  function scorePoint(s) {
+    const p = P[s];
+    p.score++;
+    p.flash = FLASH_T;
+    // burst where the ball left the field
+    const ex = s === 0 ? W : 0, dir = s === 0 ? -1 : 1;
+    burst(ex, clamp(ball.y, BR, H - BR), dir);
+    serveDir = -serveDir;
+    state = 'point';
+    stateT = POINT_T;
+    if (p.score >= mode.target) winner = s;
+  }
+
+  function endGame() {
+    state = 'over';
+    overT = 0;
+    const leftWon = winner === 0;
+    const rows = [];
+    let title;
+    if (mode.players === 1) {
+      title = leftWon ? 'You win' : 'You lose';
+      rows.push(row('You', P[0].score, leftWon, true));
+      rows.push(row('Computer', P[1].score, !leftWon, true));
+      const st = loadJSON(STREAK_KEY, { easy: 0, normal: 0, hard: 0 });
+      st[mode.diff] = leftWon ? (Number(st[mode.diff]) || 0) + 1 : 0;
+      saveJSON(STREAK_KEY, st);
+      const name = DIFF[mode.diff].name;
+      if (mode.diff === 'hard') {
+        const isBest = V.gameOver(st.hard);
+        rows.push(row(name + ' win streak', st.hard));
+        rows.push(row('Best', V.best(), false, false, isBest && st.hard > 0 ? 'New best' : ''));
+      } else {
+        rows.push(row(name + ' win streak', st[mode.diff]));
+      }
+    } else {
+      title = sideName(winner) + ' wins';
+      rows.push(row(sideName(0), P[0].score, leftWon, true));
+      rows.push(row(sideName(1), P[1].score, !leftWon, true));
+    }
+    $('overTitle').textContent = title;
+    $('overRows').innerHTML = rows.join('');
+    show(ovOver);
+  }
+
+  function row(label, value, win, big, badge) {
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return '<div class="row' + (big ? ' big' : '') + (win ? ' win' : '') + '"><span class="label">' + esc(label) +
+      (badge ? '<span class="badge">' + esc(badge) + '</span>' : '') + '</span><b>' + esc(value) + '</b></div>';
+  }
+
+  function toTitle() {
+    state = 'title';
+    paused = false; pausedBy = null;
+    drags.clear();
+    parts = [];
+    for (const p of P) { p.y = p.prevY = p.target = H / 2; p.vy = 0; p.score = 0; p.flash = 0; p.squash = 0; }
+    hideAll();
+    syncOptions();
+    show(ovStart);
+  }
+
+  // ---------- Physics ----------
+  function stepBall(dt) {
+    ball.px = ball.x; ball.py = ball.y;
+    const n = Math.max(1, Math.ceil((Math.hypot(ball.vx, ball.vy) * dt) / 3));
+    const sdt = dt / n;
+    for (let i = 0; i < n; i++) {
+      ball.x += ball.vx * sdt;
+      ball.y += ball.vy * sdt;
+      if (ball.y < BR) { ball.y = 2 * BR - ball.y; ball.vy = Math.abs(ball.vy); }
+      else if (ball.y > H - BR) { ball.y = 2 * (H - BR) - ball.y; ball.vy = -Math.abs(ball.vy); }
+      collidePaddle(ball.vx < 0 ? 0 : 1, sdt);
+      if (ball.x < -BS) { scorePoint(1); return; }
+      if (ball.x > W + BS) { scorePoint(0); return; }
+    }
+  }
+
+  function collidePaddle(s, sdt) {
+    const p = P[s];
+    const top = p.y - PL / 2, bot = p.y + PL / 2;
+    const x0 = s === 0 ? PX : RFACE, x1 = x0 + PT;
+    if (ball.x + BR <= x0 || ball.x - BR >= x1 || ball.y + BR <= top || ball.y - BR >= bot) return;
+    // How far the ball's leading edge is past the front face.
+    const pen = s === 0 ? x1 - (ball.x - BR) : (ball.x + BR) - x0;
+    if (pen <= Math.abs(ball.vx) * sdt + 1.5) {
+      ball.x = s === 0 ? x1 + BR : x0 - BR;
+      bounce(s);
+    } else {
+      // Clipped the end of the paddle after passing the face: glance off, still a miss.
+      const push = Math.abs(p.vy) + 60;
+      if (ball.y < p.y) { ball.y = top - BR; ball.vy = -Math.max(Math.abs(ball.vy), push); }
+      else { ball.y = bot + BR; ball.vy = Math.max(Math.abs(ball.vy), push); }
+    }
+  }
+
+  function bounce(s) {
+    const p = P[s];
+    const rel = clamp((ball.y - p.y) / (PL / 2 + BR), -1, 1);
+    const ang = rel * MAX_ANG;
+    ball.speed = Math.min(SPEED_MAX, ball.speed + SPEED_INC);
+    const dir = s === 0 ? 1 : -1;
+    ball.vx = dir * ball.speed * Math.cos(ang);
+    ball.vy = ball.speed * Math.sin(ang);
+    p.squash = 1;
+    rally++;
+    sparks(s === 0 ? LFACE : RFACE, ball.y, dir);
+  }
+
+  // ---------- Computer ----------
+  function planIntercept(d) {
+    const xf = RFACE - BR;
+    if (ball.vx <= 0) return H / 2;
+    const t = (xf - ball.x) / ball.vx;
+    if (t <= 0) return P[1].y;
+    const span = H - 2 * BR;
+    const yy = ball.y + ball.vy * t - BR;
+    const bounces = yy >= 0 ? Math.floor(yy / span) : Math.floor(-yy / span) + 1;
+    let m = ((yy % (2 * span)) + 2 * span) % (2 * span);
+    if (m > span) m = 2 * span - m;
+    const yi = m + BR;
+    const speedF = Math.max(0.85, ball.speed / 450);
+    const err = rand(-1, 1) * d.err * (1 + 0.6 * Math.min(bounces, 2)) * speedF;
+    let aim = 0;
+    if (d.aimMax > 0) {
+      const mag = rand(d.aimMin, d.aimMax);
+      // Hard sends the ball away from where the player is; Normal picks a side at random.
+      let sgn = Math.random() < 0.5 ? -1 : 1;
+      if (mode.diff === 'hard') sgn = P[0].y < H / 2 ? 1 : -1;
+      aim = sgn * mag;
+    }
+    return clamp(yi + err - aim, PL / 2, H - PL / 2);
+  }
+
+  function updateAI(dt) {
+    const d = DIFF[mode.diff], p = P[1];
+    if (state === 'play') {
+      const toward = ball.vx > 0;
+      if (toward !== ai.toward) {
+        ai.toward = toward;
+        ai.pending = true;
+        ai.think = d.react * rand(0.85, 1.25);
+      }
+      if (ai.pending) {
+        ai.think -= dt;
+        if (ai.think <= 0) {
+          ai.pending = false;
+          ai.target = toward ? planIntercept(d) : H / 2 + rand(-24, 24);
+        }
+      }
+    } else if (state === 'count') {
+      ai.toward = false; ai.pending = false; ai.target = H / 2;
+    }
+    // Smooth approach: proportional speed, capped, with limited acceleration. No jitter.
+    const diff = ai.target - p.y;
+    const want = Math.abs(diff) < 1.5 ? 0 : clamp(diff * 9, -d.speed, d.speed);
+    const acc = d.speed * 10 * dt;
+    p.vy += clamp(want - p.vy, -acc, acc);
+    p.y = clamp(p.y + p.vy * dt, PL / 2, H - PL / 2);
+    if (p.y === PL / 2 || p.y === H - PL / 2) p.vy = 0;
+  }
+
+  function updateHuman(s, dt) {
+    const p = P[s];
+    let dir = 0;
+    if (mode.players === 1) dir = ((keys.ld || keys.rd) ? 1 : 0) - ((keys.lu || keys.ru) ? 1 : 0);
+    else dir = s === 0 ? (keys.ld ? 1 : 0) - (keys.lu ? 1 : 0) : (keys.rd ? 1 : 0) - (keys.ru ? 1 : 0);
+    if (dir) p.target = p.y + dir * KEY_SPEED * dt;
+    p.target = clamp(p.target, PL / 2, H - PL / 2);
+    const max = PTR_SPEED * dt;
+    const ny = p.y + clamp(p.target - p.y, -max, max);
+    p.vy = (ny - p.y) / dt;
+    p.y = ny;
+  }
+
+  // ---------- Particles ----------
+  function burst(x, y, dir) {
+    if (reduceMotion.matches) return;
+    const cols = ['#ffffff', C.orange, C.light];
+    for (let i = 0; i < 22; i++) {
+      parts.push({
+        x, y, vx: dir * rand(60, 460), vy: rand(-280, 280),
+        life: rand(0.45, 0.9), max: 0.9, size: rand(3, 6), color: cols[i % 3],
+      });
+    }
+  }
+  function sparks(x, y, dir) {
+    if (reduceMotion.matches || parts.length > 200) return;
+    for (let i = 0; i < 4; i++) {
+      parts.push({ x, y: y + rand(-4, 4), vx: dir * rand(60, 200), vy: rand(-120, 120),
+        life: rand(0.15, 0.3), max: 0.3, size: rand(2, 3), color: '#ffffff' });
+    }
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const q = parts[i];
+      q.life -= dt;
+      if (q.life <= 0) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+      const f = Math.exp(-2.6 * dt);
+      q.vx *= f; q.vy *= f;
+      q.x += q.vx * dt; q.y += q.vy * dt;
+    }
+    for (const p of P) {
+      p.prevY = p.y;
+      p.squash = Math.max(0, p.squash - dt / 0.16);
+      p.flash = Math.max(0, p.flash - dt);
+    }
+    if (state === 'over') { overT += dt; ball.px = ball.x; ball.py = ball.y; return; }
+    if (!active()) return;
+
+    updateHuman(0, dt);
+    if (mode.players === 2) updateHuman(1, dt); else updateAI(dt);
+
+    if (state === 'count') {
+      ball.px = ball.x; ball.py = ball.y;
+      stateT -= dt;
+      if (stateT <= 0) serve();
+    } else if (state === 'play') {
+      stepBall(dt);
+    } else if (state === 'point') {
+      ball.px = ball.x; ball.py = ball.y;
+      stateT -= dt;
+      if (stateT <= 0) { if (winner >= 0) endGame(); else startCount(); }
+    }
+  }
+
+  // ---------- Render ----------
+  function gameTransform() {
+    const k = devK;
+    if (rot) ctx.setTransform(0, -k, k, 0, 0, W * k);
+    else ctx.setTransform(k, 0, 0, k, 0, 0);
+  }
+
+  function render(alpha) {
+    const k = devK;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    drawNet();
+    if (state !== 'title') drawScores();
+
+    gameTransform();
+    drawPaddles(alpha);
+    drawParticles();
+    if (state === 'count' || state === 'play') {
+      const x = ball.px + (ball.x - ball.px) * alpha, y = ball.py + (ball.y - ball.py) * alpha;
+      const blink = state === 'count' && !paused && Math.floor(stateT * 8) % 2 === 1 && stateT < COUNT_T / 3;
+      if (!blink) { ctx.fillStyle = '#fff'; ctx.fillRect(x - BR, y - BR, BS, BS); }
+    }
+
+    if (state === 'count') drawCountdown(k);
+  }
+
+  function drawNet() {
+    const k = devK;
+    const lw = Math.max(1, Math.round(dpr));
+    const dash = 10 * k, step = 20 * k;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    if (!rot) {
+      const x = Math.round(cv.width / 2 - lw / 2);
+      for (let y = 5 * k; y < cv.height; y += step) ctx.fillRect(x, Math.round(y), lw, Math.round(dash));
+    } else {
+      const y = Math.round(cv.height / 2 - lw / 2);
+      for (let x = 5 * k; x < cv.width; x += step) ctx.fillRect(Math.round(x), y, Math.round(dash), lw);
+    }
+  }
+
+  function drawScores() {
+    const k = devK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '300 ' + Math.round(84 * k) + 'px ' + FONT_D;
+    for (let s = 0; s < 2; s++) {
+      const p = P[s];
+      const g = toScreen(s === 0 ? W / 2 - 72 : W / 2 + 72, 76);
+      const on = p.flash > 0 && Math.floor((FLASH_T - p.flash) * 7) % 2 === 0;
+      ctx.fillStyle = on ? C.orange : C.dim;
+      // In 2 player portrait the top player reads their number from the far end.
+      const flip = rot && mode.players === 2 && s === 1;
+      ctx.setTransform(1, 0, 0, 1, g.x * k, g.y * k);
+      if (flip) ctx.rotate(Math.PI);
+      ctx.fillText(String(p.score), 0, 4 * k);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function drawPaddles(alpha) {
+    const rm = reduceMotion.matches;
+    for (let s = 0; s < 2; s++) {
+      const p = P[s];
+      const y = p.prevY + (p.y - p.prevY) * alpha;
+      const q = rm ? 0 : p.squash * p.squash;
+      const t = PT * (1 - 0.4 * q), l = PL * (1 + 0.1 * q);
+      const x = s === 0 ? PX : W - PX - t;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x, y - l / 2, t, l);
+    }
+  }
+
+  function drawParticles() {
+    for (const q of parts) {
+      ctx.globalAlpha = clamp((q.life / q.max) * 1.5, 0, 1);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCountdown(k) {
+    const n = Math.max(1, Math.ceil(stateT / (COUNT_T / 3)));
+    const c = toScreen(W / 2, H / 2);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const bw = 44 * k, bh = 56 * k;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(Math.round(c.x * k - bw / 2), Math.round(c.y * k - bh / 2), Math.round(bw), Math.round(bh));
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '300 ' + Math.round(44 * k) + 'px ' + FONT_D;
+    ctx.fillText(String(n), c.x * k, c.y * k + 2 * k);
+  }
+
+  // ---------- Overlays + pause ----------
+  function show(el) { el.classList.add('show'); }
+  function hideAll() {
+    for (const el of [ovStart, ovPause, ovOver]) el.classList.remove('show');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  function setPaused(p, by) {
+    if (p) {
+      if (paused || !active()) return;
+      paused = true; pausedBy = by || 'user';
+      keys.lu = keys.ld = keys.ru = keys.rd = false;
+      drags.clear();
+      show(ovPause);
+    } else {
+      if (!paused) return;
+      paused = false; pausedBy = null;
+      ovPause.classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+  }
+
+  // The arcade hiding the game always pauses. When it comes back, resume on our own
+  // only if the ball is not in flight; otherwise the players pick it up when ready.
+  V.onPause((p) => {
+    if (p) setPaused(true, 'host');
+    else if (paused && pausedBy === 'host' && state !== 'play') setPaused(false);
+  });
+
+  function updateTexts() {
+    const touch = lastPointer === 'touch';
+    let t;
+    if (opts.players === 1) {
+      t = touch ? 'Drag anywhere to move your paddle. Tap the pause button to pause.'
+        : 'Move with the mouse, W and S, or the arrow keys. P to pause.';
+    } else if (touch) {
+      t = 'Each player drags in their own half of the screen.';
+    } else {
+      t = rot ? 'Bottom player A and D, top player arrow keys. P to pause.'
+        : 'Left player W and S, right player arrow keys. P to pause.';
+    }
+    $('ctrlText').textContent = t;
+  }
+
+  function syncOptions() {
+    for (const seg of document.querySelectorAll('.seg')) {
+      const key = seg.dataset.key;
+      for (const b of seg.querySelectorAll('button')) {
+        b.classList.toggle('on', String(opts[key]) === b.dataset.v);
+        b.setAttribute('aria-pressed', String(opts[key]) === b.dataset.v ? 'true' : 'false');
+      }
+    }
+    $('optDiff').style.display = opts.players === 1 ? '' : 'none';
+    updateTexts();
+  }
+
+  for (const seg of document.querySelectorAll('.seg')) {
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const key = seg.dataset.key, v = b.dataset.v;
+      opts[key] = key === 'diff' ? v : Number(v);
+      saveJSON(OPTS_KEY, opts);
+      syncOptions();
+    });
+  }
+
+  // ---------- Input ----------
+  window.addEventListener('pointerdown', (e) => {
+    try { window.focus(); } catch (_) {}
+    const isTouch = e.pointerType !== 'mouse';
+    if ((lastPointer === 'touch') !== isTouch) { lastPointer = isTouch ? 'touch' : 'mouse'; updateTexts(); }
+    if (e.target.closest && (e.target.closest('.ov.show') || e.target.closest('#pauseBtn'))) return;
+    if (!active() || paused) return;
+    let side;
+    if (mode.players === 1) {
+      if (!isTouch) { P[0].target = clamp(toGame(e.clientX, e.clientY).y, PL / 2, H - PL / 2); return; }
+      side = 0;
+    } else {
+      side = toGame(e.clientX, e.clientY).x < W / 2 ? 0 : 1;
+    }
+    // A new finger on a side takes over from any older one there.
+    for (const [id, d] of drags) if (d.side === side) drags.delete(id);
+    drags.set(e.pointerId, { side, sx: e.clientX, sy: e.clientY, anchor: P[side].y });
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (paused || !active()) return;
+    const d = drags.get(e.pointerId);
+    if (d) {
+      const u = unitsPerCss();
+      const delta = (rot ? e.clientX - d.sx : e.clientY - d.sy) * u * TOUCH_GAIN;
+      const want = d.anchor + delta;
+      const c = clamp(want, PL / 2, H - PL / 2);
+      // Re-anchor at the walls so reversing direction responds at once.
+      if (c !== want) d.anchor = c - delta;
+      P[d.side].target = c;
+    } else if (e.pointerType === 'mouse' && mode.players === 1) {
+      if (lastPointer !== 'mouse') { lastPointer = 'mouse'; updateTexts(); }
+      P[0].target = clamp(toGame(e.clientX, e.clientY).y, PL / 2, H - PL / 2);
+    }
+  });
+
+  const endPtr = (e) => { drags.delete(e.pointerId); };
+  window.addEventListener('pointerup', endPtr);
+  window.addEventListener('pointercancel', endPtr);
+
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const KEYMAP = {
+    KeyW: 'lu', KeyA: 'lu', KeyS: 'ld', KeyD: 'ld',
+    ArrowUp: 'ru', ArrowLeft: 'ru', ArrowDown: 'rd', ArrowRight: 'rd',
+  };
+  window.addEventListener('keydown', (e) => {
+    const code = e.code || '';
+    const k = KEYMAP[code] || KEYMAP[e.key];
+    const onButton = e.target && e.target.tagName === 'BUTTON';
+    if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
+    if (k) {
+      if (!paused && active()) keys[k] = true;
+      if (lastPointer !== 'mouse') { lastPointer = 'mouse'; updateTexts(); }
+      return;
+    }
+    if (e.repeat) return;
+    if (code === 'Space' || code === 'Enter' || code === 'NumpadEnter') {
+      if (onButton) return;          // let the focused button handle it
+      if (state === 'title') newGame();
+      else if (state === 'over') { if (overT > 0.4) newGame(); }
+      else if (paused) setPaused(false);
+      return;
+    }
+    if (code === 'KeyP' || e.key === 'Escape') {
+      if (paused) setPaused(false); else setPaused(true, 'user');
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = KEYMAP[e.code] || KEYMAP[e.key];
+    if (k) keys[k] = false;
+  });
+  window.addEventListener('blur', () => { keys.lu = keys.ld = keys.ru = keys.rd = false; });
+
+  $('btnPlay').addEventListener('click', () => { if (state === 'title') newGame(); });
+  $('btnResume').addEventListener('click', () => setPaused(false));
+  $('btnPauseMode').addEventListener('click', toTitle);
+  $('btnAgain').addEventListener('click', () => { if (state === 'over') newGame(); });
+  $('btnMode').addEventListener('click', () => { if (state === 'over') toTitle(); });
+  pauseBtn.addEventListener('click', () => setPaused(true, 'user'));
+
+  window.addEventListener('resize', resize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+  // ---------- Main loop ----------
+  let last = performance.now(), acc = 0, btnShown = false;
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1;
+    if (!paused && state !== 'title') {
+      acc += dt;
+      let n = 0;
+      while (acc >= STEP && n < 16) { update(STEP); acc -= STEP; n++; }
+      if (n >= 16) acc = 0;
+    }
+    const wantBtn = active() && !paused;
+    if (wantBtn !== btnShown) { btnShown = wantBtn; pauseBtn.classList.toggle('on', wantBtn); }
+    render(paused ? 1 : Math.min(1, acc / STEP));
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Boot ----------
+  resize();
+  syncOptions();
+
+  // Wait for the shared type (Segoe UI or bundled Selawik) before the first canvas text draw.
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    requestAnimationFrame((t) => { last = t; frame(t); });
+    V.ready();
+  }
+  try {
+    const f = document.fonts;
+    Promise.all([f.load('300 84px ' + FONT_D), f.load('400 13px ' + FONT), f.load('600 12px ' + FONT)])
+      .catch(() => {}).then(() => f.ready).then(start, start);
+    setTimeout(start, 2500);
+  } catch (_) { start(); }
+})();
+</script>
+</body>
+</html>

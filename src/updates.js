@@ -1,0 +1,75 @@
+/* The update log, newest first. Each release lists the games it added (by
+ * slug, so tiles and links come from the catalogue) and plain one-line changes.
+ *
+ * Versions below 1.0 are pre-release builds. 1.0 is the day the site went
+ * public. New versions go on top.
+ */
+export const UPDATES = [
+  {
+    version: '1.0',
+    date: '2026-10-26',
+    games: [],
+    changes: [
+      'Vela Arcade is public.',
+      'Online page: how many people are on the site right now.',
+      'Word Guess uses green and yellow.',
+      'Third-party games can no longer send the page somewhere else.',
+    ],
+  },
+  {
+    version: '0.5',
+    date: '2026-10-24',
+    games: [],
+    changes: [
+      'This page: every version and what it added.',
+      'Updates link in the top bar, and the current version in the footer.',
+    ],
+  },
+  {
+    version: '0.4',
+    date: '2026-10-24',
+    games: [
+      'memory-match', 'sliding-puzzle', 'code-breaker', 'hangman', 'road-crossing',
+      'typing-test', 'pinball', 'dots-and-boxes', 'ultimate-tic-tac-toe',
+      'basket-random', 'soccer-random', 'volley-random', 'boxing-random',
+      'basketball-legends', 'football-legends', 'air-hockey-cup', 'cannon-basketball-4',
+      '8-ball-pool', 'drift-boss', 'bike-mania', 'highway-racer-3d', 'parking-fury-3d',
+      'parking-fury-3d-night-city', 'parking-fury-3d-beach-city', 'parking-fury-3d-bounty-hunter',
+      'stack-ball', 'asteroids', 'ballistic', 'spades', 'hearts', 'yatzy', 'dominoes',
+    ],
+    changes: [
+      'Racing filter.',
+      'Long player counts on tiles wrap instead of running off the edge.',
+    ],
+  },
+  {
+    version: '0.3',
+    date: '2026-10-24',
+    games: ['basketball-stars', 'football-heads', 'drive-ahead-sports', 'mini-golf-3d', 'trial-xtreme', 'paper-io-2', 'texas-holdem'],
+    changes: [
+      'The lobby is split into Vela originals and Embedded games.',
+      'Embedded games credit the studio that made them on their page.',
+    ],
+  },
+  {
+    version: '0.2',
+    date: '2026-10-24',
+    games: ['chess', 'sea-battle', 'four-in-a-row', 'falling-blocks', 'space-shooter', 'minesweeper', 'word-guess', 'pong'],
+    changes: [
+      'Online rooms for Chess and Sea Battle. Share the code or the invite link.',
+      'Tower Stack gives you 3 lives. A full miss costs one instead of ending the run.',
+    ],
+  },
+  {
+    version: '0.1',
+    date: '2026-10-24',
+    games: ['wildcard', 'onitama', 'world-cup', 'tower-stack', '2048', 'snake', 'brick-breaker'],
+    changes: [
+      'The lobby: filters, search and your recently played games.',
+      'Full screen and reload on every game.',
+      'Bests are saved on your device.',
+    ],
+  },
+]
+
+export const CURRENT_VERSION = UPDATES[0].version

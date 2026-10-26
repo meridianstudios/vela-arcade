@@ -1,0 +1,1426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pinball</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --field: #0b0c0f;
+    --s1: #16181c;
+    --line: rgba(255, 255, 255, 0.1);
+    --text: #fff;
+    --dim: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-l: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+  #stage {
+    position: relative;
+    overflow: hidden;
+    background: var(--field);
+    outline: 1px solid var(--line);
+  }
+  canvas { display: block; }
+  #ui {
+    position: absolute;
+    left: 0; top: 0;
+    width: 440px; height: 820px;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .ov {
+    position: absolute;
+    left: 0; right: 0; top: 44px; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.78);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s;
+  }
+  .ov.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.25s var(--ease), visibility 0s;
+  }
+  .ov.tap { cursor: pointer; }
+  .card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 26px;
+    text-align: left;
+    transform: translateY(14px);
+    transition: transform 0.3s var(--ease);
+  }
+  .ov.show .card { transform: none; }
+  .label {
+    font: 600 12px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .name {
+    font: 300 48px/1 var(--font-display, sans-serif);
+    letter-spacing: -0.01em;
+  }
+  .controls { color: var(--dim); font-size: 15px; font-weight: 400; line-height: 1.5; margin: 14px 0 26px; }
+  .btn {
+    display: block;
+    width: 100%;
+    font: 600 14px/1 var(--font, sans-serif);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #fff;
+    background: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 0;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-l); border-color: var(--brand-l); }
+  .btn:active { background: var(--brand-d); border-color: var(--brand-d); transform: scale(0.985); }
+  .btn:focus { outline: none; }
+  .btn:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+  .score-big {
+    font: 300 64px/1 var(--font-display, sans-serif);
+    letter-spacing: -0.02em;
+    margin: 14px 0 18px;
+    font-variant-numeric: tabular-nums;
+  }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 13px 0;
+    margin-bottom: 18px;
+  }
+  .row b { font: 600 18px/1 var(--font-display, sans-serif); font-variant-numeric: tabular-nums; }
+  .badge {
+    display: none;
+    font: 600 12px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-l);
+    margin-left: 10px;
+  }
+  .badge.on { display: inline; }
+  .gap { height: 18px; }
+  .touch-only { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .touch-only { display: block; }
+    .desk-only { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" aria-label="Pinball game"></canvas>
+  <div id="ui">
+    <section id="ovStart" class="ov tap show">
+      <div class="card">
+        <div class="name">Pinball</div>
+        <p class="controls desk-only">Z and M, or the arrow keys, to flip. Hold Space to launch. P to pause.</p>
+        <p class="controls touch-only">Tap the left or right side to flip. Hold the lower right to launch.</p>
+        <button class="btn" id="btnPlay" type="button">Play</button>
+      </div>
+    </section>
+
+    <section id="ovPause" class="ov tap">
+      <div class="card">
+        <div class="label">Paused</div>
+        <div class="gap"></div>
+        <button class="btn" id="btnResume" type="button">Resume</button>
+      </div>
+    </section>
+
+    <section id="ovOver" class="ov">
+      <div class="card">
+        <div class="label">Game over<span class="badge" id="overBadge">New best</span></div>
+        <div class="score-big" id="overScore">0</div>
+        <div class="row"><span class="label">Best</span><b id="overBest">0</b></div>
+        <button class="btn" id="btnAgain" type="button">Play again</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="pinball"></script>
+
+<!-- Physics. Kept free of DOM access so the same code runs headless in tests. -->
+<script id="pinball-sim">
+(function (root) {
+  'use strict';
+
+  // Logical table: 440 x 820 units, y grows downwards (towards the player).
+  const W = 440, H = 820, R = 9;
+  const G = 1050;                 // table slope gravity, units/s^2
+  const RAMP_G = 700;             // extra pull while climbing the ramp
+  const MAXV = 3000;              // ball speed cap
+  const STEP = 1 / 120;           // fixed step; each one is split into sub-steps
+  const L0 = 1, L1 = 2, LB = 3;   // layers: playfield, ramp, both
+  const PI = Math.PI, TAU = PI * 2;
+  const FLIP_UP = 30, FLIP_DOWN = 17;           // rad/s
+  const FLIP_E = 0.25, FLIP_MU = 0.12;
+  const PL_Y = 792, PL_TRAVEL = 30, PL_PULL_TIME = 0.9, PL_MIN = 220, PL_MAX = 2200;
+  const SHOOT_X = 410;
+  const BUMP_KICK = 860, SLING_KICK = 700;
+
+  function create() {
+    const walls = [], sensors = [], bumpers = [], targets = [], slings = [], flippers = [];
+    const mx = (x) => 404 - x;    // mirror across the playfield centre line (x = 202)
+
+    function bbox(o, x0, y0, x1, y1, pad) {
+      o.x0 = Math.min(x0, x1) - pad; o.x1 = Math.max(x0, x1) + pad;
+      o.y0 = Math.min(y0, y1) - pad; o.y1 = Math.max(y0, y1) + pad;
+    }
+    function seg(ax, ay, bx, by, o) {
+      o = o || {};
+      const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+      const w = {
+        t: 0, ax, ay, bx, by, dx, dy, len2: dx * dx + dy * dy,
+        th: o.th || 0, layer: o.layer || L0, e: o.e == null ? 0.4 : o.e, mu: o.mu == null ? 0.05 : o.mu,
+        kind: o.kind || 'wall', draw: o.draw || 'wall', id: o.id == null ? -1 : o.id,
+        on: true, oneWay: false, onx: 0, ony: 0, cool: 0,
+      };
+      if (o.front) {
+        // One-way wall: only blocks a ball whose centre is on the same side as o.front.
+        let nx = dy / len, ny = -dx / len;
+        if ((o.front[0] - ax) * nx + (o.front[1] - ay) * ny < 0) { nx = -nx; ny = -ny; }
+        w.oneWay = true; w.onx = nx; w.ony = ny;
+      }
+      bbox(w, ax, ay, bx, by, w.th + R + 1);
+      walls.push(w);
+      return w;
+    }
+    function arc(cx, cy, r, a0, a1, o) {
+      o = o || {};
+      const w = {
+        t: 1, cx, cy, r, a0, span: a1 - a0,
+        px0: cx + r * Math.cos(a0), py0: cy + r * Math.sin(a0),
+        px1: cx + r * Math.cos(a1), py1: cy + r * Math.sin(a1),
+        th: 0, layer: o.layer || L0, e: o.e == null ? 0.4 : o.e, mu: o.mu == null ? 0.05 : o.mu,
+        kind: 'wall', draw: o.draw || 'wall', id: -1, on: true, oneWay: false,
+      };
+      bbox(w, cx - r, cy - r, cx + r, cy + r, R + 1);
+      walls.push(w);
+      return w;
+    }
+    function sensor(name, ax, ay, bx, by, o) {
+      o = o || {};
+      const dx = bx - ax, dy = by - ay;
+      sensors.push({ name, ax, ay, bx, by, dx, dy, len2: dx * dx + dy * dy, layer: o.layer || L0, i: o.i == null ? 0 : o.i });
+    }
+
+    // ---- Shell ----
+    arc(220, 262, 208, PI, TAU, { layer: LB });                 // top arch
+    seg(12, 262, 12, 860, { layer: LB });                       // left wall
+    seg(428, 262, 428, 860, { layer: LB });                     // shooter lane outer wall
+    seg(392, 300, 392, 860, { layer: LB });                     // shooter lane inner wall
+    seg(392, 300, 428, 268, { front: [380, 250], draw: 'gate', e: 0.3 }); // one-way gate out of the shooter lane
+
+    // ---- Left orbit ----
+    seg(48, 236, 48, 450, { draw: 'guide' });
+    // One-way gate at the top of the orbit: a shot can go up and round, but a ball
+    // coming round the arch from the plunger drops into the upper playfield instead
+    // of running down the orbit into the left outlane.
+    seg(220 - Math.sqrt(208 * 208 - 42 * 42), 220, 48, 236, { front: [40, 200], draw: 'gate', e: 0.3 });
+    sensor('orbit', 12, 420, 48, 420);
+    sensor('loop', 392, 140, 392, 262);
+
+    // ---- Wall deflectors above the outlanes ----
+    seg(12, 548, 26, 566, { e: 0.3 });
+    seg(392, 548, 378, 566, { e: 0.3 });
+
+    // ---- Lower playfield, both sides ----
+    for (let s = 0; s < 2; s++) {
+      const X = s ? mx : (x) => x;
+      seg(X(48), 610, X(48), 662, { e: 0.5 });                  // inlane / outlane divider
+      // Inlane guide: in line with the top of the resting flipper, so a ball rolls
+      // straight onto it instead of catching on the pivot.
+      seg(X(48), 662, X(116), 701, { e: 0.3 });
+      const A = [X(80), 592], B = [X(80), 650], C = [X(114), 670];
+      seg(A[0], A[1], B[0], B[1], { e: 0.55, draw: 'none' });
+      seg(B[0], B[1], C[0], C[1], { e: 0.4, draw: 'none' });
+      seg(A[0], A[1], C[0], C[1], { e: 0.6, kind: 'sling', id: s, draw: 'none' });
+      slings.push({ ax: A[0], ay: A[1], bx: B[0], by: B[1], cx: C[0], cy: C[1] });
+      flippers.push({
+        px: X(122), py: 716, side: s ? -1 : 1, len: 70, r1: 10, r2: 5.5,
+        rest: 0.52, up: -0.44, th: 0.52, pth: 0.52, w: 0, pressed: false,
+        cx: (s ? -1 : 1) * Math.cos(0.52), cy: Math.sin(0.52),
+      });
+      sensor('inlane', X(48), 630, X(80), 630, { i: s });
+      sensor('outlane', X(12), 690, X(48), 690, { i: s });
+    }
+
+    // ---- Top rollover lanes ----
+    for (const x of [142, 182, 222, 262]) seg(x, 104, x, 140, { e: 0.5, draw: 'guide' });
+    for (let i = 0; i < 3; i++) sensor('lane', 144 + 40 * i, 122, 180 + 40 * i, 122, { i });
+
+    // ---- Pop bumpers ----
+    [[166, 196], [238, 196], [202, 256]].forEach((p, i) => bumpers.push({ x: p[0], y: p[1], r: 21, i, cool: 0 }));
+
+    // ---- Drop target bank. Tilted so nothing can rest on top of it, and the targets
+    // butt end to end so the top has no notch for a ball to sit in. ----
+    {
+      const x0 = 134, y0 = 336, x1 = 234, y1 = 312;
+      const len = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+      const pitch = len / 3, half = pitch / 2;
+      for (let i = 0; i < 3; i++) {
+        const s = half + pitch * i, cx = x0 + ux * s, cy = y0 + uy * s;
+        const t = seg(cx - ux * half, cy - uy * half, cx + ux * half, cy + uy * half, { th: 4, e: 0.3, kind: 'target', id: i, draw: 'none' });
+        t.cx = cx; t.cy = cy; t.ang = Math.atan2(uy, ux);
+        t.fnx = -uy; t.fny = ux;            // front face points down and to the right
+        targets.push(t);
+      }
+    }
+
+    // ---- Ramp: climbs from the centre, turns over the top and drops into the right inlane ----
+    const ramp = {
+      upL: 236, upR: 276, mouthY: 400, cx: 298, cy: 300, rOut: 62, rIn: 22,
+      downL: 320, downR: 360, bendY: 540, exitY: 575,
+    };
+    seg(236, 400, 236, 300, { layer: LB, draw: 'rail' });
+    seg(276, 400, 276, 300, { layer: LB, draw: 'rail' });
+    seg(236, 300, 256, 290, { layer: L0, draw: 'none' });       // underside of the ramp: peaked so nothing rests on it
+    seg(256, 290, 276, 300, { layer: L0, draw: 'none' });
+    arc(298, 300, 62, PI, TAU, { layer: L1, draw: 'rail' });
+    arc(298, 300, 22, PI, TAU, { layer: L1, draw: 'rail' });
+    seg(360, 300, 360, 540, { layer: L1, draw: 'rail' });
+    seg(360, 540, 354, 575, { layer: L1, draw: 'rail' });
+    seg(320, 300, 320, 540, { layer: L1, draw: 'rail' });
+    seg(320, 540, 326, 575, { layer: L1, draw: 'rail' });
+    sensor('rampIn', 236, 400, 276, 400, { layer: LB });
+    sensor('rampOut', 320, 575, 360, 575, { layer: L1 });
+
+    // ---- Plunger: a one-way floor in the shooter lane that can move ----
+    const pw = seg(393, PL_Y, 427, PL_Y, { layer: LB, front: [410, 0], kind: 'plunger', e: 0, mu: 0, draw: 'none' });
+    const plunger = { y: PL_Y, pull: 0, holding: false, firing: false, fireV: 0, sv: 0, wall: pw };
+
+    const sim = {
+      W, H, R, STEP, L0, L1, PL_Y, PL_TRAVEL, SHOOT_X,
+      walls, sensors, bumpers, targets, slings, flippers, plunger, ramp,
+      balls: [], events: [], time: 0, clock: 0, nextId: 1, nudges: 0, maxSub: 0,
+      debug: null,      // optional fn(ball) called after every sub-step (used by tests)
+    };
+
+    // ---------- Contacts ----------
+    // Push the ball out along n, then apply restitution and Coulomb friction against a
+    // surface moving at (svx, svy). Returns the closing speed (0 if separating).
+    function resolve(b, nx, ny, pen, svx, svy, e, mu) {
+      b.x += nx * pen; b.y += ny * pen;
+      const rvx = b.vx - svx, rvy = b.vy - svy;
+      const vn = rvx * nx + rvy * ny;
+      if (vn >= 0) return 0;
+      const resting = vn > -40;
+      const jn = -(1 + (resting ? 0 : e)) * vn;   // no micro-bounce, so a ball can settle and roll
+      let vx = rvx + nx * jn, vy = rvy + ny * jn;
+      // Friction only on real impacts. A ball in resting contact is rolling, which does
+      // not scrub off speed (and must not let a ball balance on the tip of a post).
+      if (mu > 0 && !resting) {
+        const tx = rvx - nx * vn, ty = rvy - ny * vn, vt = Math.hypot(tx, ty);
+        if (vt > 1e-9) { const k = Math.min(vt, mu * jn) / vt; vx -= tx * k; vy -= ty * k; }
+      }
+      b.vx = vx + svx; b.vy = vy + svy;
+      return -vn;
+    }
+
+    function kick(b, nx, ny, k) {
+      const vn = b.vx * nx + b.vy * ny;
+      const want = k + Math.max(0, vn) * 0.25;
+      if (vn < want) { b.vx += nx * (want - vn); b.vy += ny * (want - vn); }
+    }
+
+    function hitWall(b, w) {
+      if (!w.on || !(b.layer & w.layer)) return;
+      if (b.x < w.x0 || b.x > w.x1 || b.y < w.y0 || b.y > w.y1) return;
+      let qx, qy;
+      if (w.t === 0) {
+        let t = ((b.x - w.ax) * w.dx + (b.y - w.ay) * w.dy) / w.len2;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        qx = w.ax + w.dx * t; qy = w.ay + w.dy * t;
+      } else {
+        // Circle vs arc: nearest point on the arc if the ball's angle is inside the span,
+        // otherwise the nearer end point.
+        const ex = b.x - w.cx, ey = b.y - w.cy;
+        let rel = Math.atan2(ey, ex) - w.a0;
+        rel -= Math.floor(rel / TAU) * TAU;
+        if (rel <= w.span) {
+          const d = Math.hypot(ex, ey) || 1;
+          qx = w.cx + ex / d * w.r; qy = w.cy + ey / d * w.r;
+        } else {
+          const d0 = (b.x - w.px0) ** 2 + (b.y - w.py0) ** 2, d1 = (b.x - w.px1) ** 2 + (b.y - w.py1) ** 2;
+          if (d0 < d1) { qx = w.px0; qy = w.py0; } else { qx = w.px1; qy = w.py1; }
+        }
+      }
+      const dx = b.x - qx, dy = b.y - qy, rr = R + w.th, d2 = dx * dx + dy * dy;
+      if (d2 >= rr * rr) return;
+      if (w.oneWay && (b.x - w.ax) * w.onx + (b.y - w.ay) * w.ony < 0) return;
+      const d = Math.sqrt(d2);
+      let nx, ny;
+      if (d > 1e-6) { nx = dx / d; ny = dy / d; }
+      else if (w.oneWay) { nx = w.onx; ny = w.ony; }
+      else { const s = Math.hypot(b.vx, b.vy) || 1; nx = -b.vx / s; ny = -b.vy / s; }
+      const imp = resolve(b, nx, ny, rr - d, 0, w.kind === 'plunger' ? plunger.sv : 0, w.e, w.mu);
+      if (w.kind === 'sling') {
+        if (imp > 80 && sim.clock >= w.cool) {
+          kick(b, nx, ny, SLING_KICK);
+          w.cool = sim.clock + 0.1;
+          sim.events.push({ type: 'sling', i: w.id, ball: b });
+        }
+      } else if (w.kind === 'target') {
+        if (imp > 40 && nx * w.fnx + ny * w.fny > 0.5) {
+          w.on = false;
+          sim.events.push({ type: 'target', i: w.id, ball: b });
+        }
+      }
+    }
+
+    function hitBumper(b, p) {
+      const dx = b.x - p.x, dy = b.y - p.y, rr = p.r + R, d2 = dx * dx + dy * dy;
+      if (d2 >= rr * rr) return;
+      const d = Math.sqrt(d2) || 1e-6;
+      const nx = dx / d, ny = dy / d;
+      resolve(b, nx, ny, rr - d, 0, 0, 0.4, 0.02);
+      if (sim.clock >= p.cool) {
+        kick(b, nx, ny, BUMP_KICK);
+        p.cool = sim.clock + 0.05;
+        sim.events.push({ type: 'bumper', i: p.i, ball: b });
+      }
+    }
+
+    // Flipper: a tapered capsule turning about its pivot. The surface velocity at the
+    // contact point (angular velocity x lever arm) goes into the impulse, so a hit near
+    // the tip leaves much faster than one near the pivot.
+    function hitFlipper(b, f) {
+      const rx = b.x - f.px, ry = b.y - f.py;
+      const reach = f.len + f.r1 + R;
+      if (rx * rx + ry * ry > reach * reach) return;
+      let t = (rx * f.cx + ry * f.cy) / f.len;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = f.px + f.cx * f.len * t, qy = f.py + f.cy * f.len * t;
+      const rad = f.r1 + (f.r2 - f.r1) * t;
+      const dx = b.x - qx, dy = b.y - qy, lim = rad + R, d2 = dx * dx + dy * dy;
+      if (d2 >= lim * lim) return;
+      const d = Math.sqrt(d2);
+      let nx, ny;
+      if (d > 1e-6) { nx = dx / d; ny = dy / d; }
+      else { nx = f.cy; ny = -f.cx; if (ny > 0) { nx = -nx; ny = -ny; } }
+      const ww = f.side * f.w;
+      const lx = qx + nx * rad - f.px, ly = qy + ny * rad - f.py;
+      resolve(b, nx, ny, lim - d, -ww * ly, ww * lx, FLIP_E, FLIP_MU);
+      b.flipT = sim.time;
+    }
+
+    function hitBalls(a, b) {
+      if (!(a.layer & b.layer)) return;
+      const dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy, m = 2 * R;
+      if (d2 >= m * m) return;
+      const d = Math.sqrt(d2);
+      const nx = d > 1e-6 ? dx / d : 1, ny = d > 1e-6 ? dy / d : 0;
+      const p = (m - d) / 2;
+      a.x -= nx * p; a.y -= ny * p; b.x += nx * p; b.y += ny * p;
+      // A ball resting on a cradled ball counts as cradled too (no ball search).
+      if (a.flipT > b.flipT) b.flipT = a.flipT; else a.flipT = b.flipT;
+      const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      if (vn >= 0) return;
+      const j = -1.9 * vn / 2;
+      a.vx -= nx * j; a.vy -= ny * j; b.vx += nx * j; b.vy += ny * j;
+    }
+
+    function checkSensors(b) {
+      for (let i = 0; i < sensors.length; i++) {
+        const s = sensors[i];
+        if (!(b.layer & s.layer)) continue;
+        const c0 = (b.ox - s.ax) * s.dy - (b.oy - s.ay) * s.dx;
+        const c1 = (b.x - s.ax) * s.dy - (b.y - s.ay) * s.dx;
+        if ((c0 < 0) === (c1 < 0)) continue;
+        const k = c0 / (c0 - c1);
+        const ix = b.ox + (b.x - b.ox) * k, iy = b.oy + (b.y - b.oy) * k;
+        const u = ((ix - s.ax) * s.dx + (iy - s.ay) * s.dy) / s.len2;
+        if (u < 0 || u > 1) continue;
+        const up = b.y < b.oy, right = b.x > b.ox;
+        if (s.name === 'rampIn') {
+          if (up && b.layer === L0) { b.layer = L1; sim.events.push({ type: 'rampEnter', ball: b }); }
+          else if (!up && b.layer === L1) b.layer = L0;
+        } else if (s.name === 'rampOut') {
+          if (!up && b.layer === L1) { b.layer = L0; sim.events.push({ type: 'ramp', ball: b }); }
+        } else {
+          sim.events.push({ type: 'sensor', name: s.name, i: s.i, up, right, ball: b });
+        }
+      }
+    }
+
+    // ---------- Moving parts ----------
+    function moveFlipper(f, h) {
+      const tgt = f.pressed ? f.up : f.rest;
+      const old = f.th;
+      if (f.th !== tgt) {
+        const sp = (f.pressed ? FLIP_UP : FLIP_DOWN) * h;
+        const d = tgt - f.th;
+        f.th = Math.abs(d) <= sp ? tgt : f.th + (d > 0 ? sp : -sp);
+      }
+      f.w = (f.th - old) / h;
+      f.cx = f.side * Math.cos(f.th); f.cy = Math.sin(f.th);
+    }
+
+    function movePlunger(h) {
+      const p = plunger;
+      if (p.holding) {
+        const old = p.y;
+        p.pull = Math.min(1, p.pull + h / PL_PULL_TIME);
+        p.y = PL_Y + PL_TRAVEL * p.pull;
+        p.sv = (p.y - old) / h;
+      } else if (p.firing) {
+        p.y -= p.fireV * h;
+        p.sv = -p.fireV;
+        if (p.y <= PL_Y) { p.y = PL_Y; p.firing = false; }
+      } else p.sv = 0;
+      pw.ay = pw.by = p.y;
+      pw.y0 = p.y - R - 1; pw.y1 = p.y + R + 1;
+    }
+
+    // ---------- Step ----------
+    function substep(h) {
+      sim.clock += h;
+      for (let i = 0; i < flippers.length; i++) moveFlipper(flippers[i], h);
+      movePlunger(h);
+      const bs = sim.balls;
+      for (let i = 0; i < bs.length; i++) {
+        const b = bs[i];
+        b.ox = b.x; b.oy = b.y;
+        b.vy += G * h;
+        if (b.layer === L1 && b.y > 300 && b.x < 282) b.vy += RAMP_G * h;
+        b.x += b.vx * h; b.y += b.vy * h;
+      }
+      // Two relaxation passes. Walls go last so they always have the final say.
+      for (let it = 0; it < 2; it++) {
+        for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) hitBalls(bs[i], bs[j]);
+        for (let i = 0; i < bs.length; i++) {
+          const b = bs[i];
+          if (b.layer & L0) {
+            for (let j = 0; j < flippers.length; j++) hitFlipper(b, flippers[j]);
+            for (let j = 0; j < bumpers.length; j++) hitBumper(b, bumpers[j]);
+          }
+          for (let j = 0; j < walls.length; j++) hitWall(b, walls[j]);
+        }
+      }
+      for (let i = bs.length - 1; i >= 0; i--) {
+        const b = bs[i];
+        const s2 = b.vx * b.vx + b.vy * b.vy;
+        if (s2 > MAXV * MAXV) { const k = MAXV / Math.sqrt(s2); b.vx *= k; b.vy *= k; }
+        checkSensors(b);
+        // A ramp ball can only be inside the ramp's footprint.
+        if (b.layer === L1 && (b.x < 222 || b.x > 374 || b.y < 226 || b.y > 592)) b.layer = L0;
+        if (sim.debug) sim.debug(b, h);
+        const out = b.x < -30 || b.x > W + 30 || b.y < -30;
+        if (out || b.y > H + 30) {
+          bs.splice(i, 1);
+          sim.events.push({ type: out ? 'escape' : 'drain', ball: b });
+        }
+      }
+    }
+
+    sim.step = function () {
+      let vmax = 0;
+      for (const b of sim.balls) {
+        b.rx = b.x; b.ry = b.y;
+        const s = Math.hypot(b.vx, b.vy);
+        if (s > vmax) vmax = s;
+      }
+      let extra = 0;
+      for (const f of flippers) {
+        f.pth = f.th;
+        if (f.th !== (f.pressed ? f.up : f.rest)) extra = Math.max(extra, FLIP_UP * (f.len + f.r2));
+      }
+      if (plunger.firing) extra = Math.max(extra, plunger.fireV);
+      // Sub-steps sized so nothing moves more than 0.4 ball radii relative to anything else.
+      const n = Math.min(48, Math.max(4, Math.ceil((vmax + extra) * STEP / (R * 0.4))));
+      if (n > sim.maxSub) sim.maxSub = n;
+      const h = STEP / n;
+      for (let k = 0; k < n; k++) substep(h);
+      sim.time += STEP;
+      // Ball search: anything sitting in one spot for 3 s (and not cradled or in the
+      // shooter lane) gets a small knock.
+      for (const b of sim.balls) {
+        const dx = b.x - b.ax, dy = b.y - b.ay;
+        if (sim.inShooter(b) || sim.time - b.flipT < 0.25 || dx * dx + dy * dy > 900) {
+          b.ax = b.x; b.ay = b.y; b.at = sim.time;
+        } else if (sim.time - b.at > 3) {
+          b.vx += (Math.random() < 0.5 ? -1 : 1) * (90 + Math.random() * 120);
+          b.vy -= 240;
+          b.at = sim.time;
+          sim.nudges++;
+          sim.events.push({ type: 'nudge', ball: b });
+        }
+      }
+    };
+
+    sim.addBall = function (x, y, vx, vy, layer) {
+      const b = {
+        id: sim.nextId++, x, y, vx: vx || 0, vy: vy || 0, layer: layer || L0,
+        rx: x, ry: y, ox: x, oy: y, ax: x, ay: y, at: sim.time, flipT: -9, orbitT: -9, inS: false,
+      };
+      b.inS = sim.inShooter(b);
+      sim.balls.push(b);
+      return b;
+    };
+    sim.serve = function () { return sim.addBall(SHOOT_X, plunger.y - R - 0.01, 0, 0); };
+    sim.inShooter = (b) => b.x > 392 && b.y > 285;
+    sim.shooterClear = function () {
+      if (plunger.holding || plunger.firing) return false;
+      for (const b of sim.balls) if (b.x > 388 && b.y > 250) return false;
+      return true;
+    };
+    sim.ballWaiting = function () {
+      for (const b of sim.balls) if (b.x > 392 && b.y > PL_Y - 70 && Math.abs(b.vy) < 80) return true;
+      return false;
+    };
+    sim.pull = function () { if (!plunger.firing) plunger.holding = true; };
+    sim.release = function () {
+      if (!plunger.holding) return;
+      plunger.holding = false;
+      plunger.firing = true;
+      plunger.fireV = PL_MIN + (PL_MAX - PL_MIN) * plunger.pull;
+      plunger.pull = 0;
+    };
+    sim.cancelPull = function () {
+      if (!plunger.holding) return;
+      plunger.holding = false;
+      plunger.firing = true;
+      plunger.fireV = 40;
+      plunger.pull = 0;
+    };
+    sim.resetTargets = function () {
+      for (const t of targets) {
+        for (const b of sim.balls) {
+          if (!(b.layer & L0)) continue;
+          let u = ((b.x - t.ax) * t.dx + (b.y - t.ay) * t.dy) / t.len2;
+          u = u < 0 ? 0 : u > 1 ? 1 : u;
+          const d = Math.hypot(b.x - (t.ax + t.dx * u), b.y - (t.ay + t.dy * u));
+          if (d < R + t.th + 2) return false;
+        }
+      }
+      for (const t of targets) t.on = true;
+      return true;
+    };
+    sim.clear = function () {
+      sim.balls.length = 0; sim.events.length = 0;
+      plunger.holding = false; plunger.firing = false; plunger.pull = 0; plunger.y = PL_Y; plunger.sv = 0;
+      pw.ay = pw.by = PL_Y; pw.y0 = PL_Y - R - 1; pw.y1 = PL_Y + R + 1;
+      for (const f of flippers) {
+        f.pressed = false; f.th = f.pth = f.rest; f.w = 0;
+        f.cx = f.side * Math.cos(f.rest); f.cy = Math.sin(f.rest);
+      }
+      for (const t of targets) t.on = true;
+    };
+    return sim;
+  }
+
+  root.PinballSim = { create, W, H, R, STEP };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Bridge (with a standalone fallback if the bridge failed to load) ----------
+  const V = window.Vela || (() => {
+    const key = 'vela:best:pinball';
+    const rb = () => { try { return Number(localStorage.getItem(key)) || 0; } catch (_) { return 0; } };
+    return {
+      embedded: false, ready() {}, score() {}, best: rb, onPause() {},
+      gameOver(n) { const p = rb(); if (n > p) { try { localStorage.setItem(key, String(n)); } catch (_) {} } return n > p; },
+    };
+  })();
+
+  const PS = window.PinballSim;
+  const W = PS.W, H = PS.H, R = PS.R, STEP = PS.STEP, HUD = 44;
+  const BALLS = 3;
+  const BALL_SAVE = 8, MB_SAVE = 12, MAX_MULT = 6;
+
+  const C = {
+    field: '#0b0c0f', s1: '#16181c', s2: '#1e2126',
+    line: 'rgba(255,255,255,0.1)', text: '#ffffff', dim: 'rgba(255,255,255,0.6)',
+    wall: 'rgba(255,255,255,0.86)', guide: 'rgba(255,255,255,0.55)', faint: 'rgba(255,255,255,0.22)',
+    orange: '#ea5426', light: '#ff7a4d', dark: '#b83f19', steel: '#5b5e64',
+  };
+  const rootStyle = getComputedStyle(document.documentElement);
+  const FONT = rootStyle.getPropertyValue('--font').trim() || '"Segoe UI", system-ui, sans-serif';
+  const FONT_D = rootStyle.getPropertyValue('--font-display').trim() || FONT;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), cv = $('c'), ctx = cv.getContext('2d'), ui = $('ui');
+  const ovStart = $('ovStart'), ovPause = $('ovPause'), ovOver = $('ovOver');
+
+  function resize() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const pad = V.embedded ? 0 : Math.round(Math.min(16, Math.min(vw, vh) * 0.02));
+    const s = Math.max(0.1, Math.min((vw - pad * 2) / W, (vh - pad * 2) / H));
+    const cw = Math.max(1, Math.floor(W * s)), ch = Math.max(1, Math.floor(H * s));
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    stage.style.width = cw + 'px';
+    stage.style.height = ch + 'px';
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+    cv.width = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+    ui.style.transform = 'scale(' + (cw / W) + ',' + (ch / H) + ')';
+  }
+
+  // ---------- State ----------
+  const sim = PS.create();
+  let state = 'title';                // title, play, over
+  let paused = false, pausedBy = null;
+  let score = 0, ballNum = 1, mult = 1, bestCache = V.best();
+  let lanes = [0, 0, 0], laneDoneT = 0;
+  let ramps = 0, rampGoal = 3, multiball = false;
+  let saveT = 0, saveOn = false;      // ball save: seconds left, and whether the clock is running
+  let queue = 0, autoT = -1;          // balls waiting to be auto launched, and the launch timer
+  let betweenT = -1, overT = 0, targetResetT = -1, bankDone = false;
+  let msg = null, shake = 0;
+  let parts = [];
+  const fx = {
+    bumper: [0, 0, 0], sling: [0, 0], target: [0, 0, 0], lane: [0, 0, 0],
+    inlane: [0, 0], outlane: [0, 0], orbit: 0, ramp: 0, mult: 0, save: 0,
+  };
+  let lastPointer = matchMedia('(hover: none) and (pointer: coarse)').matches ? 'touch' : 'mouse';
+
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  function setScore(n) { score = n; V.score(score); }
+  function add(pts) { setScore(score + pts * mult); }
+  function message(big, small, time) { msg = { big, small: small || '', t: 0, max: time || 1.6 }; }
+
+  // ---------- Game flow ----------
+  function newGame() {
+    hideAll();
+    paused = false; pausedBy = null;
+    sim.clear();
+    setScore(0);
+    ballNum = 1; mult = 1; lanes = [0, 0, 0]; laneDoneT = 0;
+    ramps = 0; rampGoal = 3; multiball = false;
+    queue = 0; autoT = -1; betweenT = -1; targetResetT = -1; bankDone = false;
+    parts = []; msg = null; shake = 0;
+    bestCache = V.best();
+    releaseAllInput();
+    state = 'play';
+    serveBall();
+    message('Ball 1', '', 1.2);
+  }
+
+  function serveBall() {
+    sim.serve();
+    saveT = BALL_SAVE; saveOn = false;
+  }
+
+  function endOfBall() {
+    multiball = false;
+    queue = 0;
+    shake = reduceMotion ? 0 : 0.3;
+    betweenT = ballNum >= BALLS ? 1.0 : 1.2;
+    if (ballNum < BALLS) message('Ball lost', '', 1.2);
+  }
+
+  function nextBall() {
+    if (ballNum >= BALLS) { endGame(); return; }
+    ballNum++;
+    mult = 1;
+    serveBall();
+    message('Ball ' + ballNum, '', 1.2);
+  }
+
+  function endGame() {
+    state = 'over';
+    overT = 0;
+    releaseAllInput();
+    const isBest = V.gameOver(score);
+    bestCache = V.best();
+    $('overScore').textContent = score.toLocaleString();
+    $('overBest').textContent = bestCache.toLocaleString();
+    $('overBadge').classList.toggle('on', isBest && score > 0);
+    show(ovOver);
+  }
+
+  function raiseMult() {
+    if (mult < MAX_MULT) {
+      mult++;
+      fx.mult = 1;
+      message(mult + 'x', 'Multiplier');
+    }
+  }
+
+  function startMultiball() {
+    multiball = true;
+    ramps = 0;
+    rampGoal = Math.min(rampGoal + 1, 6);
+    queue += 2;
+    saveT = MB_SAVE; saveOn = true;
+    message('Multiball', 'Ramp for jackpot', 2);
+  }
+
+  // ---------- Rules: react to physics events ----------
+  function onEvent(e) {
+    switch (e.type) {
+      case 'bumper':
+        add(100); fx.bumper[e.i] = 1;
+        burst(e.ball.x, e.ball.y, 6, C.light);
+        break;
+      case 'sling':
+        add(50); fx.sling[e.i] = 1;
+        burst(e.ball.x, e.ball.y, 5, '#fff');
+        break;
+      case 'target': {
+        add(750); fx.target[e.i] = 1;
+        const t = sim.targets[e.i];
+        burst(t.cx, t.cy, 8, '#fff');
+        if (!bankDone && sim.targets.every((x) => !x.on)) {
+          bankDone = true;
+          add(10000);
+          raiseMult();
+          if (mult >= MAX_MULT) message('Targets', '10,000');
+          targetResetT = 1.0;
+        }
+        break;
+      }
+      case 'rampEnter':
+        fx.ramp = Math.max(fx.ramp, 0.4);
+        break;
+      case 'ramp':
+        fx.ramp = 1;
+        if (multiball) { add(50000); message('Jackpot', '50,000 x ' + mult); }
+        else {
+          add(5000);
+          ramps++;
+          if (ramps >= rampGoal) startMultiball();
+          else message('Ramp', ramps + ' of ' + rampGoal, 1.1);
+        }
+        break;
+      case 'sensor': onSensor(e); break;
+      case 'drain': onDrain(); break;
+      case 'escape': onDrain(); break;
+      default: break;
+    }
+  }
+
+  function onSensor(e) {
+    const b = e.ball;
+    switch (e.name) {
+      case 'lane':
+        if (e.up) break;
+        fx.lane[e.i] = 1;
+        if (!lanes[e.i]) {
+          lanes[e.i] = 1;
+          add(500);
+          if (lanes[0] && lanes[1] && lanes[2]) {
+            add(5000);
+            laneDoneT = 0.9;
+            lanes = [0, 0, 0];
+            raiseMult();
+          }
+        } else add(100);
+        break;
+      case 'inlane':
+        if (!e.up) { add(250); fx.inlane[e.i] = 1; }
+        break;
+      case 'outlane':
+        if (!e.up) { add(1000); fx.outlane[e.i] = 1; }
+        break;
+      case 'orbit':
+        if (e.up) { add(1000); fx.orbit = 1; b.orbitT = sim.time; }
+        break;
+      case 'loop':
+        if (e.right && sim.time - b.orbitT < 3) {
+          b.orbitT = -9;
+          add(7500); fx.orbit = 1;
+          message('Loop', '7,500 x ' + mult, 1.2);
+        }
+        break;
+      default: break;
+    }
+  }
+
+  function onDrain() {
+    if (betweenT >= 0) return;
+    const left = sim.balls.length + queue;
+    if (saveOn && saveT > 0) {
+      queue++;
+      fx.save = 1;
+      if (!multiball) saveT = 0;          // one save per ball outside multiball
+      message('Ball saved', '', 1.2);
+      return;
+    }
+    if (left === 0) { endOfBall(); return; }
+    if (multiball && left <= 1) multiball = false;
+  }
+
+  function rotateLanes(dir) {
+    if (dir < 0) lanes = [lanes[1], lanes[2], lanes[0]];
+    else lanes = [lanes[2], lanes[0], lanes[1]];
+  }
+
+  // ---------- Particles ----------
+  function burst(x, y, n, color) {
+    if (reduceMotion || parts.length > 300) return;
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, Math.PI * 2), s = rand(60, 220);
+      parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.18, 0.34), max: 0.34, size: rand(1.5, 3), color });
+    }
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96;
+    }
+    const decay = (arr, rate) => { for (let i = 0; i < arr.length; i++) arr[i] = Math.max(0, arr[i] - dt * rate); };
+    decay(fx.bumper, 7); decay(fx.sling, 7); decay(fx.target, 3); decay(fx.lane, 3);
+    decay(fx.inlane, 3); decay(fx.outlane, 3);
+    fx.orbit = Math.max(0, fx.orbit - dt * 2); fx.ramp = Math.max(0, fx.ramp - dt * 2);
+    fx.mult = Math.max(0, fx.mult - dt * 1.5); fx.save = Math.max(0, fx.save - dt * 2);
+    laneDoneT = Math.max(0, laneDoneT - dt);
+    shake = Math.max(0, shake - dt);
+    if (msg) { msg.t += dt; if (msg.t >= msg.max) msg = null; }
+    if (state === 'over') { overT += dt; return; }
+    if (state !== 'play') return;
+
+    applyInput();
+    sim.step();
+
+    // Ball save starts counting once a ball leaves the shooter lane.
+    for (const b of sim.balls) {
+      const inS = sim.inShooter(b);
+      if (b.inS && !inS && !saveOn) saveOn = true;
+      b.inS = inS;
+    }
+    if (saveOn && saveT > 0) saveT = Math.max(0, saveT - dt);
+
+    const evs = sim.events.splice(0, sim.events.length);
+    for (const e of evs) onEvent(e);
+
+    if (targetResetT > 0) {
+      targetResetT -= dt;
+      if (targetResetT <= 0) {
+        if (sim.resetTargets()) { targetResetT = -1; bankDone = false; } else targetResetT = 0.25;
+      }
+    }
+
+    // Auto launcher for saved balls and multiball.
+    if (autoT >= 0) {
+      autoT -= dt;
+      if (autoT <= 0) { sim.release(); autoT = -1; }
+    } else if (queue > 0 && betweenT < 0 && sim.shooterClear()) {
+      queue--;
+      sim.serve();
+      sim.pull();
+      autoT = 0.78;
+    }
+
+    if (betweenT >= 0) {
+      betweenT -= dt;
+      if (betweenT < 0) nextBall();
+    }
+  }
+
+  // ---------- Input ----------
+  const keyHeld = { L: false, R: false, P: false };
+  const ptrs = new Map();          // pointerId -> 'L' | 'R' | 'P'
+  let flipL = false, flipR = false, plHeld = false;
+  const latch = { L: false, R: false };   // a press and release inside one step still flips
+
+  function held(z) {
+    if (keyHeld[z]) return true;
+    for (const v of ptrs.values()) if (v === z) return true;
+    return false;
+  }
+
+  function applyInput() {
+    const live = state === 'play' && !paused;
+    const l = live && (held('L') || latch.L), r = live && (held('R') || latch.R), p = live && held('P');
+    latch.L = latch.R = false;
+    if (l && !flipL) rotateLanes(-1);
+    if (r && !flipR) rotateLanes(1);
+    flipL = l; flipR = r;
+    sim.flippers[0].pressed = l;
+    sim.flippers[1].pressed = r;
+    if (autoT >= 0) { plHeld = p; return; }   // the auto launcher owns the plunger
+    if (p && !plHeld) sim.pull();
+    else if (!p && plHeld) sim.release();
+    plHeld = p;
+  }
+
+  function releaseAllInput() {
+    keyHeld.L = keyHeld.R = keyHeld.P = false;
+    latch.L = latch.R = false;
+    ptrs.clear();
+    flipL = flipR = false;
+    sim.flippers[0].pressed = sim.flippers[1].pressed = false;
+    if (plHeld && autoT < 0) sim.cancelPull();
+    plHeld = false;
+  }
+
+  function logical(e) {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / (r.width || 1)) * W,
+      y: ((e.clientY - r.top) / (r.height || 1)) * H,
+    };
+  }
+
+  window.addEventListener('pointerdown', (e) => {
+    try { window.focus(); } catch (_) {}
+    lastPointer = e.pointerType === 'touch' ? 'touch' : 'mouse';
+    if (e.target.closest && e.target.closest('.ov.show')) return;
+    if (state !== 'play' || paused) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const p = logical(e);
+    let zone = p.x < W / 2 ? 'L' : 'R';
+    if (zone === 'R' && p.y > H * 0.55 && sim.ballWaiting() && autoT < 0) zone = 'P';
+    ptrs.set(e.pointerId, zone);
+    if (zone !== 'P') latch[zone] = true;
+  });
+  function endPointer(e) {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+  }
+  window.addEventListener('pointerup', endPointer);
+  window.addEventListener('pointercancel', endPointer);
+
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const LEFT_KEYS = ['ArrowLeft', 'KeyZ', 'ShiftLeft'];
+  const RIGHT_KEYS = ['ArrowRight', 'KeyM', 'Slash', 'ShiftRight'];
+  const PLUNGE_KEYS = ['Space', 'ArrowDown'];
+
+  window.addEventListener('keydown', (e) => {
+    const code = e.code || '';
+    const k = e.key;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Slash', 'Enter'].includes(code) || k === ' ') e.preventDefault();
+    lastPointer = 'mouse';
+    const isPlunge = PLUNGE_KEYS.includes(code) || k === ' ';
+    if (state === 'title') {
+      if (!e.repeat && (isPlunge || code === 'Enter' || code === 'NumpadEnter')) newGame();
+      return;
+    }
+    if (state === 'over') {
+      if (!e.repeat && overT > 0.5 && (isPlunge || code === 'Enter' || code === 'NumpadEnter')) newGame();
+      return;
+    }
+    if (code === 'KeyP' || code === 'Escape') {
+      if (!e.repeat) { if (paused) setPaused(false); else setPaused(true, 'user'); }
+      return;
+    }
+    if (paused) {
+      if (!e.repeat && (code === 'Enter' || isPlunge)) setPaused(false);
+      return;
+    }
+    if (LEFT_KEYS.includes(code)) { keyHeld.L = true; latch.L = true; }
+    else if (RIGHT_KEYS.includes(code)) { keyHeld.R = true; latch.R = true; }
+    else if (isPlunge && (!e.repeat || keyHeld.P)) keyHeld.P = true;
+  });
+  window.addEventListener('keyup', (e) => {
+    const code = e.code || '';
+    if (LEFT_KEYS.includes(code)) keyHeld.L = false;
+    else if (RIGHT_KEYS.includes(code)) keyHeld.R = false;
+    else if (PLUNGE_KEYS.includes(code) || e.key === ' ') keyHeld.P = false;
+  });
+  window.addEventListener('blur', () => releaseAllInput());
+
+  ovStart.addEventListener('click', () => { if (state === 'title') newGame(); });
+  ovPause.addEventListener('click', () => setPaused(false));
+  $('btnAgain').addEventListener('click', () => { if (state === 'over') newGame(); });
+
+  // ---------- Overlays + pause ----------
+  function show(el) { el.classList.add('show'); }
+  function hideAll() {
+    for (const el of [ovStart, ovPause, ovOver]) el.classList.remove('show');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  function setPaused(p, by) {
+    if (p) {
+      if (paused || state !== 'play') return;
+      paused = true; pausedBy = by || 'user';
+      releaseAllInput();
+      show(ovPause);
+    } else {
+      if (!paused) return;
+      paused = false; pausedBy = null;
+      ovPause.classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+  }
+  // The arcade hiding the game always pauses. When it comes back, resume on our own only
+  // if the table is quiet (one ball sitting on the plunger); otherwise the player resumes.
+  V.onPause((p) => {
+    if (p) setPaused(true, 'host');
+    else if (paused && pausedBy === 'host' && sim.balls.length <= 1 && sim.ballWaiting() && queue === 0) setPaused(false);
+  });
+
+  // ---------- Render ----------
+  function spaced(px) { if ('letterSpacing' in ctx) ctx.letterSpacing = px; }
+  const blink = (rate) => Math.floor(performance.now() / 1000 * rate) % 2 === 0;
+
+  function render(alpha) {
+    const k = cv.width / W;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.fillStyle = C.field;
+    ctx.fillRect(0, 0, W, H);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    let sx = 0, sy = 0;
+    if (shake > 0 && !paused) { const m = (shake / 0.3) * 4; sx = rand(-m, m); sy = rand(-m, m); }
+    ctx.save();
+    ctx.translate(sx, sy);
+    drawInserts();
+    drawWalls();
+    drawSlings();
+    drawBumpers();
+    drawTargets();
+    drawPlunger();
+    drawFlippers(alpha);
+    drawBalls(alpha, sim.L0);
+    drawRamp();
+    drawBalls(alpha, sim.L1);
+    drawApron();
+    drawParticles();
+    ctx.restore();
+
+    drawHUD();
+    drawMessage();
+    drawHint();
+  }
+
+  function strokePath(w) {
+    ctx.beginPath();
+    if (w.t === 0) { ctx.moveTo(w.ax, w.ay); ctx.lineTo(w.bx, w.by); }
+    else ctx.arc(w.cx, w.cy, w.r, w.a0, w.a0 + w.span);
+    ctx.stroke();
+  }
+
+  function drawWalls() {
+    for (const w of sim.walls) {
+      if (w.draw === 'wall') { ctx.strokeStyle = C.wall; ctx.lineWidth = 2; }
+      else if (w.draw === 'guide') { ctx.strokeStyle = C.guide; ctx.lineWidth = 2; }
+      else if (w.draw === 'gate') { ctx.strokeStyle = C.faint; ctx.lineWidth = 1; }
+      else continue;
+      strokePath(w);
+    }
+  }
+
+  function lamp(x, y, w, h, lit, flash) {
+    if (lit || flash > 0) {
+      ctx.fillStyle = flash > 0 && !lit ? 'rgba(234,84,38,' + Math.min(1, flash * 1.4) + ')' : C.orange;
+      ctx.fillRect(x, y, w, h);
+    } else {
+      ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+  }
+
+  function chevron(x, y, s, color) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - s, y + s * 0.6); ctx.lineTo(x, y - s * 0.4); ctx.lineTo(x + s, y + s * 0.6); ctx.stroke();
+  }
+
+  function drawInserts() {
+    // Top lanes
+    const doneBlink = laneDoneT > 0 && blink(10);
+    for (let i = 0; i < 3; i++) {
+      lamp(156 + 40 * i, 111, 12, 12, doneBlink || (laneDoneT <= 0 && lanes[i] === 1), fx.lane[i]);
+    }
+    // Inlanes and outlanes
+    for (let s = 0; s < 2; s++) {
+      const ix = s ? 404 - 64 : 64, ox = s ? 404 - 30 : 30;
+      lamp(ix - 4, 640, 8, 8, false, fx.inlane[s]);
+      lamp(ox - 4, 700, 8, 8, false, fx.outlane[s]);
+    }
+    // Orbit arrows
+    const oc = fx.orbit > 0 ? C.orange : C.faint;
+    chevron(30, 468, 7, oc); chevron(30, 480, 7, oc);
+    // Ramp progress arrows in front of the ramp mouth
+    const litN = Math.floor(3 * ramps / rampGoal);
+    for (let i = 0; i < 3; i++) {
+      const lit = multiball ? blink(6) : 2 - i < litN;
+      chevron(256, 418 + i * 12, 8, lit || fx.ramp > 0.5 ? C.orange : C.faint);
+    }
+    // Multiplier row
+    ctx.font = '600 10px ' + FONT;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let n = 2; n <= MAX_MULT; n++) {
+      const x = 129 + (n - 2) * 30, y = 512;
+      const lit = mult >= n;
+      const pop = lit && mult === n && fx.mult > 0 && blink(10);
+      if (lit && !pop) { ctx.fillStyle = C.orange; ctx.fillRect(x, y, 26, 16); }
+      else if (pop) { ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 26, 16); }
+      else { ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 25, 15); }
+      ctx.fillStyle = pop ? '#000' : lit ? '#fff' : C.faint;
+      ctx.fillText(n + 'x', x + 13, y + 8.5);
+    }
+  }
+
+  function drawSlings() {
+    sim.slings.forEach((s, i) => {
+      const f = fx.sling[i];
+      ctx.beginPath();
+      ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.bx, s.by); ctx.lineTo(s.cx, s.cy); ctx.closePath();
+      ctx.fillStyle = f > 0.3 ? C.orange : C.s1;
+      ctx.fill();
+      ctx.strokeStyle = C.wall; ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = f > 0.3 ? '#fff' : C.orange; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(s.ax, s.ay); ctx.lineTo(s.cx, s.cy); ctx.stroke();
+    });
+  }
+
+  function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  function drawBumpers() {
+    for (const p of sim.bumpers) {
+      const f = fx.bumper[p.i];
+      const hot = f > 0.35;
+      const r = p.r + (hot ? 2 : 0);
+      ctx.fillStyle = hot ? '#fff' : C.orange; circle(p.x, p.y, r);
+      ctx.fillStyle = C.field; circle(p.x, p.y, r - 5);
+      ctx.fillStyle = hot ? '#fff' : C.orange; circle(p.x, p.y, r - 9);
+    }
+  }
+
+  function drawTargets() {
+    for (const t of sim.targets) {
+      ctx.save();
+      ctx.translate(t.cx, t.cy); ctx.rotate(t.ang);
+      const f = fx.target[t.id];
+      if (t.on) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(-16, -4, 32, 8);
+      } else {
+        if (f > 0) { ctx.fillStyle = 'rgba(234,84,38,' + Math.min(1, f) + ')'; ctx.fillRect(-16, -4, 32, 8); }
+        ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+        ctx.strokeRect(-15.5, -3.5, 31, 7);
+      }
+      ctx.restore();
+    }
+  }
+
+  function drawPlunger() {
+    const p = sim.plunger;
+    const y = p.y;
+    ctx.fillStyle = p.holding ? C.orange : C.steel;
+    ctx.fillRect(405, y + 5, 10, H - y);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(396, y, 28, 5);
+    if (p.holding) {
+      // Power: a column of lit steps beside the lane
+      const n = Math.round(p.pull * 8);
+      for (let i = 0; i < 8; i++) {
+        ctx.fillStyle = i < n ? C.orange : 'rgba(255,255,255,0.12)';
+        ctx.fillRect(431, 806 - i * 7, 6, 5);
+      }
+    }
+  }
+
+  function drawFlippers(alpha) {
+    for (const f of sim.flippers) {
+      const th = f.pth + (f.th - f.pth) * alpha;
+      const phi = f.side > 0 ? th : Math.PI - th;
+      const tx = f.px + Math.cos(phi) * f.len, ty = f.py + Math.sin(phi) * f.len;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(f.px, f.py, f.r1, phi + Math.PI / 2, phi + Math.PI * 1.5);
+      ctx.arc(tx, ty, f.r2, phi - Math.PI / 2, phi + Math.PI / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = f.pressed ? C.orange : C.field;
+      circle(f.px, f.py, 3);
+    }
+  }
+
+  function drawBalls(alpha, layer) {
+    for (const b of sim.balls) {
+      if (b.layer !== layer) continue;
+      const x = b.rx + (b.x - b.rx) * alpha, y = b.ry + (b.y - b.ry) * alpha;
+      ctx.fillStyle = '#fff';
+      circle(x, y, layer === sim.L1 ? R + 1 : R);
+      ctx.fillStyle = C.field;
+      ctx.fillRect(x - 4, y - 4, 3, 3);
+    }
+  }
+
+  function drawRamp() {
+    const r = sim.ramp;
+    ctx.beginPath();
+    ctx.moveTo(r.upL, r.mouthY);
+    ctx.lineTo(r.upL, r.cy);
+    ctx.arc(r.cx, r.cy, r.rOut, Math.PI, Math.PI * 2);
+    ctx.lineTo(r.downR, r.bendY);
+    ctx.lineTo(r.downR - 6, r.exitY);
+    ctx.lineTo(r.downL + 6, r.exitY);
+    ctx.lineTo(r.downL, r.bendY);
+    ctx.lineTo(r.downL, r.cy);
+    ctx.arc(r.cx, r.cy, r.rIn, 0, Math.PI, true);
+    ctx.lineTo(r.upR, r.mouthY);
+    ctx.closePath();
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = C.s1;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = fx.ramp > 0.5 ? C.orange : C.guide;
+    ctx.lineWidth = 2;
+    for (const w of sim.walls) if (w.draw === 'rail') strokePath(w);
+    // Ramp mouth edge
+    ctx.strokeStyle = C.faint; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(r.upL, r.mouthY + 0.5); ctx.lineTo(r.upR, r.mouthY + 0.5); ctx.stroke();
+  }
+
+  function drawApron() {
+    ctx.fillStyle = C.s1;
+    ctx.fillRect(13, 786, 378, H - 786);
+    ctx.fillStyle = C.line;
+    ctx.fillRect(13, 786, 378, 1);
+    // Ball save lamp
+    const on = saveT > 0 && state === 'play' && (saveT > 2 || !saveOn || blink(5));
+    const x = 202 - 26, y = 796;
+    if (on || fx.save > 0) { ctx.fillStyle = C.orange; ctx.fillRect(x, y, 52, 16); }
+    else { ctx.strokeStyle = C.faint; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 51, 15); }
+    ctx.font = '600 9.5px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = on || fx.save > 0 ? '#fff' : C.faint;
+    spaced('1.5px'); ctx.fillText('SAVE', 202 + 1, y + 8.5); spaced('0px');
+  }
+
+  function drawParticles() {
+    for (const p of parts) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max * 1.5));
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawHUD() {
+    ctx.fillStyle = C.s1;
+    ctx.fillRect(0, 0, W, HUD);
+    ctx.fillStyle = C.line;
+    ctx.fillRect(0, HUD - 1, W, 1);
+    ctx.textBaseline = 'alphabetic';
+    const label = (t, x, align) => {
+      ctx.font = '600 9.5px ' + FONT; ctx.fillStyle = C.dim; ctx.textAlign = align;
+      spaced('1.5px'); ctx.fillText(t, x, 16); spaced('0px');
+    };
+    const value = (t, x, align, col) => {
+      ctx.font = '600 18px ' + FONT_D; ctx.fillStyle = col || C.text; ctx.textAlign = align;
+      ctx.fillText(t, x, 36);
+    };
+    label('SCORE', 14, 'left'); value(score.toLocaleString(), 14, 'left');
+    label('BEST', 170, 'left'); value(Math.max(bestCache, score).toLocaleString(), 170, 'left', C.dim);
+    label('BALL', 316, 'center'); value(state === 'title' ? '1' : String(ballNum), 316, 'center');
+    label('MULT', W - 14, 'right'); value(mult + 'x', W - 14, 'right', mult > 1 ? C.light : C.text);
+  }
+
+  function drawMessage() {
+    if (!msg || paused || state === 'over') return;
+    const t = msg.t, a = Math.min(1, t / 0.12, (msg.max - t) / 0.25);
+    ctx.globalAlpha = Math.max(0, a);
+    const w = 200, h = msg.small ? 64 : 48, x = (W - w) / 2, y = 432 - h / 2;
+    ctx.fillStyle = C.s1; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = C.orange; ctx.fillRect(x, y, w, 2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = C.text; ctx.font = '300 28px ' + FONT_D;
+    ctx.fillText(msg.big, W / 2, y + (msg.small ? 26 : 25));
+    if (msg.small) {
+      ctx.fillStyle = C.light; ctx.font = '600 10px ' + FONT;
+      spaced('1.5px'); ctx.fillText(msg.small.toUpperCase(), W / 2 + 1, y + 50); spaced('0px');
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawHint() {
+    if (state !== 'play' || paused || autoT >= 0 || queue > 0 || !sim.ballWaiting() || sim.plunger.holding) return;
+    if (sim.balls.length !== 1 || msg) return;
+    ctx.globalAlpha = 0.6 + 0.4 * Math.sin(performance.now() / 260);
+    ctx.fillStyle = C.dim;
+    ctx.font = '600 10px ' + FONT;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    spaced('1.5px');
+    ctx.fillText(lastPointer === 'touch' ? 'HOLD LOWER RIGHT TO LAUNCH' : 'HOLD SPACE TO LAUNCH', 202 + 1, 452);
+    spaced('0px');
+    ctx.globalAlpha = 1;
+  }
+
+  window.addEventListener('resize', resize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+  // ---------- Main loop ----------
+  let last = performance.now(), acc = 0;
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1;
+    if (!paused) {
+      acc += dt;
+      let n = 0;
+      while (acc >= STEP && n < 16) { update(STEP); acc -= STEP; n++; }
+      if (n >= 16) acc = 0;
+    }
+    render(Math.min(1, acc / STEP));
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Boot ----------
+  resize();
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    requestAnimationFrame((t) => { last = t; frame(t); });
+    V.ready();
+  }
+  try {
+    const f = document.fonts;
+    const loads = [
+      f.load('300 28px ' + FONT_D), f.load('600 18px ' + FONT_D),
+      f.load('400 13px ' + FONT), f.load('600 10px ' + FONT),
+    ];
+    Promise.all(loads).catch(() => {}).then(() => f.ready).then(start, start);
+    setTimeout(start, 2500);
+  } catch (_) { start(); }
+})();
+</script>
+</body>
+</html>

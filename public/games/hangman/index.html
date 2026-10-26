@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Hangman</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --absent: #1d1f24;
+    --key: #4a4e56;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --s: 40px;     /* letter slot width, set from JS */
+    --sg: 6px;     /* slot gap */
+    --kh: 50px;    /* key height */
+    --kg: 6px;     /* key gap */
+    --W: 340px;    /* play column width */
+    --H: 600px;    /* app height */
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    width: var(--W);
+    height: var(--H);
+    display: grid;
+    grid-template-columns: 100%;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+    grid-template-areas: "head" "fig" "cat" "word" "info" "kb";
+    justify-items: center;
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.wide {
+    width: auto;
+    grid-template-columns: var(--figW) var(--W);
+    grid-template-rows: auto 1fr auto auto auto auto 1fr;
+    grid-template-areas: "head head" "fig ." "fig cat" "fig word" "fig info" "fig kb" "fig .";
+    column-gap: 2.4em;
+  }
+  .head { grid-area: head; width: 100%; display: flex; align-items: center; gap: 1.2em; }
+  .fig { grid-area: fig; }
+  .cat { grid-area: cat; }
+  .word { grid-area: word; }
+  .info { grid-area: info; }
+  .kb { grid-area: kb; }
+
+  .brand { flex: 1; min-width: 0; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  html.vela-embedded .brand h1 { display: none; }
+  .tally { display: flex; gap: 1.4em; }
+  .tally div { text-align: right; }
+  .lab {
+    display: block;
+    font: 600 0.66em/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tally .n {
+    display: block;
+    font: 300 1.6em/1.05 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- drawing ---------- */
+  .fig {
+    width: 100%;
+    min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0.6em 0;
+  }
+  .fig svg { height: 100%; max-width: 100%; display: block; overflow: visible; }
+  .app.wide .fig { height: var(--figH); padding: 0; align-self: center; }
+  .fig.shake { animation: shake 320ms linear; }
+  @keyframes shake {
+    15% { transform: translateX(-6px); } 30% { transform: translateX(5px); }
+    45% { transform: translateX(-4px); } 60% { transform: translateX(3px); }
+    75% { transform: translateX(-2px); } 90% { transform: translateX(1px); }
+  }
+  .gallows { stroke: #fff; stroke-width: 5; fill: none; stroke-linecap: square; stroke-linejoin: miter; }
+  .gallows .rope { stroke-width: 3; }
+  .part {
+    stroke: var(--brand); stroke-width: 5; fill: none; stroke-linecap: square;
+    stroke-dasharray: 1 1; stroke-dashoffset: 1;
+    transition: stroke-dashoffset 300ms var(--ease);
+  }
+  .part.on { stroke-dashoffset: 0; }
+
+  .cat {
+    margin: 0.2em 0 0;
+    max-width: 100%;
+    color: var(--muted);
+    font: 600 0.72em/1.2 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---------- word ---------- */
+  .word {
+    display: flex; justify-content: center; gap: var(--sg);
+    margin: 0.7em 0 0;
+  }
+  .slot {
+    width: var(--s);
+    height: calc(var(--s) * 1.12);
+    display: grid; place-items: center;
+    border-bottom: 3px solid rgba(255, 255, 255, 0.5);
+    font: 600 calc(var(--s) * 0.68)/1 var(--font-display);
+    text-transform: uppercase;
+  }
+  .slot.hit { border-bottom-color: var(--brand); }
+  .slot.missed { color: rgba(255, 255, 255, 0.38); border-bottom-color: rgba(255, 255, 255, 0.2); }
+  .slot.pop { animation: pop 180ms cubic-bezier(0.3, 0.7, 0.4, 1); }
+  @keyframes pop { 50% { transform: scale(1.18); } }
+  .slot.bounce { animation: bounce 420ms cubic-bezier(0.3, 0.8, 0.4, 1); }
+  @keyframes bounce { 30% { transform: translateY(-24%); } 55% { transform: translateY(4%); } 75% { transform: translateY(-6%); } }
+
+  .info {
+    width: 100%;
+    margin: 0.75em 0 0;
+    display: flex; justify-content: center; align-items: center; gap: 0.9em;
+    color: var(--muted);
+    font-size: 0.82em;
+    min-height: 1.4em;
+    font-variant-numeric: tabular-nums;
+  }
+  .lives { display: flex; gap: 4px; }
+  .lives i { width: 0.7em; height: 0.7em; background: var(--brand); display: block; transition: background 200ms var(--ease); }
+  .lives i.gone { background: rgba(255, 255, 255, 0.14); }
+
+  /* ---------- keyboard ---------- */
+  .kb { width: 100%; display: grid; gap: var(--kg); margin-top: var(--gapY); }
+  .kb-row { display: flex; gap: var(--kg); }
+  .kb-row .sp { flex: 0.5; }
+  .key {
+    flex: 1;
+    min-width: 0;
+    height: var(--kh);
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: var(--key);
+    color: #fff;
+    font: 600 calc(var(--kh) * 0.36)/1 var(--font);
+    text-transform: uppercase;
+    cursor: pointer;
+    display: grid; place-items: center;
+    touch-action: manipulation;
+    transition: background 200ms var(--ease), color 200ms var(--ease), transform 100ms var(--ease);
+  }
+  .key:hover { background: #5a5e67; }
+  .key:active { transform: scale(0.94); }
+  .key.hit, .key.hit:hover { background: var(--brand); color: #fff; cursor: default; }
+  .key.miss, .key.miss:hover { background: var(--absent); color: rgba(255, 255, 255, 0.3); cursor: default; }
+  .key.hit:active, .key.miss:active { transform: none; }
+
+  .toast {
+    position: fixed;
+    left: 50%; top: 18%;
+    z-index: 5;
+    padding: 0.75em 1.1em;
+    background: #fff;
+    color: #000;
+    font: 600 0.86em/1 var(--font);
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translate(-50%, -6px);
+    opacity: 0;
+    transition: opacity 160ms var(--ease), transform 220ms var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- panel ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    max-height: 100%;
+    overflow: auto;
+    padding: 1.3em 1.3em 1.2em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 0.62em/1 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .tag[hidden] { display: none; }
+  .answer { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; }
+  .answer b { color: var(--text); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    margin-top: 1em;
+    border: 1px solid var(--line);
+  }
+  .stats > div { padding: 0.6em 0.6em 0.65em; min-width: 0; }
+  .stats > div + div { border-left: 1px solid var(--line); }
+  .stats .n {
+    display: block;
+    font: 300 1.9em/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1em;
+  }
+  .btns { display: flex; gap: 0.5em; margin-top: 1.1em; flex-wrap: wrap; }
+  .btns .btn { flex: 1 1 7em; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 3.3em;
+    padding: 0 1.1em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.76em var(--font);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.small { height: 2.6em; padding: 0 1em; font-size: 0.68em; }
+  .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fig.shake, .slot.pop, .slot.bounce { animation: none; }
+    .part { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Hangman</h1></div>
+    <div class="tally">
+      <div><span class="lab">Streak</span><span class="n" id="streakNum">0</span></div>
+      <div><span class="lab">Best</span><span class="n" id="bestNum">0</span></div>
+    </div>
+  </header>
+  <div class="fig" id="fig">
+    <svg viewBox="-4 0 152 200" aria-hidden="true">
+      <g class="gallows">
+        <path d="M10 194H110"/>
+        <path d="M34 194V10"/>
+        <path d="M34 10H112"/>
+        <path d="M34 40L64 10"/>
+        <path class="rope" d="M112 10V36"/>
+      </g>
+      <circle class="part" pathLength="1" cx="112" cy="52" r="16" transform="rotate(-90 112 52)"/>
+      <path class="part" pathLength="1" d="M112 68V122"/>
+      <path class="part" pathLength="1" d="M112 82L90 106"/>
+      <path class="part" pathLength="1" d="M112 82L134 106"/>
+      <path class="part" pathLength="1" d="M112 122L94 158"/>
+      <path class="part" pathLength="1" d="M112 122L130 158"/>
+    </svg>
+  </div>
+  <p class="cat" id="cat"></p>
+  <div class="word" id="word" aria-live="polite"></div>
+  <div class="info" id="info"><span id="infoText"></span><span class="lives" id="lives"></span><button class="btn primary small" id="nextBtn" type="button" hidden>Next word</button></div>
+  <div class="kb" id="kb" aria-label="Keyboard"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" role="dialog" aria-live="polite">
+    <div class="card-top"><h2 id="ovTitle"></h2><span class="tag" id="ovTag" hidden>New best</span></div>
+    <p class="answer" id="ovAnswer"></p>
+    <div class="stats">
+      <div><span class="lab">Played</span><span class="n" id="stPlayed">0</span></div>
+      <div><span class="lab">Win %</span><span class="n" id="stWin">0</span></div>
+      <div><span class="lab">Streak</span><span class="n" id="stStreak">0</span></div>
+      <div><span class="lab">Best</span><span class="n" id="stBest">0</span></div>
+    </div>
+    <div class="btns" id="ovButtons"></div>
+  </div>
+</div>
+
+<script src="words.js"></script>
+<script src="../_shared/bridge.js" data-game="hangman"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  const MAX_MISSES = 6;
+  const WORDS = (window.HANGMAN_WORDS && window.HANGMAN_WORDS.length) ? window.HANGMAN_WORDS : [{ word: 'hangman', category: '' }];
+  const BY_WORD = {};
+  WORDS.forEach((w) => { BY_WORD[w.word] = w; });
+
+  /* ---------- storage ---------- */
+  const K = 'vela:hangman:';
+  function get(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(K + key)); return v == null ? fallback : v; } catch (_) { return fallback; }
+  }
+  function put(key, v) { try { localStorage.setItem(K + key, JSON.stringify(v)); } catch (_) {} }
+
+  function cleanStats(s) {
+    const b = { played: 0, wins: 0, streak: 0, max: 0 };
+    if (s && typeof s === 'object') for (const k in b) if (Number.isFinite(s[k]) && s[k] >= 0) b[k] = Math.floor(s[k]);
+    return b;
+  }
+  const stats = cleanStats(get('stats', null));
+  function saveStats() { put('stats', stats); }
+  function bestStreak() { return Math.max(stats.max, V.best() || 0); }
+
+  /* ---------- game ---------- */
+  function misses(g) { let n = 0; for (const ch of g.guessed) if (g.word.indexOf(ch) < 0) n++; return n; }
+  function solved(g) { for (const ch of g.word) if (g.guessed.indexOf(ch) < 0) return false; return true; }
+  function state(g) {
+    if (solved(g)) return 'won';
+    if (misses(g) >= MAX_MISSES) return 'lost';
+    return 'play';
+  }
+
+  function pickWord() {
+    let recent = get('recent', []);
+    if (!Array.isArray(recent)) recent = [];
+    const keep = Math.min(400, Math.floor(WORDS.length * 0.6));
+    const avoid = new Set(recent.slice(-keep));
+    let w;
+    for (let tries = 0; tries < 50; tries++) {
+      w = WORDS[Math.floor(Math.random() * WORDS.length)];
+      if (!avoid.has(w.word)) break;
+    }
+    recent.push(w.word);
+    put('recent', recent.slice(-keep));
+    return w.word;
+  }
+
+  function newGame() { return { word: pickWord(), guessed: '', counted: false }; }
+  function loadGame() {
+    const g = get('game', null);
+    if (g && typeof g.word === 'string' && BY_WORD[g.word] && typeof g.guessed === 'string' && /^[a-z]*$/.test(g.guessed)) {
+      const clean = { word: g.word, guessed: Array.from(new Set(g.guessed)).join(''), counted: !!g.counted };
+      if (state(clean) === 'play' || !clean.counted) return clean;
+    }
+    return newGame();
+  }
+  function saveGame() { put('game', game); }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), fig = $('fig'), catEl = $('cat'), wordEl = $('word');
+  const infoText = $('infoText'), livesEl = $('lives'), kbEl = $('kb'), toastEl = $('toast'), overlay = $('overlay');
+  const parts = Array.from(document.querySelectorAll('.part'));
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  for (let i = 0; i < MAX_MISSES; i++) livesEl.appendChild(document.createElement('i'));
+
+  const LAYOUT = ['qwertyuiop', ' asdfghjkl ', 'zxcvbnm'];
+  const keyEls = {};
+  LAYOUT.forEach((line) => {
+    const row = document.createElement('div');
+    row.className = 'kb-row';
+    for (const ch of line) {
+      if (ch === ' ') { const sp = document.createElement('div'); sp.className = 'sp'; row.appendChild(sp); continue; }
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.tabIndex = -1;
+      b.className = 'key';
+      b.textContent = ch;
+      b.dataset.k = ch;
+      keyEls[ch] = b;
+      row.appendChild(b);
+    }
+    if (line === 'zxcvbnm') {
+      const a = document.createElement('div'); a.className = 'sp'; a.style.flex = '1.5'; row.insertBefore(a, row.firstChild);
+      const z = document.createElement('div'); z.className = 'sp'; z.style.flex = '1.5'; row.appendChild(z);
+    }
+    kbEl.appendChild(row);
+  });
+  kbEl.addEventListener('mousedown', (e) => e.preventDefault());
+  kbEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.key');
+    if (b) guess(b.dataset.k);
+  });
+
+  /* ---------- state ---------- */
+  let game = loadGame();
+  let paused = false;
+  let overlayOpen = false;
+  let lastResult = null;
+  let slots = [];
+
+  function anim(el, cls) {
+    if (reduceMotion) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  }
+  document.addEventListener('animationend', (e) => { e.target.classList.remove('pop', 'bounce', 'shake'); });
+
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1100);
+  }
+
+  /* ---------- rendering ---------- */
+  function buildWord() {
+    wordEl.textContent = '';
+    slots = [];
+    for (let i = 0; i < game.word.length; i++) {
+      const s = document.createElement('div');
+      s.className = 'slot';
+      wordEl.appendChild(s);
+      slots.push(s);
+    }
+    const info = BY_WORD[game.word];
+    catEl.textContent = info && info.category ? info.category : '';
+    layout();
+  }
+
+  function render() {
+    const st = state(game);
+    const m = misses(game);
+    slots.forEach((s, i) => {
+      const ch = game.word[i];
+      const known = game.guessed.indexOf(ch) >= 0;
+      s.textContent = known || st === 'lost' ? ch : '';
+      s.classList.toggle('hit', known);
+      s.classList.toggle('missed', !known && st === 'lost');
+    });
+    parts.forEach((p, i) => p.classList.toggle('on', i < m));
+    for (const ch in keyEls) {
+      const used = game.guessed.indexOf(ch) >= 0;
+      keyEls[ch].classList.toggle('hit', used && game.word.indexOf(ch) >= 0);
+      keyEls[ch].classList.toggle('miss', used && game.word.indexOf(ch) < 0);
+      keyEls[ch].setAttribute('aria-disabled', used || st !== 'play');
+    }
+    Array.from(livesEl.children).forEach((el, i) => el.classList.toggle('gone', i >= MAX_MISSES - m));
+    let t;
+    if (st === 'won') t = 'You win.';
+    else if (st === 'lost') t = 'You lose.';
+    else t = game.guessed.length ? (MAX_MISSES - m) + ' wrong guesses left' : 'Type or tap letters. 6 wrong guesses and you lose.';
+    infoText.textContent = t;
+    livesEl.style.display = st === 'play' && game.guessed.length ? '' : 'none';
+    $('nextBtn').hidden = st === 'play';
+    $('streakNum').textContent = stats.streak;
+    $('bestNum').textContent = bestStreak();
+  }
+
+  /* ---------- play ---------- */
+  function guess(ch) {
+    if (paused || overlayOpen || state(game) !== 'play') return;
+    if (!/^[a-z]$/.test(ch)) return;
+    if (game.guessed.indexOf(ch) >= 0) { toast('Already tried ' + ch.toUpperCase()); return; }
+    game.guessed += ch;
+    const hit = game.word.indexOf(ch) >= 0;
+    const st = state(game);
+    if (st !== 'play') record(st === 'won');
+    saveGame();
+    render();
+    if (hit) {
+      slots.forEach((s, i) => { if (game.word[i] === ch) anim(s, 'pop'); });
+    } else {
+      anim(fig, 'shake');
+    }
+    if (st === 'won') {
+      if (!reduceMotion) slots.forEach((s, i) => setTimeout(() => anim(s, 'bounce'), 200 + i * 70));
+      const g = game;
+      setTimeout(() => { if (game === g && !overlayOpen) showPanel(); }, reduceMotion ? 400 : 200 + slots.length * 70 + 650);
+    } else if (st === 'lost') {
+      const g = game;
+      setTimeout(() => { if (game === g && !overlayOpen) showPanel(); }, reduceMotion ? 500 : 1300);
+    }
+  }
+
+  // The best is the longest run of words solved in a row. It is reported after
+  // every finished word, so a streak counts even if the player stops mid-run.
+  function record(won) {
+    if (game.counted) return;
+    game.counted = true;
+    stats.played++;
+    let newBest = false;
+    if (won) {
+      stats.wins++;
+      stats.streak++;
+      stats.max = Math.max(stats.max, stats.streak);
+      newBest = V.gameOver(stats.streak) && stats.streak > 0;
+    } else {
+      V.gameOver(stats.streak); // the streak that just ended
+      stats.streak = 0;
+    }
+    saveStats();
+    lastResult = { game, won, newBest };
+  }
+
+  function nextWord() {
+    if (overlayOpen) hidePanel();
+    game = newGame();
+    saveGame();
+    buildWord();
+    render();
+  }
+
+  /* ---------- panel ---------- */
+  function showPanel() {
+    const g = game;
+    const st = state(g);
+    $('ovTitle').textContent = st === 'won' ? 'You win' : 'You lose';
+    $('ovTag').hidden = !(lastResult && lastResult.game === g && lastResult.newBest);
+    const ans = $('ovAnswer');
+    const m = misses(g);
+    ans.innerHTML = st === 'won'
+      ? '<b>' + g.word + '</b> with ' + (m === 0 ? 'no wrong guesses' : m === 1 ? '1 wrong guess' : m + ' wrong guesses')
+      : 'The word was <b>' + g.word + '</b>';
+    $('stPlayed').textContent = stats.played;
+    $('stWin').textContent = stats.played ? Math.round((stats.wins / stats.played) * 100) : 0;
+    $('stStreak').textContent = stats.streak;
+    $('stBest').textContent = bestStreak();
+
+    const row = $('ovButtons');
+    row.textContent = '';
+    const mk = (label, primary, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (primary ? ' primary' : '');
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      row.appendChild(b);
+      return b;
+    };
+    const first = mk('Play again', true, nextWord);
+    mk('Close', false, hidePanel);
+
+    overlayOpen = true;
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+    setTimeout(() => { try { first.focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hidePanel() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) hidePanel(); });
+  $('nextBtn').addEventListener('click', (e) => { e.currentTarget.blur(); nextWord(); });
+
+  /* ---------- keyboard ---------- */
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); hidePanel(); }
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!e.repeat && state(game) !== 'play') nextWord();
+      return;
+    }
+    if (/^[a-zA-Z]$/.test(e.key)) { e.preventDefault(); guess(e.key.toLowerCase()); }
+  });
+
+  document.addEventListener('touchmove', (e) => { if (!e.target.closest('.card')) e.preventDefault(); }, { passive: false });
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+  V.onPause((p) => { paused = !!p; });
+
+  /* ---------- layout ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(8, m * 0.03, 22);
+    const fs = clamp(12, m / 34, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+
+    const wide = vw >= 460 && vw / vh > 1.2;
+    app.classList.toggle('wide', wide);
+    const H = vh - 2 * pad;
+    app.style.setProperty('--H', H + 'px');
+
+    let W;
+    if (wide) {
+      W = Math.min(520, (vw - 2 * pad) * 0.56);
+      const figH = Math.min(H - head.offsetHeight - fs, 420);
+      app.style.setProperty('--figH', figH + 'px');
+      app.style.setProperty('--figW', Math.min(vw - 2 * pad - W - fs * 2.4, figH * 0.78) + 'px');
+    } else {
+      W = Math.min(vw - 2 * pad, 520);
+    }
+    app.style.setProperty('--W', W + 'px');
+
+    const kg = clamp(4, W * 0.014, 7);
+    const kh = clamp(36, vh * (wide ? 0.085 : 0.072), 56);
+    app.style.setProperty('--kg', kg + 'px');
+    app.style.setProperty('--kh', kh + 'px');
+    app.style.setProperty('--gapY', clamp(8, vh * 0.025, 22) + 'px');
+
+    const L = Math.max(4, game.word.length);
+    const sg = clamp(4, W * 0.016, 8);
+    const s = Math.floor(clamp(18, (W - (L - 1) * sg) / L, Math.min(52, vh * 0.075)));
+    app.style.setProperty('--s', s + 'px');
+    app.style.setProperty('--sg', sg + 'px');
+  }
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  saveGame();
+  buildWord();
+  render();
+  app.classList.add('ready');
+  // A finished word that was not yet counted (closed mid-reveal) is counted now.
+  if (state(game) !== 'play') { record(state(game) === 'won'); saveGame(); render(); }
+  V.ready();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "online": {
+      ".indexOn": [
+        "at"
+      ],
+      ".read": "query.orderByChild === 'at' && query.limitToLast <= 5000",
+      "$id": {
+        ".write": "$id.matches(/^[A-Za-z0-9]{20}$/) && newData.exists()",
+        ".validate": "newData.hasChildren(['at'])",
+        "at": {
+          ".validate": "newData.val() === now"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+/* Vela type. Segoe UI is Microsoft's UI face; it ships with Windows but its
+   licence does not allow serving it from a website, so it is used wherever the
+   visitor's system has it. Everywhere else falls back to Selawik, Microsoft's
+   open-source (OFL) metric-compatible stand-in, bundled here.
+   Shared by the arcade and every in-house game: link /fonts/type.css and use
+   var(--font) / var(--font-display). */
+
+@font-face { font-family: "Selawik"; src: url("selawksl.woff2") format("woff2"); font-weight: 300; font-display: swap; }
+@font-face { font-family: "Selawik"; src: url("selawk.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Selawik"; src: url("selawksb.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Selawik"; src: url("selawkb.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", "Selawik", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", "Selawik", system-ui, sans-serif;
+}

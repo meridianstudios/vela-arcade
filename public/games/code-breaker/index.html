@@ -1,0 +1,1162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Code Breaker</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --key: #2a2d33;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --t: 36px;     /* peg size, set from JS */
+    --g: 5px;      /* peg gap */
+    --kh: 48px;    /* key height */
+    --kg: 6px;     /* key gap */
+    --W: 340px;    /* column width */
+    --side: 260px; /* side column width in the wide layout */
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    display: grid;
+    width: var(--W);
+    grid-template-columns: 100%;
+    grid-template-areas: "head" "status" "board" "legend" "pal";
+    justify-items: center;
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.wide {
+    width: auto;
+    grid-template-columns: auto var(--side);
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "head head" "board status" "board pal" "board legend" "board .";
+    column-gap: 2.2em;
+    align-items: start;
+  }
+  .head { grid-area: head; width: 100%; display: flex; align-items: center; gap: 0.6em; }
+  .status { grid-area: status; }
+  .board-wrap { grid-area: board; }
+  .legend { grid-area: legend; }
+  .pal { grid-area: pal; }
+
+  .brand { flex: 1; min-width: 0; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  html.vela-embedded .brand h1, .app.narrow .brand h1 { display: none; }
+
+  .seg { display: flex; }
+  .seg button {
+    height: 2.7em;
+    padding: 0 0.85em;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.72em var(--font);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease);
+  }
+  .seg button + button { border-left: 0; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"], .seg button[aria-pressed="true"]:hover { background: var(--brand); border-color: var(--brand); }
+  .icon-btn {
+    width: 2.7em; height: 2.7em;
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font-size: 0.72em;
+    cursor: pointer;
+    transition: background 180ms var(--ease);
+  }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.08); }
+  .icon-btn svg { width: 1.5em; height: 1.5em; }
+  .seg button:focus-visible, .icon-btn:focus-visible, .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+
+  .status {
+    width: 100%;
+    margin: 0.55em 0 0;
+    color: var(--muted);
+    font-size: 0.82em;
+    line-height: 1.35;
+    min-height: 2.7em;
+    font-variant-numeric: tabular-nums;
+  }
+  .app.wide .status { margin: 0 0 1.2em; min-height: 0; font-size: 0.9em; }
+
+  /* ---------- board ---------- */
+  .board-wrap { position: relative; margin: var(--gapY) 0; }
+  .app.wide .board-wrap { margin: 0.9em 0 0; }
+  .board { display: grid; gap: var(--g); }
+  .crow {
+    display: grid;
+    grid-template-columns: calc(var(--t) * 0.8) auto calc(var(--fbw));
+    column-gap: calc(var(--t) * 0.3);
+    align-items: center;
+  }
+  .crow.secret { margin-bottom: calc(var(--g) * 1.6); }
+  .crow.shake { animation: shake 320ms linear; }
+  @keyframes shake {
+    15% { transform: translateX(-7px); } 30% { transform: translateX(6px); }
+    45% { transform: translateX(-5px); } 60% { transform: translateX(4px); }
+    75% { transform: translateX(-2px); } 90% { transform: translateX(1px); }
+  }
+  .num {
+    text-align: right;
+    color: rgba(255, 255, 255, 0.35);
+    font: 600 calc(var(--t) * 0.32)/1 var(--font);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+  }
+  .crow.cur .num { color: var(--brand-hover); }
+  .crow.secret .num { font-size: calc(var(--t) * 0.26); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .pegs { display: flex; gap: var(--g); }
+  .peg {
+    position: relative;
+    width: var(--t); height: var(--t);
+    display: grid; place-items: center;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: var(--surface);
+  }
+  .peg svg { width: 78%; height: 78%; display: block; }
+  .crow.cur .peg { border-color: rgba(255, 255, 255, 0.28); cursor: pointer; }
+  .crow.cur .peg.at { border-color: var(--brand); outline: 1px solid var(--brand); outline-offset: -2px; }
+  .crow.done .peg { background: var(--surface-2); }
+  .peg.hidden { background: var(--surface-2); color: rgba(255, 255, 255, 0.35); font: 600 calc(var(--t) * 0.4)/1 var(--font); }
+  .peg.pop { animation: pop 160ms cubic-bezier(0.3, 0.7, 0.4, 1); }
+  @keyframes pop { 50% { transform: scale(1.12); } }
+  .peg.flip { animation: flip 300ms var(--ease); }
+  @keyframes flip { 0% { transform: scaleX(0.1); } 100% { transform: none; } }
+
+  .fb {
+    display: grid;
+    grid-template-columns: repeat(var(--fbc), calc(var(--t) * 0.27));
+    grid-auto-rows: calc(var(--t) * 0.27);
+    gap: calc(var(--t) * 0.1);
+    align-content: center;
+  }
+  .fb i { display: block; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 1px; }
+  .fb i.x { background: var(--brand); border-color: var(--brand); }
+  .fb i.n { background: #fff; border-color: #fff; }
+  .fb.show i { animation: pop 200ms cubic-bezier(0.3, 0.7, 0.4, 1) both; }
+  .fb.show i:nth-child(2) { animation-delay: 40ms; }
+  .fb.show i:nth-child(3) { animation-delay: 80ms; }
+  .fb.show i:nth-child(4) { animation-delay: 120ms; }
+  .fb.show i:nth-child(5) { animation-delay: 160ms; }
+
+  .toast {
+    position: absolute;
+    left: 50%; top: 30%;
+    z-index: 5;
+    padding: 0.75em 1.1em;
+    background: #fff;
+    color: #000;
+    font: 600 0.86em/1 var(--font);
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translate(-50%, -6px);
+    opacity: 0;
+    transition: opacity 160ms var(--ease), transform 220ms var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .legend {
+    width: 100%;
+    display: flex; flex-wrap: wrap; justify-content: center;
+    gap: 0.4em 1.4em;
+    margin: 0 0 var(--gapY);
+    color: var(--muted);
+    font: 600 0.66em/1 var(--font);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .app.wide .legend { justify-content: flex-start; margin: 1.4em 0 0; flex-direction: column; gap: 0.8em; }
+  .legend span { display: inline-flex; align-items: center; gap: 0.6em; }
+  .legend i { width: 0.95em; height: 0.95em; display: inline-block; }
+  .legend i.x { background: var(--brand); }
+  .legend i.n { background: #fff; }
+  .legend i.o { border: 1px solid rgba(255, 255, 255, 0.3); }
+
+  /* ---------- palette ---------- */
+  .pal { width: 100%; display: flex; gap: var(--kg); }
+  .pal.two { flex-direction: column; }
+  .syms, .ctl { display: flex; gap: var(--kg); }
+  .syms { flex: var(--symflex); }
+  .ctl { flex: 2.6; }
+  .pal.two .ctl { flex: none; }
+  .app.wide .pal { flex-direction: column; }
+  .app.wide .syms { display: grid; grid-template-columns: repeat(4, 1fr); flex: none; }
+  .app.wide .ctl { flex: none; }
+  .key {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: var(--kh);
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: var(--key);
+    color: #fff;
+    font: 600 calc(var(--kh) * 0.26)/1 var(--font);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: grid; place-items: center;
+    touch-action: manipulation;
+    transition: background 160ms var(--ease), transform 100ms var(--ease), opacity 160ms var(--ease);
+  }
+  .key:hover { background: #3a3e46; }
+  .key:active { transform: scale(0.94); }
+  .key svg.sym { width: calc(var(--kh) * 0.58); height: calc(var(--kh) * 0.58); }
+  .key svg.ico { width: calc(var(--kh) * 0.42); height: calc(var(--kh) * 0.42); }
+  .key .d {
+    position: absolute; left: 0.4em; top: 0.35em;
+    font: 600 calc(var(--kh) * 0.2)/1 var(--font);
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: 0;
+  }
+  .key.enter { flex: 1.6; background: var(--brand); }
+  .key.enter:hover { background: var(--brand-hover); }
+  .key.enter:active { background: var(--brand-dark); }
+  .pal.off .key { opacity: 0.35; cursor: default; }
+  .pal.off .key:active { transform: none; }
+
+  /* symbol fills */
+  .s-o { fill: var(--brand); }
+  .s-w { fill: #fff; }
+  .s-ring-o { fill: none; stroke: var(--brand); }
+  .s-ring-w { fill: none; stroke: #fff; }
+
+  /* ---------- panel ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    max-height: 100%;
+    overflow: auto;
+    padding: 1.3em 1.3em 1.2em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 0.62em/1 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .tag[hidden] { display: none; }
+  .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.4; }
+  .line b { color: var(--text); font-weight: 600; }
+  .reveal { display: flex; gap: 6px; margin-top: 0.7em; }
+  .reveal[hidden] { display: none; }
+  .reveal .peg { width: 2.4em; height: 2.4em; }
+  .lab {
+    display: block;
+    font: 600 0.66em/1.2 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    margin-top: 1em;
+    border: 1px solid var(--line);
+  }
+  .stats[hidden] { display: none; }
+  .stats > div { padding: 0.6em 0.6em 0.65em; min-width: 0; }
+  .stats > div + div { border-left: 1px solid var(--line); }
+  .stats .n {
+    display: block;
+    font: 300 1.9em/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.1em;
+  }
+  .btns { display: flex; gap: 0.5em; margin-top: 1.1em; flex-wrap: wrap; }
+  .btns .btn { flex: 1 1 7em; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 3.3em;
+    padding: 0 1.1em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.76em var(--font);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .crow.shake, .peg.pop, .peg.flip, .fb.show i { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Code Breaker</h1></div>
+    <div class="seg" id="levelSeg" aria-label="Level">
+      <button type="button" data-v="normal">Normal</button>
+      <button type="button" data-v="hard">Hard</button>
+    </div>
+    <div class="seg" id="sideSeg" aria-label="Who breaks the code">
+      <button type="button" data-v="break">Break</button>
+      <button type="button" data-v="set">Set</button>
+    </div>
+    <button class="icon-btn" id="newBtn" type="button" aria-label="New game">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4v4h-4"/></svg>
+    </button>
+  </header>
+  <p class="status" id="status"></p>
+  <div class="board-wrap" id="boardWrap">
+    <div class="board" id="board"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+  <div class="legend" id="legend">
+    <span><i class="x"></i>Right place</span>
+    <span><i class="n"></i>Wrong place</span>
+    <span><i class="o"></i>Not in code</span>
+  </div>
+  <div class="pal" id="pal">
+    <div class="syms" id="syms"></div>
+    <div class="ctl">
+      <button class="key" type="button" tabindex="-1" data-k="back" aria-label="Backspace"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M8 5h13v14H8l-6-7z"/><path d="M11.5 9.5l5 5M16.5 9.5l-5 5"/></svg></button>
+      <button class="key enter" type="button" tabindex="-1" data-k="enter">Enter</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" role="dialog" aria-live="polite">
+    <div class="card-top"><h2 id="ovTitle"></h2><span class="tag" id="ovTag" hidden>New best</span></div>
+    <p class="line" id="ovLine"></p>
+    <div class="reveal" id="ovReveal" hidden></div>
+    <div class="stats" id="ovStats">
+      <div><span class="lab">Played</span><span class="n" id="stPlayed">0</span></div>
+      <div><span class="lab">Solved</span><span class="n" id="stWins">0</span></div>
+      <div><span class="lab">Win %</span><span class="n" id="stPct">0</span></div>
+      <div><span class="lab">Fewest</span><span class="n" id="stFewest">0</span></div>
+    </div>
+    <div class="btns" id="ovButtons"></div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="code-breaker"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const LEVELS = {
+    normal: { N: 4, C: 6, R: 10, repeats: false },
+    hard:   { N: 5, C: 8, R: 12, repeats: true },
+  };
+
+  // Feedback for a guess against a code, both arrays of symbol numbers.
+  // exact: right symbol in the right place.
+  // near:  right symbol in the wrong place. Each symbol counts at most as many
+  //        times as it appears in both codes, so repeats are never double counted.
+  function score(guess, code, C) {
+    let exact = 0;
+    const cg = new Array(C).fill(0), cc = new Array(C).fill(0);
+    for (let i = 0; i < guess.length; i++) {
+      if (guess[i] === code[i]) exact++;
+      cg[guess[i]]++; cc[code[i]]++;
+    }
+    let common = 0;
+    for (let s = 0; s < C; s++) common += Math.min(cg[s], cc[s]);
+    return [exact, common - exact];
+  }
+
+  function hasRepeat(code) { return new Set(code).size !== code.length; }
+
+  function randomCode(cfg, rnd) {
+    const out = [];
+    while (out.length < cfg.N) {
+      const s = Math.floor(rnd() * cfg.C);
+      if (cfg.repeats || out.indexOf(s) < 0) out.push(s);
+    }
+    return out;
+  }
+
+  // Every possible code, packed so feedback can be computed fast.
+  function makeSpace(N, C) {
+    const total = Math.pow(C, N);
+    const digits = new Uint8Array(total * N);
+    const counts = new Uint8Array(total * C);
+    for (let i = 0; i < total; i++) {
+      let x = i;
+      for (let p = N - 1; p >= 0; p--) {
+        const d = x % C;
+        digits[i * N + p] = d;
+        counts[i * C + d]++;
+        x = (x - d) / C;
+      }
+    }
+    return { N, C, total, digits, counts };
+  }
+  function toIndex(code, C) { return code.reduce((a, d) => a * C + d, 0); }
+  function toCode(sp, i) { return Array.from(sp.digits.subarray(i * sp.N, i * sp.N + sp.N)); }
+  function fbKey(sp, a, b) {
+    const N = sp.N, C = sp.C, d = sp.digits, k = sp.counts;
+    let ex = 0, com = 0;
+    const aN = a * N, bN = b * N, aC = a * C, bC = b * C;
+    for (let p = 0; p < N; p++) if (d[aN + p] === d[bN + p]) ex++;
+    for (let s = 0; s < C; s++) { const x = k[aC + s], y = k[bC + s]; com += x < y ? x : y; }
+    return ex * (N + 1) + (com - ex);
+  }
+
+  // The computer's code breaker.
+  // Normal (1296 codes, 360 possible answers): Knuth's minimax. Every one of the
+  // 1296 codes is tried as the next guess and scored by the size of the largest
+  // group of answers it could leave; the smallest worst case wins, preferring a
+  // guess that could itself be the answer.
+  // Hard (32768 codes): the same idea scored by expected group size, over a
+  // sample of guesses and answers when the space is too big to search fully.
+  function makeSolver(cfg, rnd) {
+    const sp = makeSpace(cfg.N, cfg.C);
+    const K = (cfg.N + 1) * (cfg.N + 1);
+    const part = new Int32Array(K);
+    let cands = [];
+    for (let i = 0; i < sp.total; i++) {
+      if (cfg.repeats) cands.push(i);
+      else {
+        const c = sp.counts.subarray(i * sp.C, i * sp.C + sp.C);
+        if (c.every((v) => v <= 1)) cands.push(i);
+      }
+    }
+    const first = cfg.N === 4 ? toIndex([0, 0, 1, 1].map((v, i) => cfg.repeats ? v : i), cfg.C) : toIndex([0, 0, 1, 2, 3], cfg.C);
+    let turn = 0;
+
+    function sample(list, n) {
+      if (list.length <= n) return list;
+      const a = list.slice();
+      for (let i = 0; i < n; i++) {
+        const j = i + Math.floor(rnd() * (a.length - i));
+        const t = a[i]; a[i] = a[j]; a[j] = t;
+      }
+      return a.slice(0, n);
+    }
+
+    function next() {
+      if (turn === 0) return toCode(sp, first);
+      if (cands.length <= 2) return toCode(sp, cands[0]);
+      const knuth = sp.total <= 1296;
+      let pool, against;
+      if (knuth) {
+        pool = null; // every code
+        against = cands;
+      } else {
+        against = sample(cands, 1500);
+        const fromCands = sample(cands, 500);
+        const extra = [];
+        for (let i = 0; i < 400; i++) extra.push(Math.floor(rnd() * sp.total));
+        pool = fromCands.concat(extra);
+      }
+      const isCand = new Uint8Array(sp.total);
+      for (const c of cands) isCand[c] = 1;
+      let best = -1, bestScore = Infinity, bestCand = 0;
+      const n = pool ? pool.length : sp.total;
+      for (let j = 0; j < n; j++) {
+        const g = pool ? pool[j] : j;
+        part.fill(0);
+        for (let s = 0; s < against.length; s++) part[fbKey(sp, g, against[s])]++;
+        let sc;
+        if (knuth) {
+          sc = 0;
+          for (let k = 0; k < K; k++) if (part[k] > sc) sc = part[k];
+        } else {
+          sc = 0;
+          for (let k = 0; k < K; k++) sc += part[k] * part[k];
+          if (isCand[g]) sc -= against.length / cands.length; // a guess that can win outright
+        }
+        const ic = isCand[g];
+        if (sc < bestScore || (sc === bestScore && ic && !bestCand)) { best = g; bestScore = sc; bestCand = ic; }
+      }
+      return toCode(sp, best);
+    }
+
+    function feed(guess, fb) {
+      const g = toIndex(guess, cfg.C);
+      const key = fb[0] * (cfg.N + 1) + fb[1];
+      cands = cands.filter((c) => fbKey(sp, g, c) === key);
+      turn++;
+    }
+
+    return { next, feed, left: () => cands.length };
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- symbols ---------- */
+  // Eight symbols told apart by shape first; fill alternates orange and white,
+  // except the last two swap so the hexagon never sits next to the orange circle
+  // in colour as well as outline.
+  function poly(n, r, rot, cx, cy) {
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = rot + (i * 2 * Math.PI) / n;
+      pts.push((cx + r * Math.cos(a)).toFixed(2) + ',' + (cy + r * Math.sin(a)).toFixed(2));
+    }
+    return pts.join(' ');
+  }
+  function star(cx, cy, ro, ri) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const r = i % 2 ? ri : ro;
+      pts.push((cx + r * Math.cos(a)).toFixed(2) + ',' + (cy + r * Math.sin(a)).toFixed(2));
+    }
+    return pts.join(' ');
+  }
+  const SHAPES = [
+    { name: 'Circle',   svg: (c) => '<circle class="' + c + '" cx="12" cy="12" r="7.6"/>' },
+    { name: 'Triangle', svg: (c) => '<polygon class="' + c + '" points="12,3.6 20.6,19 3.4,19"/>' },
+    { name: 'Square',   svg: (c) => '<rect class="' + c + '" x="5" y="5" width="14" height="14"/>' },
+    { name: 'Diamond',  svg: (c) => '<polygon class="' + c + '" points="12,2.6 21.4,12 12,21.4 2.6,12"/>' },
+    { name: 'Plus',     svg: (c) => '<path class="' + c + '" d="M9.4 3.5h5.2v5.9h5.9v5.2h-5.9v5.9H9.4v-5.9H3.5V9.4h5.9z"/>' },
+    { name: 'Star',     svg: (c) => '<polygon class="' + c + '" points="' + star(12, 12.8, 9.6, 4) + '"/>' },
+    { name: 'Hexagon',  svg: (c) => '<polygon class="' + c + '" points="' + poly(6, 8.6, 0, 12, 12) + '"/>' },
+    { name: 'Ring',     svg: (c) => '<circle class="' + c + '" cx="12" cy="12" r="6.4" stroke-width="3.4"/>' },
+  ];
+  const SYM_SVG = SHAPES.map((s, i) => {
+    const white = i >= 6 ? i === 6 : i % 2 === 1;
+    const cls = i === 7 ? (white ? 's-ring-w' : 's-ring-o') : (white ? 's-w' : 's-o');
+    return '<svg class="sym" viewBox="0 0 24 24" aria-hidden="true">' + s.svg(cls) + '</svg>';
+  });
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:code-breaker:';
+  function get(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(KEY + key)); return v == null ? fallback : v; } catch (_) { return fallback; }
+  }
+  function put(key, v) { try { localStorage.setItem(KEY + key, JSON.stringify(v)); } catch (_) {} }
+
+  function blankStats() { return { played: 0, wins: 0, fewest: 0 }; }
+  function cleanStats(s) {
+    const b = blankStats();
+    if (s && typeof s === 'object') for (const k in b) if (Number.isFinite(s[k]) && s[k] >= 0) b[k] = Math.floor(s[k]);
+    return b;
+  }
+  const savedStats = get('stats', {});
+  const stats = { normal: cleanStats(savedStats.normal), hard: cleanStats(savedStats.hard) };
+  function saveStats() { put('stats', stats); }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), statusEl = $('status'), boardEl = $('board'), boardWrap = $('boardWrap');
+  const legendEl = $('legend'), palEl = $('pal'), symsEl = $('syms'), toastEl = $('toast'), overlay = $('overlay');
+  const levelSeg = $('levelSeg'), sideSeg = $('sideSeg'), newBtn = $('newBtn');
+
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- state ---------- */
+  let level = get('level', 'normal') === 'hard' ? 'hard' : 'normal';
+  let side = get('side', 'break') === 'set' ? 'set' : 'break';
+  let cfg = LEVELS[level];
+  let game = null;
+  let paused = false;
+  let overlayOpen = false;
+  let cpuTimer = 0;
+  let cpuWaiting = false;
+  let solver = null;
+  let rows = [];        // { el, num, pegs: [el], fb }
+  let secretRow = null;
+  let lastResult = null;
+
+  function validCode(c, cf) {
+    return Array.isArray(c) && c.length === cf.N && c.every((v) => Number.isInteger(v) && v >= 0 && v < cf.C) && (cf.repeats || !hasRepeat(c));
+  }
+  function anyCode(c, cf) {
+    return Array.isArray(c) && c.length === cf.N && c.every((v) => Number.isInteger(v) && v >= 0 && v < cf.C);
+  }
+
+  function newGame() {
+    const g = {
+      level, side,
+      secret: side === 'break' ? randomCode(cfg, Math.random) : null,
+      guesses: [],
+      cur: new Array(cfg.N).fill(-1),
+      cursor: 0,
+      done: false, won: false, counted: false,
+    };
+    return g;
+  }
+
+  function loadBreak() {
+    const s = get('game-' + level, null);
+    if (s && validCode(s.secret, cfg) && Array.isArray(s.guesses) && s.guesses.length < cfg.R && s.guesses.every((c) => anyCode(c, cfg))) {
+      const g = newGame();
+      g.secret = s.secret;
+      g.guesses = s.guesses.map((c) => ({ code: c, fb: score(c, s.secret, cfg.C) }));
+      if (g.guesses.some((x) => x.fb[0] === cfg.N)) return newGame();
+      return g;
+    }
+    return newGame();
+  }
+  function saveBreak() {
+    if (game.side !== 'break') return;
+    if (game.done) put('game-' + level, null);
+    else put('game-' + level, { secret: game.secret, guesses: game.guesses.map((x) => x.code) });
+  }
+
+  /* ---------- build ---------- */
+  function makePeg() {
+    const p = document.createElement('div');
+    p.className = 'peg';
+    return p;
+  }
+  function makeFb() {
+    const fb = document.createElement('div');
+    fb.className = 'fb';
+    for (let i = 0; i < cfg.N; i++) fb.appendChild(document.createElement('i'));
+    return fb;
+  }
+
+  function build() {
+    boardEl.textContent = '';
+    rows = [];
+    app.style.setProperty('--fbc', cfg.N === 4 ? 2 : 3);
+    app.style.setProperty('--fbw', cfg.N === 4 ? 'calc(var(--t) * 0.64)' : 'calc(var(--t) * 1.01)');
+
+    const sr = document.createElement('div');
+    sr.className = 'crow secret';
+    const sn = document.createElement('div');
+    sn.className = 'num';
+    sn.textContent = 'Code';
+    const sp = document.createElement('div');
+    sp.className = 'pegs';
+    const spegs = [];
+    for (let i = 0; i < cfg.N; i++) { const p = makePeg(); p.dataset.i = i; sp.appendChild(p); spegs.push(p); }
+    sr.appendChild(sn); sr.appendChild(sp); sr.appendChild(document.createElement('div'));
+    boardEl.appendChild(sr);
+    secretRow = { el: sr, num: sn, pegs: spegs };
+
+    for (let r = 0; r < cfg.R; r++) {
+      const row = document.createElement('div');
+      row.className = 'crow';
+      const num = document.createElement('div');
+      num.className = 'num';
+      num.textContent = r + 1;
+      const pegs = document.createElement('div');
+      pegs.className = 'pegs';
+      const list = [];
+      for (let i = 0; i < cfg.N; i++) { const p = makePeg(); p.dataset.i = i; pegs.appendChild(p); list.push(p); }
+      const fb = makeFb();
+      row.appendChild(num); row.appendChild(pegs); row.appendChild(fb);
+      boardEl.appendChild(row);
+      rows.push({ el: row, num, pegs: list, fb });
+    }
+
+    symsEl.textContent = '';
+    for (let s = 0; s < cfg.C; s++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.tabIndex = -1;
+      b.className = 'key';
+      b.dataset.k = String(s);
+      b.setAttribute('aria-label', SHAPES[s].name + ', key ' + (s + 1));
+      b.innerHTML = '<span class="d">' + (s + 1) + '</span>' + SYM_SVG[s];
+      symsEl.appendChild(b);
+    }
+    app.style.setProperty('--symflex', cfg.C);
+  }
+
+  /* ---------- rendering ---------- */
+  function setPeg(p, s) {
+    const v = s == null || s < 0 ? '' : String(s);
+    if (p.dataset.s === v && !p.classList.contains('hidden')) return;
+    p.classList.remove('hidden');
+    p.dataset.s = v;
+    p.innerHTML = v === '' ? '' : SYM_SVG[s];
+    p.setAttribute('aria-label', v === '' ? 'Empty' : SHAPES[s].name);
+  }
+  function hidePeg(p) {
+    p.dataset.s = '';
+    p.classList.add('hidden');
+    p.textContent = '?';
+    p.setAttribute('aria-label', 'Hidden');
+  }
+  function setFb(fb, res) {
+    const marks = fb.children;
+    for (let i = 0; i < marks.length; i++) {
+      marks[i].className = res ? (i < res[0] ? 'x' : i < res[0] + res[1] ? 'n' : '') : '';
+    }
+    fb.setAttribute('aria-label', res ? res[0] + ' right place, ' + res[1] + ' wrong place' : '');
+  }
+
+  function inputRow() {
+    // Row index taking input, -1 for the secret row, null when nothing takes input.
+    if (game.done || overlayOpen) return null;
+    if (game.side === 'set') return game.secret ? null : -1;
+    return game.guesses.length;
+  }
+
+  function render() {
+    const ir = inputRow();
+    // secret row
+    const sRowCur = ir === -1;
+    secretRow.el.classList.toggle('cur', sRowCur);
+    secretRow.pegs.forEach((p, i) => {
+      p.classList.toggle('at', sRowCur && game.cursor === i);
+      if (game.side === 'set') setPeg(p, game.secret ? game.secret[i] : game.cur[i]);
+      else if (game.done) setPeg(p, game.secret[i]);
+      else hidePeg(p);
+    });
+    // guess rows
+    rows.forEach((row, r) => {
+      const g = game.guesses[r];
+      const isCur = ir === r;
+      row.el.classList.toggle('cur', isCur);
+      row.el.classList.toggle('done', !!g);
+      row.pegs.forEach((p, i) => {
+        p.classList.toggle('at', isCur && game.cursor === i);
+        setPeg(p, g ? g.code[i] : isCur ? game.cur[i] : -1);
+      });
+      setFb(row.fb, g ? g.fb : null);
+    });
+    palEl.classList.toggle('off', ir === null);
+    renderSegs();
+    renderStatus();
+  }
+
+  function renderSegs() {
+    levelSeg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === level));
+    sideSeg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === side));
+  }
+
+  let statusOverride = '';
+  function renderStatus() {
+    let t;
+    const keys = 'Pick with 1 to ' + cfg.C + ' or tap, Enter to ';
+    const rule = cfg.repeats ? cfg.N + ' symbols, repeats allowed. ' : cfg.N + ' different symbols. ';
+    if (statusOverride) t = statusOverride;
+    else if (game.side === 'break') {
+      if (game.done) t = game.won ? 'Solved in ' + game.guesses.length + ' of ' + cfg.R + '.' : 'Out of guesses. The code is shown at the top.';
+      else t = rule + keys + 'guess.';
+    } else {
+      if (!game.secret) t = 'Set a code for the computer to break. ' + rule + keys + 'start.';
+      else if (game.done) t = game.won ? 'The computer broke your code in ' + game.guesses.length + ' guesses.' : 'The computer did not break your code.';
+      else t = 'Computer guess ' + (game.guesses.length + 1) + '. ' + (solver ? solver.left() : '') + ' possible codes left.';
+    }
+    if (statusEl.textContent !== t) statusEl.textContent = t;
+  }
+
+  /* ---------- toast ---------- */
+  let toastTimer = 0;
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms || 1300);
+  }
+  function anim(el, cls) {
+    if (reduceMotion) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  }
+  boardEl.addEventListener('animationend', (e) => { e.target.classList.remove('shake', 'pop', 'flip'); });
+
+  /* ---------- input ---------- */
+  function canInput() { return !paused && inputRow() !== null; }
+  function curPegs() { const ir = inputRow(); return ir === -1 ? secretRow.pegs : rows[ir].pegs; }
+  function curRowEl() { const ir = inputRow(); return ir === -1 ? secretRow.el : rows[ir].el; }
+
+  function pick(s) {
+    if (!canInput() || s < 0 || s >= cfg.C) return;
+    const i = game.cursor;
+    game.cur[i] = s;
+    let next = -1;
+    for (let k = 1; k <= cfg.N; k++) { const j = i + k; if (j < cfg.N && game.cur[j] < 0) { next = j; break; } }
+    if (next < 0) for (let j = 0; j < cfg.N; j++) if (game.cur[j] < 0) { next = j; break; }
+    game.cursor = next < 0 ? Math.min(i + 1, cfg.N - 1) : next;
+    const p = curPegs()[i];
+    render();
+    anim(p, 'pop');
+  }
+
+  function back() {
+    if (!canInput()) return;
+    const i = game.cursor;
+    if (game.cur[i] >= 0) game.cur[i] = -1;
+    else if (i > 0) { game.cursor = i - 1; game.cur[i - 1] = -1; }
+    render();
+  }
+
+  function moveCursor(d) {
+    if (!canInput()) return;
+    game.cursor = Math.max(0, Math.min(cfg.N - 1, game.cursor + d));
+    render();
+  }
+
+  function tapSlot(i) {
+    if (!canInput()) return;
+    if (game.cursor === i && game.cur[i] >= 0) game.cur[i] = -1;
+    game.cursor = i;
+    render();
+  }
+
+  function reject(msg) {
+    anim(curRowEl(), 'shake');
+    toast(msg);
+  }
+
+  function submit() {
+    if (!canInput()) return;
+    if (game.cur.some((v) => v < 0)) { reject('Fill every slot'); return; }
+    const code = game.cur.slice();
+    if (game.side === 'set') {
+      if (!cfg.repeats && hasRepeat(code)) { reject('Use ' + cfg.N + ' different symbols'); return; }
+      game.secret = code;
+      game.cur = new Array(cfg.N).fill(-1);
+      game.cursor = 0;
+      render();
+      startCpu();
+      return;
+    }
+    const fb = score(code, game.secret, cfg.C);
+    const r = game.guesses.length;
+    game.guesses.push({ code, fb });
+    game.cur = new Array(cfg.N).fill(-1);
+    game.cursor = 0;
+    if (fb[0] === cfg.N) finish(true);
+    else if (game.guesses.length >= cfg.R) finish(false);
+    saveBreak();
+    render();
+    anim(rows[r].fb, 'show');
+    if (game.done) revealSecretThenPanel();
+  }
+
+  function revealSecretThenPanel() {
+    if (game.side === 'break') secretRow.pegs.forEach((p, i) => setTimeout(() => anim(p, 'flip'), i * 70));
+    const g = game;
+    setTimeout(() => { if (game === g && game.done && !overlayOpen) showPanel(); }, reduceMotion ? 300 : 900);
+  }
+
+  function finish(won) {
+    game.done = true;
+    game.won = won;
+    if (game.side !== 'break' || game.counted) return;
+    game.counted = true;
+    const s = stats[level];
+    s.played++;
+    let newBest = false;
+    if (won) {
+      s.wins++;
+      const n = game.guesses.length;
+      newBest = s.fewest > 0 && n < s.fewest;
+      if (!s.fewest || n < s.fewest) s.fewest = n;
+    }
+    saveStats();
+    lastResult = { game, newBest };
+  }
+
+  /* ---------- computer breaks ---------- */
+  function startCpu() {
+    solver = makeSolver(cfg, Math.random);
+    statusOverride = '';
+    render();
+    clearTimeout(cpuTimer);
+    cpuTimer = setTimeout(cpuStep, 500);
+  }
+
+  function cpuStep() {
+    const g = game;
+    if (g.side !== 'set' || !g.secret || g.done) return;
+    if (paused) { cpuWaiting = true; return; }
+    const code = solver.next();
+    const fb = score(code, g.secret, cfg.C);
+    solver.feed(code, fb);
+    const r = g.guesses.length;
+    g.guesses.push({ code, fb });
+    if (fb[0] === cfg.N) g.done = true, g.won = true;
+    else if (g.guesses.length >= cfg.R) g.done = true, g.won = false;
+    render();
+    rows[r].pegs.forEach((p, i) => setTimeout(() => anim(p, 'flip'), i * 60));
+    setTimeout(() => anim(rows[r].fb, 'show'), cfg.N * 60 + 120);
+    if (g.done) {
+      setTimeout(() => { if (game === g && !overlayOpen) showPanel(); }, reduceMotion ? 400 : 1300);
+    } else {
+      cpuTimer = setTimeout(cpuStep, reduceMotion ? 500 : 850);
+    }
+  }
+
+  /* ---------- panel ---------- */
+  function showPanel() {
+    const g = game;
+    const s = stats[level];
+    const breakSide = g.side === 'break';
+    $('ovTitle').textContent = breakSide ? (g.won ? 'You win' : 'You lose') : 'Game over';
+    $('ovTag').hidden = !(breakSide && lastResult && lastResult.game === g && lastResult.newBest);
+    const line = $('ovLine');
+    const reveal = $('ovReveal');
+    reveal.textContent = '';
+    if (breakSide) {
+      line.innerHTML = g.won ? 'Solved in <b>' + g.guesses.length + '</b> of ' + cfg.R + '.' : 'The code was';
+      reveal.hidden = g.won;
+      if (!g.won) g.secret.forEach((v) => { const p = makePeg(); setPeg(p, v); reveal.appendChild(p); });
+    } else {
+      line.innerHTML = g.won ? 'The computer broke your code in <b>' + g.guesses.length + '</b> guesses.' : 'The computer did not break your code.';
+      reveal.hidden = true;
+    }
+    $('ovStats').hidden = !breakSide;
+    $('stPlayed').textContent = s.played;
+    $('stWins').textContent = s.wins;
+    $('stPct').textContent = s.played ? Math.round((s.wins / s.played) * 100) : 0;
+    $('stFewest').textContent = s.fewest || '-';
+
+    const row = $('ovButtons');
+    row.textContent = '';
+    const mk = (label, primary, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn' + (primary ? ' primary' : '');
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      row.appendChild(b);
+      return b;
+    };
+    const first = mk('Play again', true, () => { hidePanel(); restart(); });
+    mk('Close', false, hidePanel);
+
+    overlayOpen = true;
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+    setTimeout(() => { try { first.focus({ preventScroll: true }); } catch (_) {} }, 60);
+    render();
+  }
+
+  function hidePanel() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    render();
+  }
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) hidePanel(); });
+
+  /* ---------- modes ---------- */
+  function restart() {
+    clearTimeout(cpuTimer);
+    cpuWaiting = false;
+    solver = null;
+    statusOverride = '';
+    game = newGame();
+    saveBreak();
+    render();
+  }
+
+  function setMode(newLevel, newSide) {
+    if (newLevel === level && newSide === side) return;
+    clearTimeout(cpuTimer);
+    cpuWaiting = false;
+    solver = null;
+    const levelChanged = newLevel !== level;
+    level = newLevel; side = newSide;
+    cfg = LEVELS[level];
+    put('level', level); put('side', side);
+    if (levelChanged) build();
+    game = side === 'break' ? loadBreak() : newGame();
+    render();
+    layout();
+  }
+
+  levelSeg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    b.blur();
+    if (overlayOpen) hidePanel();
+    setMode(b.dataset.v, side);
+  });
+  sideSeg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    b.blur();
+    if (overlayOpen) hidePanel();
+    setMode(level, b.dataset.v);
+  });
+  newBtn.addEventListener('click', (e) => { e.currentTarget.blur(); if (overlayOpen) hidePanel(); restart(); });
+
+  palEl.addEventListener('mousedown', (e) => e.preventDefault());
+  palEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.key');
+    if (!b) return;
+    const k = b.dataset.k;
+    if (k === 'enter') submit();
+    else if (k === 'back') back();
+    else pick(Number(k));
+  });
+  boardEl.addEventListener('click', (e) => {
+    const p = e.target.closest('.peg');
+    if (!p) return;
+    const row = p.closest('.crow');
+    if (!row || !row.classList.contains('cur')) return;
+    tapSlot(Number(p.dataset.i));
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); hidePanel(); }
+      return;
+    }
+    if (e.key === 'Enter') { e.preventDefault(); if (!e.repeat) submit(); return; }
+    if (e.key === 'Backspace') { e.preventDefault(); back(); return; }
+    if (e.key === 'Delete') { e.preventDefault(); if (canInput()) { game.cur[game.cursor] = -1; render(); } return; }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); moveCursor(-1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); moveCursor(1); return; }
+    if (/^[1-9]$/.test(e.key)) { e.preventDefault(); pick(Number(e.key) - 1); }
+  });
+
+  document.addEventListener('touchmove', (e) => { if (!e.target.closest('.card')) e.preventDefault(); }, { passive: false });
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+  V.onPause((p) => {
+    paused = !!p;
+    if (!paused && cpuWaiting) { cpuWaiting = false; cpuTimer = setTimeout(cpuStep, 400); }
+  });
+
+  /* ---------- layout ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(8, m * 0.03, 22);
+    const fs = clamp(12, m / 34, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+
+    const R = cfg.R + 1;           // guess rows plus the code row
+    const GR = 0.14;               // peg gap as a fraction of peg size
+    const fbw = cfg.N === 4 ? 0.64 : 1.01;
+    const rowUnits = 0.8 + 0.3 + cfg.N + (cfg.N - 1) * GR + 0.3 + fbw;
+    const colUnits = R + (R - 1) * GR + 1.6 * GR;
+
+    const wide = vw >= 440 && vw / vh > 1.15;
+    app.classList.toggle('wide', wide);
+    app.classList.toggle('narrow', !wide && vw < 560);
+
+    let t, kh, kg;
+    if (wide) {
+      const side = clamp(220, vw * 0.26, 300);
+      app.style.setProperty('--side', side + 'px');
+      kg = 6;
+      kh = clamp(40, (side - 3 * kg) / 4 * 0.9, 58);
+      app.style.setProperty('--kh', kh + 'px');
+      app.style.setProperty('--kg', kg + 'px');
+      const headH = head.offsetHeight;
+      const availH = vh - 2 * pad - headH - fs * 0.9;
+      const availW = vw - 2 * pad - side - fs * 2.2;
+      t = Math.floor(clamp(18, Math.min(availH / colUnits, availW / rowUnits), 60));
+      app.style.setProperty('--gapY', '0px');
+    } else {
+      const W = Math.min(vw - 2 * pad, 480);
+      app.style.setProperty('--W', W + 'px');
+      kg = clamp(4, W * 0.014, 7);
+      kh = clamp(36, vh * 0.072, 54);
+      // One row of keys when each symbol key is at least 38px wide, else two rows.
+      const keyW = (W - (cfg.C + 1) * kg) / (cfg.C + 2.6);
+      const two = keyW < 38;
+      palEl.classList.toggle('two', two);
+      app.style.setProperty('--kh', kh + 'px');
+      app.style.setProperty('--kg', kg + 'px');
+      const palH = two ? 2 * kh + kg : kh;
+      const headH = head.offsetHeight + statusEl.offsetHeight + parseFloat(getComputedStyle(statusEl).marginTop);
+      const legH = legendEl.offsetHeight;
+      const gapY = clamp(6, vh * 0.018, 18);
+      app.style.setProperty('--gapY', gapY + 'px');
+      const availH = vh - 2 * pad - headH - palH - legH - 3 * gapY;
+      t = Math.floor(clamp(16, Math.min(availH / colUnits, W / rowUnits), 56));
+    }
+    app.style.setProperty('--t', t + 'px');
+    app.style.setProperty('--g', Math.max(2, Math.round(t * GR)) + 'px');
+  }
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  build();
+  game = side === 'break' ? loadBreak() : newGame();
+  render();
+  layout();
+  app.classList.add('ready');
+  V.ready();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Minesweeper</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --c: 30px;        /* cell size, set from JS */
+    --gap: 12px;
+    --flag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='6' y='3' width='1.8' height='13' fill='%23ffffff' fill-opacity='0.8'/%3E%3Crect x='7.8' y='3' width='7.4' height='6' fill='%23ea5426'/%3E%3Crect x='4' y='15' width='7.4' height='2' fill='%23ffffff' fill-opacity='0.8'/%3E%3C/svg%3E");
+    --mine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='5.5' y='5.5' width='9' height='9' fill='%23ffffff'/%3E%3Crect x='9' y='2.5' width='2' height='15' fill='%23ffffff'/%3E%3Crect x='2.5' y='9' width='15' height='2' fill='%23ffffff'/%3E%3Crect x='7.5' y='7.5' width='2' height='2' fill='%23000000' fill-opacity='0.35'/%3E%3C/svg%3E");
+    --wrong: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='6' y='3' width='1.8' height='13' fill='%23ffffff' fill-opacity='0.45'/%3E%3Crect x='7.8' y='3' width='7.4' height='6' fill='%23ea5426' fill-opacity='0.45'/%3E%3Crect x='4' y='15' width='7.4' height='2' fill='%23ffffff' fill-opacity='0.45'/%3E%3Cpath d='M3 3 17 17M17 3 3 17' stroke='%23ffffff' stroke-width='1.8'/%3E%3C/svg%3E");
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    display: flex; flex-direction: column; align-items: center;
+    gap: var(--gap);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+
+  .head { display: grid; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .app.wide .head {
+    grid-template-columns: 1fr auto auto auto auto auto;
+    grid-template-areas: "brand mines time diff mode new";
+  }
+  .app.wide.no-mode .head {
+    grid-template-columns: 1fr auto auto auto auto;
+    grid-template-areas: "brand mines time diff new";
+  }
+  .app.wide.no-mode .b-mode { display: none; }
+  .app.narrow .head {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-areas: "brand brand brand" "mines time new" "diff diff mode";
+  }
+  html.vela-embedded .app.narrow .head { grid-template-areas: "mines time new" "diff diff mode"; }
+  html.vela-embedded .app.narrow .brand { display: none; }
+
+  .brand { grid-area: brand; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .app.narrow .brand { padding: 0.15em 0 0.25em; }
+
+  .st-mines { grid-area: mines; }
+  .st-time { grid-area: time; }
+  .b-diff { grid-area: diff; }
+  .b-mode { grid-area: mode; }
+  .b-new { grid-area: new; }
+
+  .stat {
+    min-width: 5.6em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .lab {
+    display: block;
+    font: 600 0.66em/1.2 var(--font);
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .num {
+    display: block;
+    font: 600 1.4em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+  }
+  .num.neg { color: var(--brand-hover); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6em;
+    min-height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.76em var(--font);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .head .btn { font-size: 0.76rem; }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .app.narrow .b-diff { justify-content: space-between; }
+  .b-mode .ico-flag { display: none; }
+  .b-mode.on { border-color: var(--brand); color: var(--brand-hover); background: var(--surface); }
+  .b-mode.on .ico-flag { display: block; }
+  .b-mode.on .ico-reveal { display: none; }
+  .b-mode .mode-name { min-width: 4.4em; text-align: left; }
+
+  /* ---------- board ---------- */
+  .stage { display: flex; align-items: center; justify-content: center; }
+  .scroller {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #000;
+    touch-action: none;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) #000;
+    outline: none;
+  }
+  .scroller.pan { overflow: auto; touch-action: pan-x pan-y; }
+  .scroller::-webkit-scrollbar { width: 8px; height: 8px; background: #000; }
+  .scroller::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); }
+  .scroller::-webkit-scrollbar-corner { background: #000; }
+  .scroller.shake { animation: shake 260ms linear; }
+  @keyframes shake {
+    20% { transform: translate(-4px, 1px); } 40% { transform: translate(4px, -1px); }
+    60% { transform: translate(-3px, 0); } 80% { transform: translate(2px, 1px); }
+  }
+
+  .board {
+    display: grid;
+    gap: 1px;
+    padding: 1px;
+    width: max-content;
+    background: #000;
+    cursor: default;
+  }
+  .c {
+    position: relative;
+    width: var(--c); height: var(--c);
+    display: grid; place-items: center;
+    background-color: var(--surface);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 62%;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: calc(var(--c) * 0.6);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  @media (hover: hover) {
+    .c:not(.o):hover { background-color: var(--surface-2); }
+  }
+  .c.p, .c.p:hover { background-color: var(--bg-2); }
+  .c.o { background-color: var(--bg-2); cursor: default; }
+  .c.f { background-image: var(--flag); }
+  .c.m { background-image: var(--mine); }
+  .c.hit { background-color: var(--brand); }
+  .c.wrong { background-image: var(--wrong); }
+  .c.cur { box-shadow: inset 0 0 0 2px var(--brand-hover); }
+  .n1 { color: rgba(255, 255, 255, 0.86); }
+  .n2 { color: var(--brand-hover); }
+  .n3 { color: var(--brand); }
+  .n4 { color: var(--brand-dark); }
+  .n5, .n6, .n7, .n8 { color: #fff; }
+  .n5::after, .n6::after, .n7::after, .n8::after {
+    content: "";
+    position: absolute;
+    left: 32%; right: 32%; bottom: 12%;
+    height: max(2px, calc(var(--c) * 0.08));
+    background: var(--brand);
+  }
+  .c.anim { animation: open 180ms var(--ease) var(--d, 0ms) both; }
+  @keyframes open { from { background-color: var(--surface); color: transparent; } }
+  .c.pop { animation: pop 200ms var(--ease) var(--d, 0ms) both; }
+  @keyframes pop { from { background-size: 0%; } }
+
+  .foot {
+    color: var(--muted);
+    font-size: 0.82em;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 21em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 0.62em/1 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .card .tag[hidden] { display: none; }
+  .card .sub { margin: 0.55em 0 0; color: var(--muted); font-size: 0.86em; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div + div { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2.1em; font-weight: 300; line-height: 1.1; }
+  .ov-stats .num.none { font-size: 1.3em; line-height: 1.75; color: var(--muted); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.1em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .btns .btn[hidden] { display: none; }
+
+  .opts { display: grid; gap: 0.4em; margin-top: 1.1em; }
+  .opt {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 0.75em;
+    width: 100%;
+    padding: 0.75em 0.9em;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    text-align: left;
+    cursor: pointer;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease);
+  }
+  .opt:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.4); }
+  .opt:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .opt.sel { border-color: var(--brand); box-shadow: inset 3px 0 0 var(--brand); }
+  .opt-name { font: 600 0.95em var(--font); }
+  .opt-info { color: var(--muted); font-size: 0.78em; text-align: right; }
+  .fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5em; margin-top: 0.9em; }
+  .fields label { display: block; min-width: 0; }
+  .fields .lab { margin-bottom: 0.4em; }
+  .fields input {
+    display: block;
+    width: 100%;
+    height: 2.5em;
+    padding: 0 0.6em;
+    background: var(--bg-2);
+    border: 1px solid var(--outline);
+    border-radius: 0;
+    color: #fff;
+    font: 600 1.1em var(--font-display);
+    font-variant-numeric: tabular-nums;
+    user-select: text;
+    -webkit-user-select: text;
+    outline: none;
+  }
+  .fields input:focus { border-color: var(--brand); }
+  .note { margin: 0.6em 0 0; color: var(--muted); font-size: 0.78em; line-height: 1.4; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .c.anim, .c.pop, .scroller.shake { animation: none; }
+    .overlay, .card { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app narrow" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Minesweeper</h1></div>
+    <div class="stat st-mines"><span class="lab">Mines</span><span class="num" id="minesLeft">10</span></div>
+    <div class="stat st-time"><span class="lab">Time</span><span class="num" id="time">0:00</span></div>
+    <button class="btn b-diff" id="diffBtn" type="button" aria-haspopup="dialog">
+      <span id="diffName">Beginner</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="btn b-mode" id="modeBtn" type="button" aria-pressed="false" aria-label="Tap action: Reveal">
+      <svg class="ico-reveal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/></svg>
+      <svg class="ico-flag" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="2" height="16" fill="currentColor"/><rect x="9" y="3" width="9" height="7" fill="#ea5426"/><rect x="4" y="18" width="9" height="2" fill="currentColor"/></svg>
+      <span class="mode-name" id="modeName">Reveal</span>
+    </button>
+    <button class="btn primary b-new" id="newBtn" type="button">New game</button>
+  </header>
+  <main class="stage" id="stage">
+    <div class="scroller" id="scroller">
+      <div class="board" id="board" role="grid" aria-label="Minefield"></div>
+    </div>
+  </main>
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="resultCard" role="dialog" aria-live="polite" hidden>
+    <div class="card-top"><h2 id="resTitle"></h2><span class="tag" id="resTag" hidden>New best</span></div>
+    <p class="sub" id="resSub"></p>
+    <div class="ov-stats">
+      <div><span class="lab">Time</span><span class="num" id="resTime">0:00.0</span></div>
+      <div><span class="lab">Best</span><span class="num" id="resBest">0:00.0</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="boardBtn" type="button">Show board</button>
+    </div>
+  </div>
+  <div class="card" id="menuCard" role="dialog" aria-label="Difficulty" hidden>
+    <div class="card-top"><h2>Difficulty</h2></div>
+    <div class="opts" id="opts"></div>
+    <div id="customBox" hidden>
+      <div class="fields">
+        <label><span class="lab">Width</span><input id="cw" type="text" inputmode="numeric" maxlength="2" autocomplete="off"></label>
+        <label><span class="lab">Height</span><input id="ch" type="text" inputmode="numeric" maxlength="2" autocomplete="off"></label>
+        <label><span class="lab">Mines</span><input id="cm" type="text" inputmode="numeric" maxlength="4" autocomplete="off"></label>
+      </div>
+      <p class="note" id="cnote"></p>
+    </div>
+    <div class="btns">
+      <button class="btn" id="menuCancel" type="button">Cancel</button>
+      <button class="btn primary" id="customStart" type="button" hidden>Start</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="minesweeper"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, onPause() {} };
+
+  /* ---------- settings and storage ---------- */
+  const PRESETS = {
+    beginner:     { name: 'Beginner',     w: 9,  h: 9,  m: 10 },
+    intermediate: { name: 'Intermediate', w: 16, h: 16, m: 40 },
+    expert:       { name: 'Expert',       w: 30, h: 16, m: 99 },
+  };
+  const LIM = { wMin: 5, wMax: 40, hMin: 5, hMax: 30 };
+  const KEY_DIFF = 'vela:minesweeper:difficulty';
+  const KEY_CUSTOM = 'vela:minesweeper:custom';
+  const KEY_BEST = 'vela:minesweeper:best:';
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function toInt(v, fallback) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : fallback; }
+
+  function fixCustom(c) {
+    const w = clamp(LIM.wMin, toInt(c && c.w, 20), LIM.wMax);
+    const h = clamp(LIM.hMin, toInt(c && c.h, 12), LIM.hMax);
+    const m = clamp(1, toInt(c && c.m, 40), w * h - 9);
+    return { w, h, m };
+  }
+
+  let diff = lsGet(KEY_DIFF);
+  if (diff !== 'custom' && !PRESETS[diff]) diff = 'beginner';
+  let custom;
+  try { custom = fixCustom(JSON.parse(lsGet(KEY_CUSTOM) || 'null')); } catch (_) { custom = fixCustom(null); }
+
+  function cfgOf(d) { return d === 'custom' ? custom : PRESETS[d]; }
+  function idOf(d) { return d === 'custom' ? 'custom-' + custom.w + 'x' + custom.h + '-' + custom.m : d; }
+  function nameOf(d) { return d === 'custom' ? 'Custom' : PRESETS[d].name; }
+  function sizeText(c) { return c.w + ' x ' + c.h + ', ' + c.m + ' mines'; }
+  function readBest(d) { const v = Number(lsGet(KEY_BEST + idOf(d))); return Number.isFinite(v) && v > 0 ? v : 0; }
+
+  function fmtClock(ms) {
+    const s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function fmtTime(ms) {
+    return fmtClock(ms) + '.' + Math.floor((ms % 1000) / 100);
+  }
+
+  /* ===== LOGIC START ===== */
+  const HIDDEN = 0, OPEN = 1, FLAG = 2;
+  let W = 9, H = 9, M = 10, N = 81;
+  let mine, adj, st, hit;
+  let status = 'ready';      // ready, playing, won, lost
+  let opened = 0, flags = 0;
+  let rotated = false;
+
+  function eachNb(i, fn) {
+    const r = (i / W) | 0, c = i - r * W;
+    for (let dr = -1; dr <= 1; dr++) {
+      const rr = r + dr;
+      if (rr < 0 || rr >= H) continue;
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const cc = c + dc;
+        if (cc < 0 || cc >= W) continue;
+        fn(rr * W + cc);
+      }
+    }
+  }
+
+  // Mines go anywhere except the first cell and its neighbours, so the first
+  // click always opens an area.
+  function generate(safe) {
+    const banned = new Uint8Array(N);
+    banned[safe] = 1;
+    eachNb(safe, (j) => { banned[j] = 1; });
+    let pool = [];
+    for (let i = 0; i < N; i++) if (!banned[i]) pool.push(i);
+    if (pool.length < M) { pool = []; for (let i = 0; i < N; i++) if (i !== safe) pool.push(i); }
+    for (let k = 0; k < M && k < pool.length; k++) {
+      const j = k + Math.floor(Math.random() * (pool.length - k));
+      const t = pool[k]; pool[k] = pool[j]; pool[j] = t;
+      mine[pool[k]] = 1;
+    }
+    for (let i = 0; i < N; i++) {
+      if (mine[i]) continue;
+      let n = 0;
+      eachNb(i, (j) => { n += mine[j]; });
+      adj[i] = n;
+    }
+  }
+
+  // Breadth-first open, iterative. Returns opened cells with their distance.
+  function flood(starts) {
+    const q = [], dep = [];
+    for (const s of starts) {
+      if (st[s] === HIDDEN && !mine[s]) { st[s] = OPEN; q.push(s); dep.push(0); }
+    }
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], d = dep[h];
+      opened++;
+      if (adj[i] === 0) {
+        eachNb(i, (j) => {
+          if (st[j] === HIDDEN && !mine[j]) { st[j] = OPEN; q.push(j); dep.push(d + 1); }
+        });
+      }
+    }
+    return { q, dep };
+  }
+
+  // Swap rows and columns (Expert on a portrait screen).
+  function transposeState() {
+    const nW = H, nH = W;
+    const map = (a) => {
+      const out = new a.constructor(N);
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) out[c * nW + r] = a[r * W + c];
+      return out;
+    };
+    mine = map(mine); adj = map(adj); st = map(st); hit = map(hit);
+    const cr = (cur / W) | 0, cc = cur - cr * W;
+    cur = cc * nW + cr;
+    W = nW; H = nH;
+    rotated = !rotated;
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), foot = $('foot'), stage = $('stage');
+  const scroller = $('scroller'), board = $('board');
+  const minesEl = $('minesLeft'), timeEl = $('time');
+  const diffBtn = $('diffBtn'), modeBtn = $('modeBtn'), newBtn = $('newBtn');
+  const overlay = $('overlay'), resultCard = $('resultCard'), menuCard = $('menuCard');
+
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let touchy = (navigator.maxTouchPoints || 0) > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  let lastTouch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+
+  let cells = [], clsCache = [];
+  let mode = 'reveal';
+  let cur = 0, curShown = false, pressI = -1;
+  let elapsed = 0, startedAt = 0, running = false;
+  let paused = false, overlayOpen = false, menuOpen = false;
+  let resultTimer = 0;
+
+  function cellClass(i) {
+    const s = st[i];
+    let k;
+    if (s === OPEN) k = 'c o n' + adj[i];
+    else if (s === FLAG) k = status === 'lost' && !mine[i] ? 'c o wrong' : 'c f';
+    else if (status === 'lost' && mine[i]) k = hit[i] ? 'c o m hit' : 'c o m';
+    else k = 'c' + (i === pressI ? ' p' : '');
+    if (curShown && i === cur) k += ' cur';
+    return k;
+  }
+
+  function paint(i, anim, delay) {
+    if (i < 0 || i >= N) return;
+    const el = cells[i];
+    let k = cellClass(i);
+    if (anim && !reduceMotion) {
+      k += ' ' + anim;
+      el.style.setProperty('--d', (delay || 0) + 'ms');
+    }
+    if (k === clsCache[i]) return;
+    clsCache[i] = k;
+    el.className = k;
+    const txt = st[i] === OPEN && adj[i] ? String(adj[i]) : '';
+    if (el.textContent !== txt) el.textContent = txt;
+  }
+
+  function paintAll() { for (let i = 0; i < N; i++) paint(i); }
+
+  function buildBoard() {
+    board.textContent = '';
+    board.style.gridTemplateColumns = 'repeat(' + W + ', var(--c))';
+    const frag = document.createDocumentFragment();
+    cells = new Array(N);
+    clsCache = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const el = document.createElement('div');
+      el.dataset.i = i;
+      cells[i] = el;
+      frag.appendChild(el);
+    }
+    board.appendChild(frag);
+    paintAll();
+  }
+
+  /* ---------- timer ---------- */
+  function getElapsed() { return running ? elapsed + (performance.now() - startedAt) : elapsed; }
+  function syncTimer() {
+    const should = status === 'playing' && !paused && !menuOpen;
+    if (should && !running) { startedAt = performance.now(); running = true; }
+    else if (!should && running) { elapsed += performance.now() - startedAt; running = false; }
+  }
+  let shownClock = '';
+  function tick() {
+    const t = fmtClock(getElapsed());
+    if (t !== shownClock) { timeEl.textContent = t; shownClock = t; }
+  }
+  setInterval(tick, 200);
+
+  /* ---------- HUD ---------- */
+  function updateHud() {
+    const left = M - flags;
+    minesEl.textContent = left;
+    minesEl.classList.toggle('neg', left < 0);
+    $('diffName').textContent = nameOf(diff);
+    const on = mode === 'flag';
+    modeBtn.classList.toggle('on', on);
+    modeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    modeBtn.setAttribute('aria-label', 'Tap action: ' + (on ? 'Flag' : 'Reveal'));
+    $('modeName').textContent = on ? 'Flag' : 'Reveal';
+    let hint;
+    if (lastTouch) {
+      hint = on ? 'Tap to flag. Hold to reveal. Tap a number to open around it.'
+                : 'Tap to reveal. Hold to flag. Tap a number to open around it.';
+    } else {
+      hint = on ? 'Click to flag. Click a number to open around it.'
+                : 'Click to reveal. Right click to flag. Click a number to open around it.';
+    }
+    if (foot.textContent === hint) return false;
+    foot.textContent = hint;
+    return true;
+  }
+
+  /* ---------- game flow ---------- */
+  function newGame() {
+    clearTimeout(resultTimer); resultTimer = 0;
+    hideOverlay();
+    const cfg = cfgOf(diff);
+    W = cfg.w; H = cfg.h; M = cfg.m; N = W * H;
+    mine = new Uint8Array(N); adj = new Uint8Array(N); st = new Uint8Array(N); hit = new Uint8Array(N);
+    status = 'ready'; opened = 0; flags = 0;
+    rotated = false;
+    if (diff === 'expert' && wantPortrait()) { const t = W; W = H; H = t; rotated = true; }
+    elapsed = 0; running = false; shownClock = '';
+    cur = ((H / 2) | 0) * W + ((W / 2) | 0);
+    pressI = -1;
+    scroller.classList.remove('shake');
+    buildBoard();
+    updateHud();
+    tick();
+    layout();
+    scroller.scrollTop = 0; scroller.scrollLeft = 0;
+  }
+
+  const over = () => status === 'won' || status === 'lost';
+
+  function reveal(i) {
+    if (over() || st[i] !== HIDDEN) return;
+    if (status === 'ready') {
+      generate(i);
+      status = 'playing';
+      syncTimer();
+    }
+    if (mine[i]) { hit[i] = 1; lose(); return; }
+    openCells([i]);
+  }
+
+  function openCells(starts) {
+    const { q, dep } = flood(starts);
+    for (let k = 0; k < q.length; k++) paint(q[k], 'anim', Math.min(dep[k] * 18, 320));
+    if (opened === N - M) win();
+  }
+
+  // Open the neighbours of a number once enough flags sit around it.
+  function chord(i) {
+    if (over() || st[i] !== OPEN || !adj[i]) return;
+    let f = 0;
+    eachNb(i, (j) => { if (st[j] === FLAG) f++; });
+    if (f !== adj[i]) return;
+    const starts = [];
+    let boom = false;
+    eachNb(i, (j) => {
+      if (st[j] !== HIDDEN) return;
+      if (mine[j]) { hit[j] = 1; boom = true; } else starts.push(j);
+    });
+    if (boom) { lose(); return; }
+    if (starts.length) openCells(starts);
+  }
+
+  function toggleFlag(i) {
+    if (over()) return;
+    if (st[i] === HIDDEN) { st[i] = FLAG; flags++; paint(i, 'pop', 0); }
+    else if (st[i] === FLAG) { st[i] = HIDDEN; flags--; paint(i); }
+    else return;
+    updateHud();
+  }
+
+  // Tap, click, Enter: depends on the mode toggle.
+  function primary(i) {
+    if (over()) return;
+    if (st[i] === OPEN) { chord(i); return; }
+    if (mode === 'flag') toggleFlag(i); else reveal(i);
+  }
+
+  // Long press: the opposite of the current mode.
+  function alternate(i) {
+    if (over()) return;
+    if (st[i] === OPEN) { chord(i); return; }
+    if (mode === 'flag') reveal(i); else toggleFlag(i);
+  }
+
+  // Right click, F key: always flag.
+  function flagAction(i) {
+    if (over()) return;
+    if (st[i] === OPEN) chord(i); else toggleFlag(i);
+  }
+
+  function lose() {
+    status = 'lost';
+    syncTimer();
+    setPress(-1);
+    paintAll();
+    if (!reduceMotion) {
+      scroller.classList.remove('shake'); void scroller.offsetWidth; scroller.classList.add('shake');
+    }
+    const t = getElapsed();
+    resultTimer = setTimeout(() => showResult(false, t, readBest(diff), false), 1000);
+  }
+
+  function win() {
+    status = 'won';
+    syncTimer();
+    const t = Math.max(1, Math.round(getElapsed()));
+    elapsed = t;
+    let k = 0;
+    for (let i = 0; i < N; i++) {
+      if (mine[i] && st[i] !== FLAG) { st[i] = FLAG; paint(i, 'pop', Math.min(k++ * 12, 400)); }
+    }
+    flags = M;
+    updateHud();
+    tick();
+    const prev = readBest(diff);
+    const isBest = !prev || t < prev;
+    if (isBest) lsSet(KEY_BEST + idOf(diff), String(t));
+    resultTimer = setTimeout(() => showResult(true, t, isBest ? t : prev, isBest), 600);
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    resultCard.hidden = card !== resultCard;
+    menuCard.hidden = card !== menuCard;
+    overlayOpen = true;
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    menuOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    syncTimer();
+  }
+
+  function showResult(won, t, best, isBest) {
+    resultTimer = 0;
+    $('resTitle').textContent = won ? 'You win' : 'Game over';
+    $('resTag').hidden = !isBest;
+    $('resSub').textContent = nameOf(diff) + ', ' + sizeText(cfgOf(diff));
+    $('resTime').textContent = fmtTime(t);
+    const bestEl = $('resBest');
+    bestEl.textContent = best ? fmtTime(best) : 'None';
+    bestEl.classList.toggle('none', !best);
+    openOverlay(resultCard);
+    setTimeout(() => { try { $('againBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  /* ---------- difficulty menu ---------- */
+  const opts = $('opts'), customBox = $('customBox'), customStart = $('customStart');
+  const cw = $('cw'), ch = $('ch'), cm = $('cm');
+  let menuSel = 'beginner';
+
+  function buildOpts() {
+    opts.textContent = '';
+    ['beginner', 'intermediate', 'expert', 'custom'].forEach((d) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'opt' + (d === menuSel ? ' sel' : '');
+      b.dataset.d = d;
+      const name = document.createElement('span');
+      name.className = 'opt-name';
+      name.textContent = nameOf(d);
+      const info = document.createElement('span');
+      info.className = 'opt-info';
+      const cfg = cfgOf(d);
+      const best = readBest(d);
+      info.textContent = d === 'custom'
+        ? (best ? 'Best ' + fmtTime(best) : 'Choose size')
+        : sizeText(cfg) + (best ? '. Best ' + fmtTime(best) : '');
+      b.append(name, info);
+      b.addEventListener('click', () => pickOpt(d));
+      opts.appendChild(b);
+    });
+  }
+
+  function openMenu() {
+    menuSel = diff;
+    menuOpen = true;
+    syncTimer();
+    buildOpts();
+    showCustom(diff === 'custom', false);
+    openOverlay(menuCard);
+    setTimeout(() => {
+      const sel = opts.querySelector('.sel');
+      try { (sel || opts.firstChild).focus({ preventScroll: true }); } catch (_) {}
+    }, 60);
+  }
+
+  function showCustom(on, focus) {
+    customBox.hidden = !on;
+    customStart.hidden = !on;
+    if (on) {
+      cw.value = custom.w; ch.value = custom.h; cm.value = custom.m;
+      updateNote();
+      if (focus) setTimeout(() => { try { cw.focus(); cw.select(); } catch (_) {} }, 30);
+    }
+  }
+
+  function updateNote() {
+    const w = clamp(LIM.wMin, toInt(cw.value, custom.w), LIM.wMax);
+    const h = clamp(LIM.hMin, toInt(ch.value, custom.h), LIM.hMax);
+    $('cnote').textContent = 'Width ' + LIM.wMin + ' to ' + LIM.wMax + '. Height ' + LIM.hMin + ' to ' + LIM.hMax +
+      '. Mines 1 to ' + (w * h - 9) + '.';
+  }
+
+  function setDiff(d) {
+    diff = d;
+    lsSet(KEY_DIFF, d);
+  }
+
+  function pickOpt(d) {
+    if (d === 'custom') {
+      menuSel = 'custom';
+      opts.querySelectorAll('.opt').forEach((b) => b.classList.toggle('sel', b.dataset.d === 'custom'));
+      showCustom(true, true);
+      return;
+    }
+    setDiff(d);
+    newGame();
+  }
+
+  function startCustom() {
+    custom = fixCustom({ w: cw.value, h: ch.value, m: cm.value });
+    lsSet(KEY_CUSTOM, JSON.stringify(custom));
+    setDiff('custom');
+    newGame();
+  }
+
+  [cw, ch, cm].forEach((inp) => {
+    inp.addEventListener('input', () => {
+      inp.value = inp.value.replace(/[^0-9]/g, '');
+      updateNote();
+    });
+  });
+  customStart.addEventListener('click', startCustom);
+  $('menuCancel').addEventListener('click', hideOverlay);
+  $('againBtn').addEventListener('click', newGame);
+  $('boardBtn').addEventListener('click', hideOverlay);
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay) hideOverlay(); });
+  diffBtn.addEventListener('click', openMenu);
+  newBtn.addEventListener('click', newGame);
+  modeBtn.addEventListener('click', () => {
+    mode = mode === 'flag' ? 'reveal' : 'flag';
+    if (updateHud()) layout();
+  });
+
+  /* ---------- layout ---------- */
+  function wantPortrait() { return window.innerHeight > window.innerWidth; }
+
+  function ensureOrientation() {
+    const want = diff === 'expert' && wantPortrait();
+    if (want !== rotated && diff === 'expert') {
+      transposeState();
+      pressI = -1;
+      buildBoard();
+    }
+  }
+
+  const MIN_CELL = 22, MAX_CELL = 60;
+
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = Math.round(clamp(8, m * 0.03, 24));
+    const gap = Math.round(clamp(8, m * 0.022, 14));
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.padding = pad + 'px';
+    app.style.setProperty('--gap', gap + 'px');
+    ensureOrientation();
+
+    const availW = vw - 2 * pad;
+    function calc(headH, footH) {
+      const availH = vh - 2 * pad - headH - footH - 2 * gap;
+      const innerW = availW - 2, innerH = Math.max(60, availH - 2);
+      const fitW = Math.floor((innerW - 1) / W - 1);
+      const fitH = Math.floor((innerH - 1) / H - 1);
+      let c = Math.min(MAX_CELL, fitW, fitH);
+      if (c < MIN_CELL) c = fitW >= 20 && fitW < MIN_CELL ? fitW : MIN_CELL;
+      const bw = W * (c + 1) + 1, bh = H * (c + 1) + 1;
+      const sw = Math.min(bw, innerW), sh = Math.min(bh, innerH);
+      const hw = Math.min(availW, Math.max(sw + 2, 320));
+      return { c, bw, bh, sw, sh, hw, pan: bw > innerW || bh > innerH };
+    }
+    function trial(narrow) {
+      app.classList.toggle('narrow', narrow);
+      app.classList.toggle('wide', !narrow);
+      app.classList.toggle('no-mode', !narrow && !touchy);
+      head.style.width = availW + 'px';
+      foot.style.width = availW + 'px';
+      let hh = head.offsetHeight, fh = foot.offsetHeight;
+      let r = calc(hh, fh);
+      head.style.width = r.hw + 'px';
+      foot.style.width = r.hw + 'px';
+      if (head.offsetHeight !== hh || foot.offsetHeight !== fh) {
+        hh = head.offsetHeight; fh = foot.offsetHeight;
+        r = calc(hh, fh);
+      }
+      return r;
+    }
+
+    // Single-row header only when it fits over the board.
+    app.classList.add('wide'); app.classList.remove('narrow');
+    app.classList.toggle('no-mode', !touchy);
+    head.style.width = 'max-content';
+    const wideNeed = head.offsetWidth;
+    let r = trial(false);
+    if (wideNeed > r.hw) r = trial(true);
+
+    board.style.setProperty('--c', r.c + 'px');
+    scroller.style.width = (r.sw + 2) + 'px';
+    scroller.style.height = (r.sh + 2) + 'px';
+    scroller.classList.toggle('pan', r.pan);
+    if (!r.pan) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- pointer input ---------- */
+  function cellAt(t) {
+    const el = t && t.closest ? t.closest('.c') : null;
+    return el && board.contains(el) ? +el.dataset.i : -1;
+  }
+
+  function setPress(i) {
+    if (i === pressI) return;
+    const old = pressI;
+    pressI = i;
+    if (old >= 0) paint(old);
+    if (i >= 0) paint(i);
+  }
+
+  function hideCursor() {
+    if (!curShown) return;
+    curShown = false;
+    paint(cur);
+  }
+
+  let ptr = null;  // { id, mouse, i, x, y, moved, fired, timer }
+  function dropPtr() {
+    if (ptr && ptr.timer) clearTimeout(ptr.timer);
+    ptr = null;
+    setPress(-1);
+  }
+
+  board.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (paused) { paused = false; syncTimer(); }
+    const i = cellAt(e.target);
+    if (i < 0 || overlayOpen) return;
+    hideCursor();
+    if (ptr) { dropPtr(); return; }   // a second finger cancels
+    const isMouse = e.pointerType === 'mouse';
+    const wasTouch = lastTouch;
+    lastTouch = !isMouse;
+    if (!isMouse && !touchy) { touchy = true; }
+    if (wasTouch !== lastTouch && updateHud()) layout();
+    if (isMouse) {
+      if (e.button === 2) { e.preventDefault(); flagAction(i); return; }
+      if (e.button === 1) { e.preventDefault(); chord(i); return; }
+      if (e.button !== 0) return;
+      ptr = { id: e.pointerId, mouse: true, i };
+      if (st[i] === HIDDEN && !over()) setPress(i);
+      return;
+    }
+    ptr = { id: e.pointerId, mouse: false, i, x: e.clientX, y: e.clientY, moved: false, fired: false, timer: 0 };
+    if (st[i] === HIDDEN && !over()) setPress(i);
+    ptr.timer = setTimeout(() => {
+      if (!ptr || ptr.moved || ptr.i !== i) return;
+      ptr.fired = true;
+      ptr.timer = 0;
+      setPress(-1);
+      if (over() || (st[i] === OPEN && !adj[i])) return;
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
+      alternate(i);
+    }, 350);
+  });
+
+  board.addEventListener('pointerover', (e) => {
+    if (!ptr || !ptr.mouse || e.pointerId !== ptr.id) return;
+    const i = cellAt(e.target);
+    setPress(i >= 0 && st[i] === HIDDEN && !over() ? i : -1);
+  });
+  board.addEventListener('pointerleave', (e) => {
+    if (ptr && ptr.mouse && e.pointerId === ptr.id) setPress(-1);
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!ptr || ptr.mouse || e.pointerId !== ptr.id || ptr.moved) return;
+    const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+    if (dx * dx + dy * dy > 100) {
+      ptr.moved = true;
+      if (ptr.timer) { clearTimeout(ptr.timer); ptr.timer = 0; }
+      setPress(-1);
+    }
+  });
+
+  window.addEventListener('pointerup', (e) => {
+    if (!ptr || e.pointerId !== ptr.id) return;
+    const p = ptr;
+    dropPtr();
+    if (p.mouse) {
+      if (e.button !== 0) return;
+      const i = board.contains(e.target) ? cellAt(e.target) : -1;
+      if (i >= 0) primary(i);
+      return;
+    }
+    if (!p.moved && !p.fired) primary(p.i);
+  });
+  window.addEventListener('pointercancel', (e) => {
+    if (ptr && e.pointerId === ptr.id) dropPtr();
+  });
+
+  board.addEventListener('contextmenu', (e) => e.preventDefault());
+  scroller.addEventListener('contextmenu', (e) => e.preventDefault());
+  board.addEventListener('dragstart', (e) => e.preventDefault());
+
+  // No page scroll, rubber-banding or pull to refresh. Only the board pans,
+  // and only when it is bigger than the frame.
+  document.addEventListener('touchmove', (e) => {
+    if (scroller.classList.contains('pan') && scroller.contains(e.target)) return;
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- keyboard ---------- */
+  const MOVES = {
+    ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0],
+    a: [0, -1], d: [0, 1], w: [-1, 0], s: [1, 0], A: [0, -1], D: [0, 1], W: [-1, 0], S: [1, 0],
+  };
+
+  function moveCursor(dr, dc) {
+    const old = cur;
+    if (curShown) {
+      const r = clamp(0, ((cur / W) | 0) + dr, H - 1);
+      const c = clamp(0, (cur % W) + dc, W - 1);
+      cur = r * W + c;
+    }
+    curShown = true;
+    paint(old);
+    paint(cur);
+    if (scroller.classList.contains('pan')) {
+      try { cells[cur].scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+    }
+  }
+
+  window.addEventListener('keydown', (e) => {
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT') {
+      if (e.key === 'Enter') { e.preventDefault(); startCustom(); }
+      else if (e.key === 'Escape') hideOverlay();
+      return;
+    }
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); hideOverlay(); }
+      return;
+    }
+    if (paused) { paused = false; syncTimer(); }
+    const mv = MOVES[e.key];
+    if (mv) { e.preventDefault(); moveCursor(mv[0], mv[1]); return; }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (tag === 'BUTTON' && e.key === 'Enter') return;
+      e.preventDefault();
+      if (!curShown) { moveCursor(0, 0); return; }
+      if (!e.repeat) primary(cur);
+      return;
+    }
+    if ((e.key === 'f' || e.key === 'F') && !e.repeat) {
+      if (!curShown) { moveCursor(0, 0); return; }
+      flagAction(cur);
+      return;
+    }
+    if ((e.key === 'n' || e.key === 'N') && !e.repeat) newGame();
+  });
+
+  V.onPause((p) => { paused = !!p; syncTimer(); dropPtr(); });
+
+  /* ---------- boot ---------- */
+  newGame();
+  app.classList.add('ready');
+  V.ready();
+})();
+</script>
+</body>
+</html>

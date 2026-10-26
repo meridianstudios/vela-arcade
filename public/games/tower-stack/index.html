@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Tower Stack</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --pad-top: calc(env(safe-area-inset-top, 0px) + clamp(14px, 4.5vh, 40px));
+    --pad-bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(22px, 7vh, 72px));
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-weight: 400;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  html.vela-embedded { --pad-top: clamp(12px, 3.5vh, 28px); --pad-bottom: clamp(18px, 5.5vh, 48px); }
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+  .ui {
+    position: fixed;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    pointer-events: none;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* Small uppercase labels */
+  .label {
+    font-family: var(--font);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .big {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(56px, 13vmin, 112px);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* HUD */
+  #hud { top: 0; padding-top: var(--pad-top); transition: opacity .2s var(--ease); }
+  body[data-state="start"] #hud, body[data-state="over"] #hud { opacity: 0; }
+  #score.pop { animation: pop .25s var(--ease); }
+  @keyframes pop { from { transform: translateY(-6px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+  #best { margin-top: 8px; }
+  #perfect, #miss { margin-top: 10px; color: var(--brand); opacity: 0; }
+  #miss { position: absolute; top: 100%; margin-top: -1.2em; color: var(--text); }
+  #perfect.on, #miss.on { animation: perfect .9s linear forwards; }
+  /* Lives: one square per remaining miss */
+  #lives { display: flex; gap: 6px; margin-top: 12px; }
+  #lives i { width: 10px; height: 10px; background: var(--brand); transition: background-color .3s var(--ease), box-shadow .3s var(--ease); }
+  #lives i.lost { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+  @keyframes perfect {
+    0% { opacity: 0; }
+    8% { opacity: 1; }
+    65% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Start and game over share one layout: label block top, action bottom. */
+  .screen {
+    top: 0;
+    bottom: 0;
+    justify-content: space-between;
+    padding-top: var(--pad-top);
+    padding-bottom: var(--pad-bottom);
+    opacity: 0;
+    transform: translateY(8px);
+    visibility: hidden;
+    transition: opacity .2s var(--ease), transform .3s var(--ease), visibility 0s linear .2s;
+  }
+  body[data-state="start"] #start,
+  body[data-state="over"] #over {
+    opacity: 1;
+    transform: none;
+    visibility: visible;
+    transition: opacity .25s var(--ease), transform .3s var(--ease);
+  }
+  #title {
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: clamp(48px, 11vmin, 96px);
+    line-height: 1;
+  }
+  #controls { font-size: 14px; color: var(--muted); }
+  #overScore { margin-top: 8px; }
+  #overBest { margin-top: 10px; }
+  #overBest.new { color: var(--brand); }
+  #again {
+    pointer-events: auto;
+    font-family: var(--font);
+    font-weight: 600;
+    font-size: 15px;
+    color: #fff;
+    background: var(--brand);
+    border: 0;
+    border-radius: 0;
+    min-width: 168px;
+    padding: 13px 28px;
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity .2s var(--ease), background-color .15s var(--ease), transform .15s var(--ease);
+  }
+  body.ready #again { opacity: 1; }
+  body.ready #again:hover { background: #f26532; }
+  body.ready #again:active { transform: scale(0.98); }
+  #again:focus { outline: none; }
+  #again:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+
+  /* Paused */
+  #paused {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+    padding: 9px 14px;
+    background: var(--bg);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    color: var(--text);
+    opacity: 0;
+    transition: opacity .15s var(--ease);
+  }
+  body.paused[data-state="play"] #paused { opacity: 1; }
+</style>
+</head>
+<body data-state="start">
+<canvas id="c" aria-label="Tower Stack game"></canvas>
+
+<div class="ui" id="hud" aria-live="polite">
+  <div id="score" class="big">0</div>
+  <div id="best" class="label">Best 0</div>
+  <div id="lives" aria-label="Lives"><i></i><i></i><i></i></div>
+  <div id="perfect" class="label">Perfect</div>
+  <div id="miss" class="label">Miss</div>
+</div>
+
+<div class="ui screen" id="start">
+  <div id="title">Tower Stack</div>
+  <div id="controls">Tap or press Space to drop</div>
+</div>
+
+<div class="ui screen" id="over">
+  <div>
+    <div class="label">Game over</div>
+    <div id="overScore" class="big">0</div>
+    <div id="overBest" class="label">Best 0</div>
+  </div>
+  <button id="again" type="button" tabindex="-1">Play again</button>
+</div>
+
+<div class="ui label" id="paused">Paused</div>
+
+<script src="../_shared/bridge.js" data-game="tower-stack"></script>
+<script>
+(function () {
+  'use strict';
+
+  // Bridge, with a stand-in so the file still runs if opened without the arcade.
+  const Vela = window.Vela || (function () {
+    let b = 0;
+    return {
+      embedded: false,
+      ready() {}, score() {},
+      gameOver(n) { const nb = n > b; if (nb) b = n; return nb; },
+      best() { return b; },
+      onPause() {},
+    };
+  })();
+
+  // ---------- Tuning (world units: base slab is 1 x 1) ----------
+  const BASE = 1;          // starting slab footprint
+  const LH = 0.2;          // layer height
+  const AMP = 1.25;        // how far the slab slides past centre each way
+  const TOL = 0.04;        // perfect tolerance
+  const GROW = 0.05;       // growth per perfect once the streak hits 3
+  const GRAVITY = 15;
+  const BEAT_MS = 700;     // pause before a restart is accepted
+  const RIPPLE_LIFE = 0.8;
+  const LIVES = 3;         // a block that misses the tower costs one
+  const ISO = Math.cos(Math.PI / 6);
+
+  function slideSpeed(score) {
+    return 1.5 * (1 + 0.0125 * Math.min(score, 80)); // 1.5 to 3.0 units per second
+  }
+
+  // ---------- Colour ----------
+  const LR = [0.35, 1, 0.65];
+  const LLEN = Math.hypot(LR[0], LR[1], LR[2]);
+  const LIGHT = [LR[0] / LLEN, LR[1] / LLEN, LR[2] / LLEN];
+  function shadeFor(nx, ny, nz) {
+    const d = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+    return 0.36 + 0.64 * d / LIGHT[1]; // top face = 1.0
+  }
+  const SH_TOP = shadeFor(0, 1, 0);
+  const SH_X = shadeFor(1, 0, 0); // right-front face
+  const SH_Z = shadeFor(0, 0, 1); // left-front face
+
+  // Orange family only: hue drifts 14..26 and lightness 53..63 on different
+  // periods, so neighbouring layers read apart without leaving orange.
+  // f = 0 is brand orange #ea5426 (hsl 14 82% 53%).
+  function palette(f) {
+    const hue = 20 - 6 * Math.cos(2 * Math.PI * f / 34);
+    const light = 58 - 5 * Math.cos(2 * Math.PI * f / 22);
+    return [hue, 82, light];
+  }
+  function hsl2rgb(h, s, l) {
+    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const k = (n + h / 30) % 12;
+      return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+    };
+    return [f(0), f(8), f(4)];
+  }
+  function rgbStr(c, m) {
+    return 'rgb(' + Math.min(255, Math.round(c[0] * m)) + ',' +
+      Math.min(255, Math.round(c[1] * m)) + ',' + Math.min(255, Math.round(c[2] * m)) + ')';
+  }
+  function faceSet(base) {
+    return { base, t: rgbStr(base, SH_TOP), x: rgbStr(base, SH_X), z: rgbStr(base, SH_Z) };
+  }
+  const PLINTH = faceSet([46, 49, 58]); // neutral graphite base the tower stands on
+  const colCache = [];
+  function colorsFor(i) {
+    if (i <= 0) return PLINTH;
+    let c = colCache[i];
+    if (!c) {
+      const p = palette(i - 1); // first placed layer is exactly brand orange
+      c = colCache[i] = faceSet(hsl2rgb(p[0], p[1], p[2]));
+    }
+    return c;
+  }
+
+  // Background: one flat black tone that steps between #000 and #0b0c0f every
+  // BG_BAND layers (eased, but always a single flat fill).
+  const BG_BAND = 15;
+  const BG_TONES = [[0, 0, 0], [6, 6, 8], [11, 12, 15], [6, 6, 8]];
+  function bgTarget(layerF) {
+    const band = Math.max(0, Math.floor(layerF / BG_BAND + 1e-6));
+    return BG_TONES[band % BG_TONES.length];
+  }
+  const bg = [0, 0, 0];
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const body = document.body;
+  const canvas = $('c');
+  const ctx = canvas.getContext('2d');
+  const elScore = $('score'), elBest = $('best'), elPerfect = $('perfect'), elMiss = $('miss');
+  const lifeEls = Array.from(document.querySelectorAll('#lives i'));
+  const elOverScore = $('overScore'), elOverBest = $('overBest');
+
+  let W = 0, H = 0, dpr = 1, S = 100; // S = pixels per world unit at zoom 1
+  function resize() {
+    W = Math.max(1, window.innerWidth);
+    H = Math.max(1, window.innerHeight);
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    S = Math.min(W / 4.6, H / 4.6);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- State ----------
+  let state = 'start';
+  let paused = false;
+  let stack = [];
+  let cur = null;          // the sliding slab
+  let pieces = [];         // falling offcuts
+  let ripples = [];
+  let score = 0;
+  let streak = 0;
+  let lives = LIVES;
+  let best = Vela.best();
+  let overAt = 0;
+  let readyTimer = 0;
+  let lastT = 0;
+  const cam = { y: 0, zoom: 1, anchor: 0 };
+
+  function makeLayer(x, z, w, d, yb, h, ci) {
+    return { x, z, w, d, yb, h, ci, rw: w, rd: d, flash: 0 };
+  }
+  function topLayer() { return stack[stack.length - 1]; }
+  function topY() { const t = topLayer(); return t.yb + t.h; }
+
+  function resetTower() {
+    stack = [makeLayer(0, 0, BASE, BASE, -80, 80, 0)]; // tall plinth
+    cur = null;
+    pieces = [];
+    ripples = [];
+    score = 0;
+    streak = 0;
+    lives = LIVES;
+  }
+
+  function spawnSlab() {
+    const t = topLayer();
+    const axis = score % 2 === 0 ? 'x' : 'z';
+    const centre = axis === 'x' ? t.x : t.z;
+    cur = {
+      axis, centre,
+      pos: centre - AMP, dir: 1,
+      x: t.x, z: t.z, w: t.w, d: t.d,
+      yb: topY(), h: LH,
+      ci: stack.length,
+      alpha: 0,
+    };
+  }
+
+  function setHud() {
+    elScore.textContent = String(score);
+    elBest.textContent = 'Best ' + Math.max(best, score);
+    lifeEls.forEach((el, i) => el.classList.toggle('lost', i >= lives));
+  }
+  function flash(el) {
+    el.classList.remove('on');
+    void el.offsetWidth;
+    el.classList.add('on');
+  }
+  function popScore() {
+    elScore.classList.remove('pop');
+    void elScore.offsetWidth;
+    elScore.classList.add('pop');
+  }
+  function showPerfect() {
+    elPerfect.classList.remove('on');
+    void elPerfect.offsetWidth;
+    elPerfect.classList.add('on');
+  }
+
+  function startGame() {
+    resetTower();
+    spawnSlab();
+    state = 'play';
+    body.dataset.state = 'play';
+    body.classList.remove('ready');
+    clearTimeout(readyTimer);
+    elPerfect.classList.remove('on');
+    elMiss.classList.remove('on');
+    setHud();
+    Vela.score(0);
+  }
+
+  function endGame() {
+    state = 'over';
+    overAt = performance.now();
+    cur = null;
+    streak = 0;
+    const isBest = Vela.gameOver(score);
+    best = Math.max(Vela.best(), score);
+    elOverScore.textContent = String(score);
+    if (isBest) {
+      elOverBest.textContent = 'New best';
+      elOverBest.classList.add('new');
+    } else {
+      elOverBest.textContent = 'Best ' + best;
+      elOverBest.classList.remove('new');
+    }
+    body.dataset.state = 'over';
+    body.classList.remove('ready');
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(() => { if (state === 'over') body.classList.add('ready'); }, BEAT_MS);
+  }
+
+  function addPiece(axis, lo, hi, side) {
+    // axis: slide axis. lo..hi: the offcut's span along that axis.
+    const c = cur;
+    const size = hi - lo, mid = (lo + hi) / 2;
+    const spin = (2.0 + Math.random() * 1.2) * side;
+    pieces.push({
+      x: axis === 'x' ? mid : c.x,
+      z: axis === 'z' ? mid : c.z,
+      y: c.yb + c.h / 2,
+      w: axis === 'x' ? size : c.w,
+      d: axis === 'z' ? size : c.d,
+      h: c.h,
+      vx: axis === 'x' ? side * 0.7 : 0,
+      vz: axis === 'z' ? side * 0.7 : 0,
+      vy: 0.4,
+      rax: axis === 'x' ? 'z' : 'x',
+      // Spin so the outer edge tips downward (see rotate()).
+      av: axis === 'x' ? -spin : spin,
+      ang: 0,
+      side,
+      ci: c.ci,
+      age: 0,
+    });
+  }
+
+  function drop() {
+    const c = cur, t = topLayer();
+    const ax = c.axis;
+    const tc = ax === 'x' ? t.x : t.z;
+    const tsize = ax === 'x' ? t.w : t.d;
+    const size = ax === 'x' ? c.w : c.d;
+    const p = c.pos;
+    const delta = p - tc;
+
+    let nx = c.x, nz = c.z, nw = c.w, nd = c.d;
+    let perfect = false;
+
+    if (Math.abs(delta) <= TOL) {
+      perfect = true;
+      if (ax === 'x') nx = t.x; else nz = t.z;
+    } else {
+      const cLo = p - size / 2, cHi = p + size / 2;
+      const tLo = tc - tsize / 2, tHi = tc + tsize / 2;
+      const lo = Math.max(cLo, tLo), hi = Math.min(cHi, tHi);
+      const overlap = hi - lo;
+      if (overlap <= 0) {
+        // Total miss: the whole slab falls and costs a life. The tower is
+        // untouched, so the next block comes back at the same size.
+        if (ax === 'x') c.x = p; else c.z = p;
+        addPiece(ax, cLo, cHi, delta > 0 ? 1 : -1);
+        lives--;
+        streak = 0;
+        setHud();
+        if (lives <= 0) { endGame(); return; }
+        elPerfect.classList.remove('on');
+        flash(elMiss);
+        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) {} }
+        spawnSlab();
+        return;
+      }
+      if (cHi > hi + 1e-9) addPiece(ax, hi, cHi, 1);   // overhang on the near side
+      if (cLo < lo - 1e-9) addPiece(ax, cLo, lo, -1);  // overhang on the far side
+      if (ax === 'x') { nx = (lo + hi) / 2; nw = overlap; } else { nz = (lo + hi) / 2; nd = overlap; }
+    }
+
+    const layer = makeLayer(nx, nz, nw, nd, c.yb, c.h, c.ci);
+
+    if (perfect) {
+      streak++;
+      layer.flash = 1;
+      if (streak >= 3) {
+        layer.w = Math.min(BASE, nw + GROW);
+        layer.d = Math.min(BASE, nd + GROW);
+      }
+      ripples.push({ x: nx, z: nz, w: layer.w, d: layer.d, y: c.yb + c.h, t: 0, ci: c.ci });
+      if (streak >= 3) ripples.push({ x: nx, z: nz, w: layer.w, d: layer.d, y: c.yb + c.h, t: -0.14, ci: c.ci });
+      showPerfect();
+      if (navigator.vibrate) { try { navigator.vibrate(10); } catch (_) {} }
+    } else {
+      streak = 0;
+    }
+
+    stack.push(layer);
+    score = stack.length - 1;
+    setHud();
+    popScore();
+    Vela.score(score);
+    spawnSlab();
+  }
+
+  // ---------- Input ----------
+  function action() {
+    if (paused) return;
+    if (state === 'start') startGame();
+    else if (state === 'play') { if (cur) drop(); }
+    else if (state === 'over') {
+      if (performance.now() - overAt >= BEAT_MS) startGame();
+    }
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    try { window.focus(); } catch (_) {}
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+    action();
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (e.repeat) return;
+      action();
+    }
+  });
+
+  // No scrolling, pinching, double-tap zoom or long-press menus on the play area.
+  const stop = (e) => { if (e.cancelable) e.preventDefault(); };
+  document.addEventListener('touchstart', stop, { passive: false });
+  document.addEventListener('touchmove', stop, { passive: false });
+  document.addEventListener('dblclick', stop);
+  document.addEventListener('contextmenu', stop);
+  document.addEventListener('gesturestart', stop);
+
+  Vela.onPause((p) => {
+    paused = !!p;
+    body.classList.toggle('paused', paused);
+    lastT = 0;
+  });
+
+  // ---------- Update ----------
+  function ease(curV, target, rate, dt) {
+    return curV + (target - curV) * (1 - Math.exp(-rate * dt));
+  }
+
+  function update(dt) {
+    // Camera
+    let ty, tz, ta, rate;
+    if (state === 'over') {
+      const top = topY();
+      const need = (top + 1.3) * S;
+      tz = Math.min(1, (H * 0.36) / need);
+      ty = top / 2;
+      ta = H * 0.53;
+      rate = 2.4;
+    } else {
+      ty = state === 'play' ? topY() : 0;
+      tz = 1;
+      ta = H * 0.5 + 0.3 * S;
+      rate = state === 'play' && cam.zoom < 0.98 ? 3.2 : 5;
+    }
+    cam.y = ease(cam.y, ty, rate, dt);
+    cam.zoom = ease(cam.zoom, tz, rate, dt);
+    cam.anchor = ease(cam.anchor, ta, rate, dt);
+
+    // Background tone: flat every frame, settling onto the band's tone.
+    const bt = bgTarget(cam.y / LH);
+    for (let i = 0; i < 3; i++) bg[i] = ease(bg[i], bt[i], 3, dt);
+
+    // Sliding slab: ping-pong between centre - AMP and centre + AMP
+    if (state === 'play' && cur) {
+      cur.alpha = Math.min(1, cur.alpha + dt * 7);
+      const v = slideSpeed(score);
+      cur.pos += cur.dir * v * dt;
+      const hi = cur.centre + AMP, lo = cur.centre - AMP;
+      if (cur.pos > hi) { cur.pos = hi - (cur.pos - hi); cur.dir = -1; }
+      else if (cur.pos < lo) { cur.pos = lo + (lo - cur.pos); cur.dir = 1; }
+      if (cur.axis === 'x') cur.x = cur.pos; else cur.z = cur.pos;
+    }
+
+    // Falling offcuts
+    for (let i = pieces.length - 1; i >= 0; i--) {
+      const p = pieces[i];
+      p.vy -= GRAVITY * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.z += p.vz * dt;
+      p.ang += p.av * dt;
+      p.age += dt;
+      const screenY = cam.anchor + ((p.x + p.z) * 0.5 - (p.y - cam.y)) * S * cam.zoom;
+      if (p.age > 8 || screenY > H + 400 * Math.max(1, S / 100)) pieces.splice(i, 1);
+    }
+
+    // Ripples
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      ripples[i].t += dt;
+      if (ripples[i].t > RIPPLE_LIFE) ripples.splice(i, 1);
+    }
+
+    // Recent layers: perfect flash and growth easing
+    for (let i = Math.max(1, stack.length - 4); i < stack.length; i++) {
+      const l = stack[i];
+      if (l.flash > 0) l.flash = Math.max(0, l.flash - dt * 2.4);
+      l.rw = ease(l.rw, l.w, 10, dt);
+      l.rd = ease(l.rd, l.d, 10, dt);
+    }
+  }
+
+  // ---------- Render ----------
+  let K = 1, CX = 0, AY = 0, CY = 0; // per-frame projection params
+
+  function sx(x, z) { return CX + (x - z) * ISO * K; }
+  function sy(x, y, z) { return AY + ((x + z) * 0.5 - (y - CY)) * K; }
+
+  function poly(pts, fill) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = fill; // closes hairline seams between faces
+    ctx.stroke();
+  }
+
+  // Axis-aligned slab. Only the three faces that face the viewer are visible
+  // (top, +x on the right, +z on the left) and they never overlap each other.
+  function drawSlab(x, z, w, d, yb, h, col, flash) {
+    const x0 = x - w / 2, x1 = x + w / 2, z0 = z - d / 2, z1 = z + d / 2, yt = yb + h;
+    const ax00 = sx(x0, z0), ay00 = sy(x0, yt, z0);
+    const ax10 = sx(x1, z0), ay10 = sy(x1, yt, z0);
+    const ax11 = sx(x1, z1), ay11 = sy(x1, yt, z1);
+    const ax01 = sx(x0, z1), ay01 = sy(x0, yt, z1);
+    const dh = h * K;
+    ctx.lineWidth = 0.75;
+    // left-front (+z)
+    poly([ax01, ay01 + dh, ax11, ay11 + dh, ax11, ay11, ax01, ay01], col.z);
+    // right-front (+x)
+    poly([ax10, ay10 + dh, ax11, ay11 + dh, ax11, ay11, ax10, ay10], col.x);
+    // top
+    poly([ax00, ay00, ax10, ay10, ax11, ay11, ax01, ay01], col.t);
+    if (flash > 0) {
+      ctx.beginPath();
+      ctx.moveTo(ax00, ay00); ctx.lineTo(ax10, ay10); ctx.lineTo(ax11, ay11); ctx.lineTo(ax01, ay01);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.4 * flash).toFixed(3) + ')';
+      ctx.fill();
+    }
+    // soft highlight on the front top edges
+    ctx.beginPath();
+    ctx.moveTo(ax10, ay10); ctx.lineTo(ax11, ay11); ctx.lineTo(ax01, ay01);
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Falling offcut: a rotated box drawn with back-face culling (convex, so no sorting needed).
+  const FACES = [
+    [1, 3, 7, 5, 1, 0, 0], [0, 4, 6, 2, -1, 0, 0],
+    [2, 3, 7, 6, 0, 1, 0], [0, 1, 5, 4, 0, -1, 0],
+    [4, 5, 7, 6, 0, 0, 1], [0, 2, 3, 1, 0, 0, -1],
+  ];
+  const cornerX = new Float64Array(8), cornerY = new Float64Array(8);
+  function rotate(p, lx, ly, lz, out) {
+    const c = Math.cos(p.ang), s = Math.sin(p.ang);
+    if (p.rax === 'z') { out[0] = lx * c - ly * s; out[1] = lx * s + ly * c; out[2] = lz; }
+    else { out[0] = lx; out[1] = ly * c - lz * s; out[2] = ly * s + lz * c; }
+    return out;
+  }
+  const tmp = [0, 0, 0];
+  function drawPiece(p) {
+    const base = colorsFor(p.ci).base;
+    for (let i = 0; i < 8; i++) {
+      rotate(p, (i & 1 ? 0.5 : -0.5) * p.w, (i & 2 ? 0.5 : -0.5) * p.h, (i & 4 ? 0.5 : -0.5) * p.d, tmp);
+      const wx = p.x + tmp[0], wy = p.y + tmp[1], wz = p.z + tmp[2];
+      cornerX[i] = sx(wx, wz);
+      cornerY[i] = sy(wx, wy, wz);
+    }
+    ctx.lineWidth = 0.75;
+    for (const f of FACES) {
+      rotate(p, f[4], f[5], f[6], tmp);
+      if (tmp[0] + tmp[1] + tmp[2] <= 1e-4) continue; // faces away from the viewer
+      // Same colour as its slab: shade stays within the slab's own face range.
+      const sh = Math.min(SH_TOP, Math.max(SH_X, shadeFor(tmp[0], tmp[1], tmp[2])));
+      const col = rgbStr(base, sh);
+      poly([cornerX[f[0]], cornerY[f[0]], cornerX[f[1]], cornerY[f[1]],
+        cornerX[f[2]], cornerY[f[2]], cornerX[f[3]], cornerY[f[3]]], col);
+    }
+  }
+
+  function drawRipple(r) {
+    if (r.t < 0) return;
+    const p = r.t / RIPPLE_LIFE;
+    const e = 0.02 + 0.34 * (1 - Math.pow(1 - p, 3));
+    const a = Math.pow(1 - p, 1.6) * 0.9;
+    const x0 = r.x - r.w / 2 - e, x1 = r.x + r.w / 2 + e;
+    const z0 = r.z - r.d / 2 - e, z1 = r.z + r.d / 2 + e;
+    ctx.beginPath();
+    ctx.moveTo(sx(x0, z0), sy(x0, r.y, z0));
+    ctx.lineTo(sx(x1, z0), sy(x1, r.y, z0));
+    ctx.lineTo(sx(x1, z1), sy(x1, r.y, z1));
+    ctx.lineTo(sx(x0, z1), sy(x0, r.y, z1));
+    ctx.closePath();
+    const b = colorsFor(r.ci).base;
+    const m = (v) => Math.round(v + (255 - v) * 0.6);
+    ctx.strokeStyle = 'rgba(' + m(b[0]) + ',' + m(b[1]) + ',' + m(b[2]) + ',' + a.toFixed(3) + ')';
+    ctx.lineWidth = 1; // crisp 1px outline
+    ctx.lineJoin = 'miter';
+    ctx.stroke();
+    ctx.lineJoin = 'round';
+  }
+
+  function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineJoin = 'round';
+
+    // Flat background, no gradient.
+    ctx.fillStyle = 'rgb(' + Math.round(bg[0]) + ',' + Math.round(bg[1]) + ',' + Math.round(bg[2]) + ')';
+    ctx.fillRect(0, 0, W, H);
+
+    K = S * cam.zoom;
+    CX = W / 2;
+    AY = cam.anchor;
+    CY = cam.y;
+
+    // Offcuts on the far side sit behind the tower.
+    for (const p of pieces) if (p.side < 0) drawPiece(p);
+
+    // Tower, bottom to top (each layer sits fully above the one before it).
+    for (let i = 0; i < stack.length; i++) {
+      const l = stack[i];
+      if (i > 0) {
+        const topSy = sy(l.x, l.yb + l.h, l.z);
+        if (topSy - K * 1.2 > H) continue; // below the screen
+      }
+      drawSlab(l.x, l.z, l.rw, l.rd, l.yb, l.h, colorsFor(l.ci), l.flash);
+    }
+
+    // Offcuts on the near side pass in front of it.
+    for (const p of pieces) if (p.side > 0) drawPiece(p);
+
+    for (const r of ripples) drawRipple(r);
+
+    // The sliding slab is always above the top surface, so it draws last.
+    if (cur) {
+      ctx.globalAlpha = cur.alpha;
+      drawSlab(cur.x, cur.z, cur.w, cur.d, cur.yb, cur.h, colorsFor(cur.ci), 0);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---------- Loop ----------
+  function frame(t) {
+    requestAnimationFrame(frame);
+    let dt = lastT ? (t - lastT) / 1000 : 0;
+    lastT = t;
+    if (dt > 0.1) dt = 0.1;
+    if (!paused) {
+      while (dt > 1e-6) {
+        const step = Math.min(dt, 1 / 120);
+        update(step);
+        dt -= step;
+      }
+    }
+    render();
+  }
+
+  resetTower();
+  cam.anchor = H * 0.5 + 0.3 * S;
+  setHud();
+  requestAnimationFrame(frame);
+  Vela.ready();
+})();
+</script>
+</body>
+</html>
