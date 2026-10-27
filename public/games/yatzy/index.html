@@ -1,0 +1,1346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Yatzy</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.35);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --d: 60px;      /* die size */
+    --dg: 10px;     /* die gap */
+    --rollH: 46px;
+    --rh: 30px;     /* scorecard row height */
+    --cf: 13px;     /* scorecard font size */
+    --cw: 44px;     /* score column width */
+    --gap: 12px;
+    --W: 340px;
+    --tray: 300px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    display: grid;
+    width: var(--W);
+    grid-template-columns: 100%;
+    grid-template-areas: "head" "tray" "card";
+    row-gap: var(--gap);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.wide {
+    width: auto;
+    grid-template-columns: var(--tray) auto;
+    grid-template-areas: "head head" "tray card";
+    column-gap: calc(var(--gap) * 2.4);
+    align-items: center;
+  }
+  .head { grid-area: head; display: flex; align-items: center; gap: 0.75em; min-width: 0; }
+  .tray { grid-area: tray; position: relative; }
+  .sheet { grid-area: card; min-width: 0; }
+
+  .brand { flex: 1; min-width: 0; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  html.vela-embedded .brand h1 { display: none; }
+
+  .info { display: flex; align-items: center; gap: 1.4em; }
+  .stat { display: flex; align-items: baseline; gap: 0.55em; white-space: nowrap; }
+  .lab {
+    font: 600 11px/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat .v { font: 400 1.05em/1 var(--font); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 0.45em; }
+  .stat .v small { color: var(--faint); font-size: 0.85em; }
+  .stat[hidden] { display: none; }
+  .chip { display: inline-block; flex: none; width: 0.62em; height: 0.62em; border-radius: 1px; background: var(--brand); }
+  .chip.c2 { background: #fff; }
+  .chip.think { animation: blink 900ms steps(2, jump-none) infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+
+  .icon-btn {
+    width: 2.6em; height: 2.6em;
+    display: grid; place-items: center;
+    flex: none;
+    padding: 0;
+    border: 1px solid var(--outline);
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+    transition: background 180ms var(--ease);
+  }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.08); }
+  .icon-btn svg { width: 1.2em; height: 1.2em; }
+  .icon-btn:focus-visible, .btn:focus-visible, .die:focus-visible, .sc:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+
+  /* ---------- dice ---------- */
+  .dice {
+    display: flex;
+    justify-content: center;
+    gap: var(--dg);
+    padding-top: calc(var(--d) * 0.14);
+  }
+  .die {
+    position: relative;
+    width: var(--d); height: var(--d);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 200ms var(--ease);
+  }
+  .die.held { transform: translateY(calc(var(--d) * -0.12)); }
+  .die:disabled { cursor: default; }
+  .face {
+    position: absolute; inset: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 9%;
+    padding: 15%;
+    background: #fff;
+    border-radius: 2px;
+    transition: background 160ms var(--ease);
+  }
+  .face i { display: block; background: var(--bg); border-radius: 1px; visibility: hidden; }
+  .face i.on { visibility: visible; }
+  .die.held .face { background: var(--brand); }
+  .die.held .face i { background: #fff; }
+  .die.blank .face { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); }
+  .die.blank .face i { visibility: hidden; }
+  .die:not(:disabled):not(.blank):hover .face { box-shadow: inset 0 0 0 2px var(--brand-hover); }
+  .die.held:not(:disabled):hover .face { box-shadow: none; background: var(--brand-hover); }
+
+  .roll {
+    display: flex; align-items: center; justify-content: center; gap: 1em;
+    width: 100%;
+    height: var(--rollH);
+    margin-top: var(--gap);
+    padding: 0 1em;
+    border: 1px solid var(--brand);
+    border-radius: 0;
+    background: var(--brand);
+    color: #fff;
+    font: 600 13px/1 var(--font);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), opacity 160ms var(--ease), transform 120ms var(--ease);
+  }
+  .roll:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .roll:active { background: var(--brand-dark); border-color: var(--brand-dark); transform: scale(0.98); }
+  .roll:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .roll .left { display: inline-flex; gap: 4px; }
+  .roll .left i { width: 8px; height: 8px; display: block; border: 1px solid #fff; }
+  .roll .left i.on { background: #fff; }
+  .roll:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+
+  .toast {
+    position: absolute;
+    left: 50%; top: calc(var(--d) * 0.5);
+    z-index: 5;
+    padding: 0.7em 1.1em;
+    background: #fff;
+    color: #000;
+    font: 600 13px/1 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translate(-50%, -6px);
+    opacity: 0;
+    transition: opacity 160ms var(--ease), transform 220ms var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .bit { position: absolute; left: 0; top: 0; width: 7px; height: 7px; pointer-events: none; z-index: 4; }
+
+  /* ---------- scorecard ---------- */
+  .halves { display: grid; grid-template-columns: 1fr 1fr; column-gap: calc(var(--gap) * 0.8); }
+  .half {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(var(--n), var(--cw));
+    grid-auto-rows: var(--rh);
+    font-size: var(--cf);
+    min-width: 0;
+  }
+  .app.wide .half { grid-template-columns: calc(var(--cf) * 7.6) repeat(var(--n), var(--cw)); }
+  .half > div, .half > button {
+    display: flex; align-items: center;
+    min-width: 0;
+    border-top: 1px solid var(--line);
+  }
+  .half .hd { border-top: 0; }
+  .hd.lab { font-size: max(10px, calc(var(--cf) * 0.78)); }
+  .hd.p { justify-content: center; gap: 0.4em; }
+  .hd.p .chip { width: 0.5em; height: 0.5em; }
+  .hd.p.on { color: var(--text); }
+  .lbl {
+    gap: 0.5em;
+    color: var(--muted);
+    white-space: nowrap; overflow: hidden;
+    padding-right: 0.3em;
+  }
+  .lbl .t { overflow: hidden; text-overflow: ellipsis; }
+  .lbl.sub { color: var(--faint); }
+  .lbl.sub small { font-size: 0.85em; }
+  .mini {
+    flex: none;
+    width: 1.15em; height: 1.15em;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 0.09em; padding: 0.17em;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 1px;
+  }
+  .mini i { background: var(--bg); visibility: hidden; }
+  .mini i.on { visibility: visible; }
+  .sc {
+    justify-content: center;
+    padding: 0;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 1em/1 var(--font);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    cursor: default;
+  }
+  .sc.act { background: rgba(255, 255, 255, 0.035); }
+  .sc.prev { color: var(--brand-hover); font-weight: 400; cursor: pointer; transition: background 140ms var(--ease); }
+  .sc.prev.zero { color: var(--faint); }
+  .sc.prev:hover, .sc.prev.kb { background: rgba(234, 84, 38, 0.18); }
+  .sc.prev.kb { box-shadow: inset 0 0 0 1px var(--brand-hover); }
+  .sc.pick { background: var(--brand); color: #fff; }
+  .sc.last { box-shadow: inset 0 -2px 0 #fff; }
+  .sc.soft { color: var(--faint); font-weight: 400; }
+  .sc.sub { color: var(--muted); }
+
+  .totals {
+    display: flex;
+    margin-top: calc(var(--gap) * 0.8);
+    border: 1px solid var(--line);
+  }
+  .tot { flex: 1 1 0; min-width: 0; padding: 0.45em 0.8em 0.5em; position: relative; }
+  .tot + .tot { border-left: 1px solid var(--line); }
+  .tot .lab { display: flex; align-items: center; gap: 0.5em; }
+  .tot .lab .chip { width: 0.6em; height: 0.6em; }
+  .tot .num {
+    display: block;
+    font: 300 calc(var(--rh) * 0.95)/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+  .tot.on::before { content: ""; position: absolute; left: -1px; right: -1px; top: -1px; height: 2px; background: var(--brand); }
+  .tot.on.c2::before { background: #fff; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.82);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+    touch-action: none;
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 24em);
+    max-height: 100%;
+    overflow: auto;
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .tag[hidden] { display: none; }
+  .group { margin-top: 1.1em; }
+  .group .lab { display: block; margin-bottom: 0.45em; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--outline); }
+  .seg button {
+    height: 2.9em;
+    min-width: 0;
+    padding: 0 0.3em;
+    border: 0; border-radius: 0;
+    background: transparent;
+    font: 600 12px var(--font);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 150ms var(--ease);
+  }
+  .seg button + button { box-shadow: -1px 0 0 var(--line); }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; box-shadow: none; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -3px; }
+  .ov-stats { display: grid; grid-template-columns: 1fr 1fr; margin-top: 1.1em; border: 1px solid var(--line); }
+  .ov-stats > div { padding: 0.7em 0.85em 0.75em; min-width: 0; }
+  .ov-stats > div:nth-child(even) { border-left: 1px solid var(--line); }
+  .ov-stats > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .ov-stats .lab { display: block; }
+  .ov-stats .n { display: block; margin-top: 0.1em; font: 300 2em/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .btns .btn { flex: 1 1 8em; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 3.3em;
+    padding: 0 1.1em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 12px var(--font);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn[hidden] { display: none; }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .die, .face, .card, .overlay, .toast { transition: none; }
+    .chip.think { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Yatzy</h1></div>
+    <div class="info">
+      <div class="stat"><span class="lab">Round</span><span class="v"><span id="round">1</span><small>/ 13</small></span></div>
+      <div class="stat" id="turnStat" hidden><span class="lab">Turn</span><span class="v"><i class="chip" id="turnChip"></i><span id="turnName">You</span></span></div>
+    </div>
+    <button class="icon-btn" id="menuBtn" type="button" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+  </header>
+  <section class="tray" id="tray">
+    <div class="dice" id="dice"></div>
+    <button class="roll" id="rollBtn" type="button">Roll<span class="left" id="rollsLeft"><i></i><i></i><i></i></span></button>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+  <section class="sheet" id="sheet">
+    <div class="halves" id="halves"></div>
+    <div class="totals" id="totals"></div>
+  </section>
+</div>
+
+<div class="overlay" id="menu" hidden>
+  <div class="card" role="dialog" aria-labelledby="menuTitle">
+    <h2 id="menuTitle">Yatzy</h2>
+    <p class="line">Tap dice to hold, roll up to three times, then tap a box to score.</p>
+    <div class="group">
+      <span class="lab">Mode</span>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-v="solo">Solo</button>
+        <button type="button" data-v="cpu">Vs computer</button>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Play</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>Resume</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="endOv" hidden>
+  <div class="card" role="dialog" aria-live="polite">
+    <div class="card-top"><h2 id="endTitle">Game over</h2><span class="tag" id="endTag" hidden>New best</span></div>
+    <div class="ov-stats" id="endStats"></div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="endMenuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="yatzy"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const CATS = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'three', 'four', 'full', 'small', 'large', 'yatzy', 'chance'];
+  const UPPER = CATS.slice(0, 6);
+  const LOWER = CATS.slice(6);
+  const BONUS_AT = 63, BONUS = 35, YATZY_BONUS = 100;
+
+  function countsOf(dice) {
+    const c = [0, 0, 0, 0, 0, 0, 0];
+    for (const d of dice) c[d]++;
+    return c;
+  }
+  function sumOf(dice) { let s = 0; for (const d of dice) s += d; return s; }
+  function hasRun(c, n) {
+    let run = 0;
+    for (let f = 1; f <= 6; f++) { run = c[f] ? run + 1 : 0; if (run >= n) return true; }
+    return false;
+  }
+  function isYatzy(dice) { return dice.length === 5 && dice.every((d) => d === dice[0]); }
+
+  // Points a roll scores in a box under the plain rules.
+  function rawScore(cat, dice) {
+    const c = countsOf(dice);
+    const ui = UPPER.indexOf(cat);
+    if (ui >= 0) return c[ui + 1] * (ui + 1);
+    const max = Math.max.apply(null, c);
+    switch (cat) {
+      case 'three': return max >= 3 ? sumOf(dice) : 0;
+      case 'four': return max >= 4 ? sumOf(dice) : 0;
+      case 'full': {
+        const nz = c.filter((x) => x > 0).sort();
+        return nz.length === 2 && nz[0] === 2 && nz[1] === 3 ? 25 : 0;
+      }
+      case 'small': return hasRun(c, 4) ? 30 : 0;
+      case 'large': return hasRun(c, 5) ? 40 : 0;
+      case 'yatzy': return max === 5 ? 50 : 0;
+      case 'chance': return sumOf(dice);
+    }
+    return 0;
+  }
+
+  // A Yatzy used as a joker scores the full fixed value in the lower boxes.
+  function jokerScore(cat, dice) {
+    if (cat === 'full') return 25;
+    if (cat === 'small') return 30;
+    if (cat === 'large') return 40;
+    return sumOf(dice);
+  }
+
+  function newCard() {
+    const s = {};
+    CATS.forEach((k) => { s[k] = null; });
+    return { s, yb: 0 };
+  }
+
+  // Which boxes this roll may go in and what each scores.
+  // Extra Yatzy (the Yatzy box already filled): 100 bonus if that box holds 50,
+  // and the joker rule: the matching upper box if open, else any open lower
+  // box at full value, else any open upper box for 0.
+  function options(card, dice) {
+    const moves = {};
+    if (isYatzy(dice) && card.s.yatzy !== null) {
+      const bonus = card.s.yatzy === 50 ? YATZY_BONUS : 0;
+      const up = UPPER[dice[0] - 1];
+      if (card.s[up] === null) moves[up] = rawScore(up, dice);
+      else {
+        const openLower = LOWER.filter((k) => card.s[k] === null);
+        if (openLower.length) openLower.forEach((k) => { moves[k] = jokerScore(k, dice); });
+        else UPPER.forEach((k) => { if (card.s[k] === null) moves[k] = 0; });
+      }
+      return { moves, bonus, joker: true };
+    }
+    CATS.forEach((k) => { if (card.s[k] === null) moves[k] = rawScore(k, dice); });
+    return { moves, bonus: 0, joker: false };
+  }
+
+  function upperSum(card) { let s = 0; UPPER.forEach((k) => { s += card.s[k] || 0; }); return s; }
+  function upperBonus(card) { return upperSum(card) >= BONUS_AT ? BONUS : 0; }
+  function upperDone(card) { return UPPER.every((k) => card.s[k] !== null); }
+  function lowerSum(card) { let s = 0; LOWER.forEach((k) => { s += card.s[k] || 0; }); return s; }
+  function total(card) { return upperSum(card) + upperBonus(card) + lowerSum(card) + card.yb * YATZY_BONUS; }
+  function filled(card) { return CATS.filter((k) => card.s[k] !== null).length; }
+
+  function applyScore(card, dice, cat) {
+    const o = options(card, dice);
+    if (!(cat in o.moves)) return false;
+    card.s[cat] = o.moves[cat];
+    if (o.bonus) card.yb++;
+    return true;
+  }
+
+  // ---- computer player ----
+  // Average points a strong player takes in each box. Using a box now gives
+  // up that much later, so a box is worth (points now - its average).
+  const EXP = { ones: 1.9, twos: 5.3, threes: 8.6, fours: 12.2, fives: 15.7, sixes: 19.2,
+    three: 21.7, four: 13.1, full: 22.6, small: 29.5, large: 32.7, yatzy: 16.9, chance: 22.0 };
+
+  // Rough chance of making the upper bonus after scoring `pts` in `cat`.
+  function bonusChance(card, cat, pts) {
+    const sum = upperSum(card) + (UPPER.indexOf(cat) >= 0 ? pts : 0);
+    if (sum >= BONUS_AT) return 1;
+    let maxLeft = 0, par = 0, open = 0;
+    UPPER.forEach((k, i) => { if (card.s[k] === null && k !== cat) { maxLeft += 5 * (i + 1); par += 3 * (i + 1); open++; } });
+    if (!open || sum + maxLeft < BONUS_AT) return 0;
+    const deficit = BONUS_AT - sum - par;
+    return 1 / (1 + Math.exp((deficit - 2) / 4));
+  }
+
+  function moveValue(card, cat, pts, bonus) {
+    return pts + bonus - EXP[cat] + BONUS * bonusChance(card, cat, pts);
+  }
+
+  function bestMove(card, dice) {
+    const o = options(card, dice);
+    let best = null, bv = -Infinity;
+    for (const k in o.moves) {
+      const v = moveValue(card, k, o.moves[k], o.bonus);
+      if (v > bv) { bv = v; best = k; }
+    }
+    return { cat: best, value: bv };
+  }
+
+  // Dice multisets are keyed by their face counts in base 6.
+  const POW = [0, 1, 6, 36, 216, 1296, 7776];
+  const KEYS = 46656;
+  function keyOf(c) { let k = 0; for (let f = 1; f <= 6; f++) k += c[f] * POW[f]; return k; }
+  function countsOfKey(k) { const c = [0, 0, 0, 0, 0, 0, 0]; for (let f = 1; f <= 6; f++) { c[f] = k % 6; k = (k - c[f]) / 6; } return c; }
+  function diceOfKey(k) { const c = countsOfKey(k), d = []; for (let f = 1; f <= 6; f++) for (let i = 0; i < c[f]; i++) d.push(f); return d; }
+
+  // OUT[n]: every result of rolling n dice, as [key, probability].
+  const OUT = (function () {
+    const fact = [1, 1, 2, 6, 24, 120];
+    const out = [];
+    for (let n = 0; n <= 5; n++) {
+      const list = [];
+      const c = [0, 0, 0, 0, 0, 0, 0];
+      (function rec(f, left) {
+        if (f === 6) {
+          c[6] = left;
+          let ways = fact[n];
+          for (let g = 1; g <= 6; g++) ways /= fact[c[g]];
+          list.push([keyOf(c), ways / Math.pow(6, n)]);
+          return;
+        }
+        for (let x = 0; x <= left; x++) { c[f] = x; rec(f + 1, left - x); }
+      })(1, n);
+      out.push(list);
+    }
+    return out;
+  })();
+  const FINALS = OUT[5].map((x) => x[0]);
+
+  function subKeys(k) {
+    const c = countsOfKey(k), out = [];
+    (function rec(f, acc) {
+      if (f > 6) { out.push(acc); return; }
+      for (let x = 0; x <= c[f]; x++) rec(f + 1, acc + x * POW[f]);
+    })(1, 0);
+    return out;
+  }
+  function sizeOfKey(k) { const c = countsOfKey(k); let n = 0; for (let f = 1; f <= 6; f++) n += c[f]; return n; }
+
+  // Choose which dice to keep, looking ahead over every possible reroll.
+  // Returns the dice values to keep; keeping all five means stop and score.
+  function bestKeep(card, dice, rollsLeft) {
+    const v0 = new Float64Array(KEYS);
+    for (const k of FINALS) v0[k] = bestMove(card, diceOfKey(k)).value;
+    const memo = [null, new Float64Array(KEYS).fill(NaN), new Float64Array(KEYS).fill(NaN)];
+    const vAt = [v0, null, null];
+    function E(level, keep) {
+      const m = memo[level];
+      if (!Number.isNaN(m[keep])) return m[keep];
+      const n = 5 - sizeOfKey(keep);
+      let e = 0;
+      for (const [o, p] of OUT[n]) e += p * V(level - 1, keep + o);
+      m[keep] = e;
+      return e;
+    }
+    function V(level, roll) {
+      if (level === 0) return v0[roll];
+      if (!vAt[level]) vAt[level] = new Float64Array(KEYS).fill(NaN);
+      const a = vAt[level];
+      if (!Number.isNaN(a[roll])) return a[roll];
+      let best = -Infinity;
+      for (const s of subKeys(roll)) { const e = E(level, s); if (e > best) best = e; }
+      a[roll] = best;
+      return best;
+    }
+    const rollKey = keyOf(countsOf(dice));
+    let best = rollKey, bv = v0[rollKey] + 1e-9; // ties go to stopping
+    for (const s of subKeys(rollKey)) {
+      if (s === rollKey) continue;
+      const e = E(rollsLeft, s);
+      if (e > bv + 1e-9) { bv = e; best = s; }
+    }
+    return diceOfKey(best);
+  }
+
+  // Hold flags for the dice that make up `keep`.
+  function holdFor(dice, keep) {
+    const need = countsOf(keep);
+    return dice.map((d) => { if (need[d] > 0) { need[d]--; return true; } return false; });
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- constants ---------- */
+  const LABELS = {
+    ones: 'Ones', twos: 'Twos', threes: 'Threes', fours: 'Fours', fives: 'Fives', sixes: 'Sixes',
+    three: '3 of a kind', four: '4 of a kind', full: 'Full house', small: 'Small straight',
+    large: 'Large straight', yatzy: 'Yatzy', chance: 'Chance',
+  };
+  const SHORT = { small: 'Sm straight', large: 'Lg straight' };
+  const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const NAMES = { solo: ['You'], cpu: ['You', 'Computer'] };
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:yatzy:';
+  function get(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(KEY + key)); return v == null ? fallback : v; } catch (_) { return fallback; }
+  }
+  function put(key, v) { try { localStorage.setItem(KEY + key, JSON.stringify(v)); } catch (_) {} }
+
+  const rec = (function () {
+    const r = get('record', {});
+    const ok = (x) => (Number.isFinite(x) && x >= 0 ? Math.floor(x) : 0);
+    return { played: ok(r.played), wins: ok(r.wins) };
+  })();
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), tray = $('tray'), diceEl = $('dice'), rollBtn = $('rollBtn');
+  const halvesEl = $('halves'), totalsEl = $('totals'), toastEl = $('toast');
+  const menu = $('menu'), endOv = $('endOv'), modeSeg = $('modeSeg');
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- state ---------- */
+  let mode = get('mode', 'solo') === 'cpu' ? 'cpu' : 'solo';
+  let game = null;
+  let rolling = false;
+  let paused = false;
+  let menuOpen = false, endOpen = false;
+  let kbCat = null;
+  let pick = null;        // { p, cat } box the computer is about to score
+  let resumeWaiters = [];
+  let started = false;    // a game is under way and can be resumed
+
+  function freshGame(m) {
+    return {
+      mode: m,
+      cards: m === 'cpu' ? [newCard(), newCard()] : [newCard()],
+      cur: 0,
+      dice: [1, 1, 1, 1, 1],
+      held: [false, false, false, false, false],
+      rolls: 0,
+      done: false,
+      last: null,
+    };
+  }
+
+  function validCard(c) {
+    if (!c || typeof c !== 'object' || !c.s || !Number.isInteger(c.yb) || c.yb < 0 || c.yb > 12) return false;
+    return CATS.every((k) => c.s[k] === null || (Number.isInteger(c.s[k]) && c.s[k] >= 0 && c.s[k] <= 50));
+  }
+  function loadGame() {
+    const g = get('game', null);
+    if (!g || (g.mode !== 'solo' && g.mode !== 'cpu')) return null;
+    const n = g.mode === 'cpu' ? 2 : 1;
+    if (!Array.isArray(g.cards) || g.cards.length !== n || !g.cards.every(validCard)) return null;
+    if (!Array.isArray(g.dice) || g.dice.length !== 5 || !g.dice.every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return null;
+    if (!Array.isArray(g.held) || g.held.length !== 5) return null;
+    if (!Number.isInteger(g.rolls) || g.rolls < 0 || g.rolls > 3) return null;
+    if (g.cur !== 0 && g.cur !== n - 1) return null;
+    if (g.cards.every((c) => filled(c) === 13)) return null;
+    const out = freshGame(g.mode);
+    out.cards = g.cards.map((c) => ({ s: Object.assign({}, c.s), yb: c.yb }));
+    out.cur = g.cur;
+    if (g.cur === 0) {
+      out.dice = g.dice.slice();
+      out.rolls = g.rolls;
+      out.held = g.rolls ? g.held.map((h) => !!h) : [false, false, false, false, false];
+    }
+    out.last = g.last && CATS.indexOf(g.last.cat) >= 0 && (g.last.p === 0 || g.last.p === 1) ? g.last : null;
+    return out;
+  }
+  function saveGame() {
+    if (!game || game.done) { put('game', null); return; }
+    put('game', { mode: game.mode, cards: game.cards, cur: game.cur, dice: game.dice, held: game.held, rolls: game.rolls, last: game.last });
+  }
+
+  /* ---------- build ---------- */
+  const dieEls = [];
+  function makeFace(cls) {
+    const f = document.createElement('span');
+    f.className = cls;
+    for (let i = 0; i < 9; i++) f.appendChild(document.createElement('i'));
+    return f;
+  }
+  function setFace(face, v) {
+    const on = PIPS[v] || [];
+    for (let i = 0; i < 9; i++) face.children[i].classList.toggle('on', on.indexOf(i) >= 0);
+  }
+  for (let i = 0; i < 5; i++) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'die blank';
+    b.dataset.i = i;
+    const face = makeFace('face');
+    b.appendChild(face);
+    diceEl.appendChild(b);
+    dieEls.push({ el: b, face });
+  }
+
+  let cells = {};   // cells[p][cat] -> element, plus 'sum', 'bonus', 'yb'
+  let totEls = [];
+  function buildSheet() {
+    const g = game;
+    const n = g.cards.length;
+    app.style.setProperty('--n', n);
+    halvesEl.textContent = '';
+    totalsEl.textContent = '';
+    cells = g.cards.map(() => ({}));
+    const halves = [
+      { name: 'Upper', rows: UPPER.concat(['sum', 'bonus']) },
+      { name: 'Lower', rows: LOWER.concat(['yb']) },
+    ];
+    halves.forEach((h) => {
+      const el = document.createElement('div');
+      el.className = 'half';
+      const hd = document.createElement('div');
+      hd.className = 'hd lab';
+      hd.textContent = h.name;
+      el.appendChild(hd);
+      for (let p = 0; p < n; p++) {
+        const c = document.createElement('div');
+        c.className = 'hd lab p';
+        c.dataset.p = p;
+        c.innerHTML = n > 1 ? '<i class="chip' + (p ? ' c2' : '') + '"></i>' + (p ? 'CPU' : 'You') : 'Score';
+        el.appendChild(c);
+      }
+      h.rows.forEach((r) => {
+        const l = document.createElement('div');
+        l.className = 'lbl';
+        const ui = UPPER.indexOf(r);
+        if (ui >= 0) { const m = makeFace('mini'); setFace(m, ui + 1); l.appendChild(m); }
+        const t = document.createElement('span');
+        t.className = 't';
+        if (r === 'sum') { l.classList.add('sub'); t.innerHTML = 'Sum <small>/ 63</small>'; }
+        else if (r === 'bonus') { l.classList.add('sub'); t.textContent = 'Bonus'; }
+        else if (r === 'yb') { l.classList.add('sub'); t.textContent = 'Yatzy bonus'; }
+        else { t.textContent = LABELS[r]; t.dataset.full = LABELS[r]; if (SHORT[r]) t.dataset.short = SHORT[r]; }
+        l.appendChild(t);
+        el.appendChild(l);
+        for (let p = 0; p < n; p++) {
+          const isBox = CATS.indexOf(r) >= 0;
+          const c = document.createElement(isBox ? 'button' : 'div');
+          c.className = 'sc' + (isBox ? '' : ' sub');
+          if (isBox) { c.type = 'button'; c.tabIndex = -1; c.dataset.cat = r; c.dataset.p = p; }
+          el.appendChild(c);
+          cells[p][r] = c;
+        }
+      });
+      halvesEl.appendChild(el);
+    });
+    totEls = [];
+    const names = NAMES[g.mode];
+    for (let p = 0; p < n; p++) {
+      const t = document.createElement('div');
+      t.className = 'tot' + (p ? ' c2' : '');
+      t.innerHTML = '<span class="lab">' + (n > 1 ? '<i class="chip' + (p ? ' c2' : '') + '"></i>' + names[p] : 'Total') + '</span><span class="num">0</span>';
+      totalsEl.appendChild(t);
+      totEls.push({ el: t, num: t.querySelector('.num') });
+    }
+    if (n === 1) {
+      const t = document.createElement('div');
+      t.className = 'tot';
+      t.innerHTML = '<span class="lab">Best</span><span class="num" id="bestNum">0</span>';
+      totalsEl.appendChild(t);
+    }
+  }
+
+  /* ---------- rendering ---------- */
+  function humanTurn() { return game && !game.done && game.cur === 0; }
+  function canAct() { return humanTurn() && !rolling && !paused && !menuOpen && !endOpen; }
+  function currentOptions() { return game.rolls > 0 && !rolling ? options(game.cards[game.cur], game.dice) : null; }
+
+  function setText(el, t) { t = String(t); if (el.textContent !== t) el.textContent = t; }
+
+  function render() {
+    const g = game;
+    if (!g) return;
+    const n = g.cards.length;
+    const opts = currentOptions();
+    const showPrev = humanTurn() && opts;
+    if (kbCat && !(showPrev && kbCat in opts.moves)) kbCat = null;
+
+    // dice
+    dieEls.forEach((d, i) => {
+      const blank = g.rolls === 0;
+      d.el.classList.toggle('blank', blank);
+      d.el.classList.toggle('held', !blank && g.held[i]);
+      d.el.disabled = !humanTurn() || blank;
+      d.el.setAttribute('aria-label', blank ? 'Die ' + (i + 1) : 'Die ' + (i + 1) + ', ' + g.dice[i] + (g.held[i] ? ', held' : ''));
+      if (!d.rolling) setFace(d.face, blank ? 0 : g.dice[i]);
+    });
+    rollBtn.disabled = !humanTurn() || g.rolls >= 3 || rolling;
+    const pips = $('rollsLeft').children;
+    for (let i = 0; i < 3; i++) pips[i].classList.toggle('on', i < 3 - g.rolls);
+
+    // sheet
+    for (let p = 0; p < n; p++) {
+      const card = g.cards[p];
+      const mine = p === g.cur && !g.done;
+      CATS.forEach((k) => {
+        const c = cells[p][k];
+        const v = card.s[k];
+        let cls = 'sc', txt = '';
+        if (mine) cls += ' act';
+        if (v !== null) {
+          txt = v;
+          if (g.last && g.last.p === p && g.last.cat === k && n > 1 && p !== 0) cls += ' last';
+        } else if (mine && showPrev && k in opts.moves) {
+          txt = opts.moves[k];
+          cls += ' prev' + (opts.moves[k] === 0 ? ' zero' : '') + (kbCat === k ? ' kb' : '');
+        }
+        if (pick && pick.p === p && pick.cat === k) { cls += ' pick'; txt = options(card, g.dice).moves[k]; }
+        if (c.className !== cls) c.className = cls;
+        setText(c, txt);
+        c.setAttribute('aria-label', LABELS[k] + ', ' + (v !== null ? v : txt !== '' ? txt + ' possible' : 'open'));
+      });
+      const us = upperSum(card);
+      const anyUp = UPPER.some((k) => card.s[k] !== null);
+      setText(cells[p].sum, anyUp ? us : '');
+      cells[p].sum.className = 'sc sub' + (mine ? ' act' : '');
+      const b = upperBonus(card);
+      setText(cells[p].bonus, b ? b : upperDone(card) ? 0 : '');
+      cells[p].bonus.className = 'sc' + (b ? '' : ' sub') + (mine ? ' act' : '');
+      let ybTxt = card.yb ? card.yb * YATZY_BONUS : '';
+      let ybCls = 'sc' + (mine ? ' act' : '');
+      if (mine && showPrev && opts.bonus) { ybTxt = '+' + YATZY_BONUS; ybCls += ' soft'; }
+      setText(cells[p].yb, ybTxt);
+      cells[p].yb.className = ybCls;
+      setText(totEls[p].num, total(card));
+      totEls[p].el.classList.toggle('on', n > 1 && mine);
+    }
+    halvesEl.querySelectorAll('.hd.p').forEach((h) => h.classList.toggle('on', Number(h.dataset.p) === g.cur && !g.done));
+    const bestNum = $('bestNum');
+    if (bestNum) setText(bestNum, V.best());
+
+    // head
+    setText($('round'), Math.min(13, filled(g.cards[n - 1]) + 1));
+    $('turnStat').hidden = n === 1;
+    if (n > 1) {
+      setText($('turnName'), g.cur === 0 ? 'You' : 'Computer');
+      $('turnChip').className = 'chip' + (g.cur ? ' c2' : '') + (g.cur && !g.done ? ' think' : '');
+    }
+  }
+
+  /* ---------- juice ---------- */
+  let toastTimer = 0;
+  function toast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms || 1200);
+  }
+  function animate(el, frames, opts) {
+    if (reduceMotion || !el.animate) return null;
+    try { return el.animate(frames, opts); } catch (_) { return null; }
+  }
+  function pop(el, s) {
+    animate(el, [{ transform: 'scale(1)' }, { transform: 'scale(' + (s || 1.12) + ')' }, { transform: 'scale(1)' }],
+      { duration: 180, easing: 'cubic-bezier(0.3, 0.7, 0.4, 1)' });
+  }
+  function burst() {
+    if (reduceMotion) return;
+    const tr = tray.getBoundingClientRect();
+    const dr = diceEl.getBoundingClientRect();
+    const cx = dr.left - tr.left + dr.width / 2, cy = dr.top - tr.top + dr.height / 2;
+    for (let i = 0; i < 26; i++) {
+      const b = document.createElement('i');
+      b.className = 'bit';
+      b.style.background = i % 3 === 0 ? '#fff' : i % 3 === 1 ? '#ea5426' : '#ff7a4d';
+      tray.appendChild(b);
+      const a = Math.random() * Math.PI * 2;
+      const r = dr.width * (0.25 + Math.random() * 0.4);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r * 0.7 - dr.height * 0.3;
+      const an = animate(b, [
+        { transform: 'translate(' + cx + 'px,' + cy + 'px) scale(1)', opacity: 1 },
+        { transform: 'translate(' + (cx + x) + 'px,' + (cy + y) + 'px) rotate(' + (Math.random() * 360) + 'deg) scale(0.6)', opacity: 1, offset: 0.7 },
+        { transform: 'translate(' + (cx + x * 1.1) + 'px,' + (cy + y + dr.height * 0.4) + 'px) scale(0.2)', opacity: 0 },
+      ], { duration: 650 + Math.random() * 250, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' });
+      setTimeout(() => b.remove(), 1000);
+      if (!an) b.remove();
+    }
+  }
+
+  /* ---------- timing ---------- */
+  function blocked() { return paused || menuOpen || endOpen; }
+  function wait(ms) {
+    return new Promise((res) => setTimeout(res, reduceMotion ? Math.min(ms, 250) : ms)).then(() => {
+      if (!blocked()) return null;
+      return new Promise((res) => resumeWaiters.push(res));
+    });
+  }
+  function release() {
+    if (blocked()) return;
+    const w = resumeWaiters; resumeWaiters = [];
+    w.forEach((f) => f());
+  }
+
+  /* ---------- rolling ---------- */
+  function rollDice() {
+    const g = game;
+    const idx = [];
+    for (let i = 0; i < 5; i++) if (g.rolls === 0 || !g.held[i]) idx.push(i);
+    if (g.rolls === 0) g.held = [false, false, false, false, false];
+    idx.forEach((i) => { g.dice[i] = 1 + Math.floor(Math.random() * 6); });
+    g.rolls++;
+    rolling = true;
+    kbCat = null;
+    render();
+    saveGame();
+
+    const D = parseFloat(getComputedStyle(app).getPropertyValue('--d')) || 60;
+    const base = reduceMotion ? 0 : 380, step = reduceMotion ? 0 : 45;
+    const end = base + step * (idx.length - 1);
+    idx.forEach((i, j) => {
+      const d = dieEls[i];
+      const dur = base + step * j;
+      if (!dur) return;
+      d.rolling = true;
+      const dir = Math.random() < 0.5 ? -1 : 1;
+      animate(d.face, [
+        { transform: 'translateY(0) rotate(0deg) scale(1)' },
+        { transform: 'translateY(' + (-0.32 * D) + 'px) rotate(' + dir * 140 + 'deg) scale(0.9)', offset: 0.38 },
+        { transform: 'translateY(0) rotate(' + dir * 300 + 'deg) scale(1)', offset: 0.72 },
+        { transform: 'translateY(' + (-0.06 * D) + 'px) rotate(' + dir * 345 + 'deg)', offset: 0.86 },
+        { transform: 'translateY(0) rotate(' + dir * 360 + 'deg)' },
+      ], { duration: dur, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' });
+      let last = 0;
+      const flick = setInterval(() => {
+        let v = 1 + Math.floor(Math.random() * 5);
+        if (v >= last) v++;
+        last = v;
+        setFace(d.face, v);
+      }, 55);
+      setTimeout(() => {
+        clearInterval(flick);
+        d.rolling = false;
+        setFace(d.face, game === g ? g.dice[i] : 0);
+        pop(d.el, 1.08);
+      }, dur);
+    });
+    return new Promise((res) => setTimeout(() => {
+      if (game !== g) return res(false);
+      rolling = false;
+      render();
+      if (isYatzy(g.dice)) {
+        const card = g.cards[g.cur];
+        toast(card.s.yatzy === 50 ? 'Yatzy +100' : 'Yatzy', 1400);
+        burst();
+        dieEls.forEach((d, i) => setTimeout(() => pop(d.el, 1.18), i * 50));
+      }
+      res(true);
+    }, end + 20));
+  }
+
+  function toggleHold(i) {
+    if (!canAct() || game.rolls === 0 || game.rolls >= 3) return;
+    game.held[i] = !game.held[i];
+    render();
+    saveGame();
+  }
+
+  function roll() {
+    if (!canAct() || game.rolls >= 3) return;
+    rollDice();
+  }
+
+  /* ---------- scoring ---------- */
+  function scoreBox(p, cat) {
+    const g = game;
+    const card = g.cards[p];
+    const o = options(card, g.dice);
+    if (!(cat in o.moves)) return false;
+    applyScore(card, g.dice, cat);
+    g.last = { p, cat };
+    pick = null;
+    kbCat = null;
+    const c = cells[p][cat];
+    if (o.bonus) toast('Yatzy bonus +100', 1300);
+    nextTurn();
+    animate(c, [{ background: p ? '#ffffff' : '#ea5426', color: p ? '#000' : '#fff' }, { background: 'transparent' }],
+      { duration: 520, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)' });
+    pop(c, 1.1);
+    pop(totEls[p].num, 1.08);
+    if (g.mode === 'solo') V.score(total(card));
+    return true;
+  }
+
+  function humanScore(cat) {
+    if (!canAct() || game.rolls === 0) return;
+    scoreBox(0, cat);
+  }
+
+  function nextTurn() {
+    const g = game;
+    g.rolls = 0;
+    g.held = [false, false, false, false, false];
+    if (g.cards.every((c) => filled(c) === 13)) {
+      g.done = true;
+      saveGame();
+      render();
+      finish();
+      return;
+    }
+    g.cur = g.cards.length > 1 ? 1 - g.cur : 0;
+    saveGame();
+    render();
+    if (g.cur === 1) cpuTurn(g);
+  }
+
+  /* ---------- computer ---------- */
+  async function cpuTurn(g) {
+    await wait(480);
+    if (game !== g) return;
+    const card = g.cards[1];
+    for (let r = 0; r < 3; r++) {
+      if (r > 0) {
+        const keep = bestKeep(card, g.dice, 3 - r);
+        if (keep.length === 5) break;
+        const hold = holdFor(g.dice, keep);
+        for (let i = 0; i < 5; i++) {
+          if (hold[i] !== g.held[i]) {
+            g.held[i] = hold[i];
+            render();
+            await wait(140);
+            if (game !== g) return;
+          }
+        }
+        await wait(260);
+        if (game !== g) return;
+      }
+      await rollDice();
+      if (game !== g) return;
+      await wait(isYatzy(g.dice) ? 1100 : 420);
+      if (game !== g) return;
+    }
+    const m = bestMove(card, g.dice);
+    pick = { p: 1, cat: m.cat };
+    render();
+    await wait(560);
+    if (game !== g) return;
+    scoreBox(1, m.cat);
+  }
+
+  /* ---------- end ---------- */
+  function finish() {
+    const g = game;
+    const tots = g.cards.map(total);
+    const stats = $('endStats');
+    stats.textContent = '';
+    const add = (lab, v) => {
+      const d = document.createElement('div');
+      d.innerHTML = '<span class="lab"></span><span class="n"></span>';
+      d.children[0].textContent = lab;
+      d.children[1].textContent = v;
+      stats.appendChild(d);
+    };
+    let tag = false;
+    if (g.mode === 'solo') {
+      tag = V.gameOver(tots[0]);
+      $('endTitle').textContent = 'Game over';
+      add('Score', tots[0]);
+      add('Best', V.best());
+    } else {
+      rec.played++;
+      if (tots[0] > tots[1]) rec.wins++;
+      put('record', rec);
+      $('endTitle').textContent = tots[0] > tots[1] ? 'You win' : tots[0] < tots[1] ? 'You lose' : 'Draw';
+      add('You', tots[0]);
+      add('Computer', tots[1]);
+      add('Wins', rec.wins);
+      add('Played', rec.played);
+    }
+    $('endTag').hidden = !tag;
+    setTimeout(() => { if (game === g) openOverlay(endOv, $('againBtn')); }, reduceMotion ? 200 : 750);
+  }
+
+  /* ---------- overlays ---------- */
+  function openOverlay(ov, focusEl) {
+    if (ov === menu) menuOpen = true; else endOpen = true;
+    ov.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add('show')));
+    setTimeout(() => ov.classList.add('show'), 50);
+    if (focusEl) setTimeout(() => { try { focusEl.focus({ preventScroll: true }); } catch (_) {} }, 60);
+    render();
+  }
+  function closeOverlay(ov) {
+    if (ov === menu) menuOpen = false; else endOpen = false;
+    ov.classList.remove('show');
+    ov.hidden = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    render();
+    release();
+  }
+
+  let draftMode = mode;
+  function renderMenu() {
+    modeSeg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === draftMode));
+    $('resumeBtn').hidden = !(started && !game.done);
+  }
+  function showMenu() {
+    if (endOpen) closeOverlay(endOv);
+    draftMode = game ? game.mode : mode;
+    renderMenu();
+    openOverlay(menu, $('playBtn'));
+  }
+
+  function startGame(m) {
+    mode = m;
+    put('mode', mode);
+    resumeWaiters = [];
+    rolling = false;
+    pick = null;
+    kbCat = null;
+    dieEls.forEach((d) => { d.rolling = false; });
+    game = freshGame(m);
+    started = true;
+    buildSheet();
+    layout();
+    saveGame();
+    if (menuOpen) closeOverlay(menu);
+    if (endOpen) closeOverlay(endOv);
+    render();
+    if (m === 'solo') V.score(0);
+  }
+
+  modeSeg.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    draftMode = b.dataset.v;
+    renderMenu();
+  });
+  $('playBtn').addEventListener('click', () => startGame(draftMode));
+  $('resumeBtn').addEventListener('click', () => closeOverlay(menu));
+  $('againBtn').addEventListener('click', () => startGame(game.mode));
+  $('endMenuBtn').addEventListener('click', () => { closeOverlay(endOv); showMenu(); });
+  $('menuBtn').addEventListener('click', (e) => { e.currentTarget.blur(); showMenu(); });
+  menu.addEventListener('pointerdown', (e) => { if (e.target === menu && started && !game.done) closeOverlay(menu); });
+
+  /* ---------- input ---------- */
+  diceEl.addEventListener('click', (e) => {
+    const b = e.target.closest('.die');
+    if (b) toggleHold(Number(b.dataset.i));
+  });
+  rollBtn.addEventListener('click', () => { rollBtn.blur(); roll(); });
+  halvesEl.addEventListener('click', (e) => {
+    const c = e.target.closest('.sc.prev');
+    if (c && c.dataset.p === '0') humanScore(c.dataset.cat);
+  });
+
+  function moveKb(dir, side) {
+    const o = currentOptions();
+    if (!canAct() || !o) return;
+    const list = CATS.filter((k) => k in o.moves);
+    if (!list.length) return;
+    if (!kbCat) { kbCat = list[0]; render(); return; }
+    let i = list.indexOf(kbCat);
+    if (side) {
+      const wantUpper = UPPER.indexOf(kbCat) < 0;
+      const pool = list.filter((k) => (UPPER.indexOf(k) >= 0) === wantUpper);
+      if (pool.length) {
+        const row = CATS.indexOf(kbCat) % 6;
+        kbCat = pool.reduce((a, k) => (Math.abs(CATS.indexOf(k) % 6 - row) < Math.abs(CATS.indexOf(a) % 6 - row) ? k : a), pool[0]);
+      }
+    } else {
+      i = (i + dir + list.length) % list.length;
+      kbCat = list[i];
+    }
+    render();
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (menuOpen) {
+      if (e.key === 'Escape' && started && !game.done) { e.preventDefault(); closeOverlay(menu); }
+      return;
+    }
+    if (endOpen) {
+      if (e.key === 'Escape') { e.preventDefault(); closeOverlay(endOv); }
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); showMenu(); return; }
+    if (/^[1-5]$/.test(e.key)) { e.preventDefault(); toggleHold(Number(e.key) - 1); return; }
+    if (e.key === ' ' || e.key === 'r' || e.key === 'R') { e.preventDefault(); if (!e.repeat) roll(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveKb(1); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); moveKb(-1); return; }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); moveKb(0, true); return; }
+    if (e.key === 'Enter') {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+      e.preventDefault();
+      if (kbCat && !e.repeat) humanScore(kbCat);
+    }
+  });
+
+  document.addEventListener('touchmove', (e) => { if (!e.target.closest('.card')) e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+  V.onPause((p) => { paused = !!p; release(); });
+
+  /* ---------- layout ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(8, m * 0.03, 22);
+    const fs = clamp(12, m / 34, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    const n = game ? game.cards.length : 1;
+    const set = (k, v) => app.style.setProperty(k, v);
+    const gap = clamp(8, vh * 0.02, 16);
+    set('--gap', gap + 'px');
+    const ROWS = 9 + 2.2;           // nine card rows plus the totals block
+    const LBL = 7.6, COL = 3.3;     // label and score column widths in card ems
+
+    let wide = vw >= 600 && vw / vh >= 1.15;
+    app.classList.toggle('wide', wide);
+    const headH = head.offsetHeight;
+
+    if (wide) {
+      const H = vh - 2 * pad - headH - gap;
+      let rh = clamp(16, H / ROWS, 50);
+      let cf = clamp(10, rh * 0.44, 21);
+      const colGap = gap * 2.4;
+      let cardW = 2 * cf * (LBL + n * COL) + gap * 0.8;
+      let trayW = clamp(200, vw - 2 * pad - colGap - cardW, 440);
+      const room = vw - 2 * pad - colGap - trayW;
+      if (cardW > room) {
+        const s = room / cardW;
+        rh *= s; cf *= s; cardW = room;
+      }
+      set('--rh', rh + 'px');
+      set('--cf', cf + 'px');
+      set('--cw', cf * COL + 'px');
+      const dg = trayW * 0.035;
+      const d = Math.floor(Math.min((trayW - 4 * dg) / 5, H * 0.28));
+      set('--tray', trayW + 'px');
+      set('--d', d + 'px');
+      set('--dg', dg + 'px');
+      set('--rollH', clamp(40, d * 0.7, 54) + 'px');
+      set('--W', 'auto');
+    } else {
+      const W = Math.min(vw - 2 * pad, 520);
+      set('--W', W + 'px');
+      const dg = W * 0.035;
+      const rollH = clamp(40, vh * 0.068, 54);
+      let d = Math.floor(Math.min((W - 4 * dg) / 5, vh * 0.12, 92));
+      const fixed = 2 * pad + headH + d * 1.14 + gap + rollH + 2 * gap;
+      let rh = (vh - fixed) / ROWS;
+      if (rh < 18) {
+        // Short screen: shrink the dice before the card.
+        d = Math.floor(Math.max(36, d - (18 - rh) * ROWS / 1.14));
+        rh = (vh - (2 * pad + headH + d * 1.14 + gap + rollH + 2 * gap)) / ROWS;
+      }
+      rh = clamp(15, rh, 46);
+      const half = (W - gap * 0.8) / 2;
+      const cf = clamp(10, Math.min(rh * 0.46, half / (7.2 + n * COL)), 19);
+      set('--rh', rh + 'px');
+      set('--cf', cf + 'px');
+      set('--cw', cf * COL + 'px');
+      set('--d', d + 'px');
+      set('--dg', dg + 'px');
+      set('--rollH', rollH + 'px');
+    }
+    // Short labels when the label column is tight.
+    const lblW = wide ? parseFloat(app.style.getPropertyValue('--cf')) * LBL
+      : (Math.min(vw - 2 * pad, 520) - gap * 0.8) / 2 - n * parseFloat(app.style.getPropertyValue('--cw'));
+    const tight = lblW < parseFloat(app.style.getPropertyValue('--cf')) * 7.4;
+    halvesEl.querySelectorAll('.t[data-short]').forEach((t) => { t.textContent = tight ? t.dataset.short : t.dataset.full; });
+  }
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); setTimeout(layout, 60); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  const saved = loadGame();
+  game = saved || freshGame(mode);
+  started = !!saved;
+  buildSheet();
+  layout();
+  render();
+  app.classList.add('ready');
+  draftMode = game.mode;
+  renderMenu();
+  openOverlay(menu, saved ? $('resumeBtn') : $('playBtn'));
+  if (saved && saved.cur === 1) cpuTurn(saved);
+  V.ready();
+
+})();
+</script>
+</body>
+</html>

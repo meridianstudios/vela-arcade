@@ -1,7 +1,7 @@
 import './style.css'
 import { GAMES, TAGS, bySlug, playable } from './games.js'
 import { UPDATES, CURRENT_VERSION } from './updates.js'
-import { startHeartbeat, countOnline } from './online.js'
+import { startHeartbeat, countOnline, visitTotals } from './online.js'
 
 const app = document.getElementById('app')
 const searchInput = document.getElementById('search')
@@ -312,13 +312,19 @@ function renderOnline() {
         <strong id="online-num">&ndash;</strong>
         <span class="label">Players online now</span>
       </section>
+      <section class="online-totals">
+        <div><strong id="online-today">&ndash;</strong><span class="label">Players today</span></div>
+        <div><strong id="online-all">&ndash;</strong><span class="label">Players all time</span></div>
+      </section>
     </div>`
+  const show = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n == null ? '–' : fmt(n) }
   const refresh = async () => {
-    const el = document.getElementById('online-num')
-    if (!el) { clearInterval(onlineTimer); onlineTimer = null; return }
+    if (!document.getElementById('online-num')) { clearInterval(onlineTimer); onlineTimer = null; return }
     if (document.hidden) return
-    const n = await countOnline()
-    el.textContent = n == null ? '–' : fmt(n)
+    const [n, totals] = await Promise.all([countOnline(), visitTotals()])
+    show('online-num', n)
+    show('online-today', totals.today)
+    show('online-all', totals.allTime)
   }
   clearInterval(onlineTimer)
   // Give this tab's first heartbeat a moment to land so it counts itself.

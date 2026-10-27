@@ -252,10 +252,16 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 .log-changes li::before { content: ""; position: absolute; left: 0; top: 19px; width: 8px; height: 2px; background: var(--vela); }
 
 /* ── online ─────────────────────────────────────────────────── */
-.online { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 40px 0 72px; }
+.online { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 40px 0 48px; }
 .online strong {
   font-family: var(--font-display); font-weight: 300; font-size: 160px; line-height: 0.85; letter-spacing: -0.02em;
   color: var(--vela); font-variant-numeric: tabular-nums;
+}
+.online-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-bottom: 72px; max-width: 640px; }
+.online-totals div { display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--bg-2); }
+.online-totals strong {
+  font-family: var(--font-display); font-weight: 300; font-size: 56px; line-height: 0.9;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── footer ─────────────────────────────────────────────────── */
@@ -283,6 +289,9 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .toolbar h1 { font-size: 34px; padding-bottom: 12px; }
   .online { padding: 24px 0 48px; }
   .online strong { font-size: 112px; }
+  .online-totals { margin-bottom: 48px; }
+  .online-totals div { padding: 16px; }
+  .online-totals strong { font-size: 40px; }
   .tabs { overflow-x: auto; scrollbar-width: none; gap: 20px; margin: 0 -16px; padding: 0 16px; }
   .tab { flex-shrink: 0; }
   .shelf { padding-top: 24px; }

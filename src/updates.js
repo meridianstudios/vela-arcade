@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.1',
+    date: '2026-10-27',
+    games: ['yatzy', 'air-hockey', 'blackjack', 'word-search', 'block-puzzle', 'hearts'],
+    changes: [
+      'Online page shows players today and players all time.',
+    ],
+  },
+  {
     version: '1.0',
     date: '2026-10-26',
     games: [],
@@ -35,7 +43,7 @@ export const UPDATES = [
       'basketball-legends', 'football-legends', 'air-hockey-cup', 'cannon-basketball-4',
       '8-ball-pool', 'drift-boss', 'bike-mania', 'highway-racer-3d', 'parking-fury-3d',
       'parking-fury-3d-night-city', 'parking-fury-3d-beach-city', 'parking-fury-3d-bounty-hunter',
-      'stack-ball', 'asteroids', 'ballistic', 'spades', 'hearts', 'yatzy', 'dominoes',
+      'stack-ball', 'asteroids', 'ballistic', 'spades', 'gd-hearts', 'gd-yatzy', 'dominoes',
     ],
     changes: [
       'Racing filter.',

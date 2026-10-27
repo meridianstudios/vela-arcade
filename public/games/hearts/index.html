@@ -1,0 +1,1460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Hearts</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --pad: 12px;
+    --face: #1f2227;
+    --ink: #e9ebee;
+    --ink-red: #ff7a4d;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+
+  .head {
+    display: grid; gap: 0.5em; align-items: stretch;
+    padding: var(--pad) var(--pad) 0;
+  }
+  .app.wide .head {
+    grid-template-columns: 1fr auto auto auto;
+    grid-template-areas: "brand s1 s2 menu";
+  }
+  .app.narrow .head {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-areas: "brand brand brand" "s1 s2 menu";
+  }
+  html.vela-embedded .app.narrow .head { grid-template-areas: "s1 s2 menu"; }
+  html.vela-embedded .app.narrow .brand { display: none; }
+
+  .brand { grid-area: brand; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .app.narrow .brand { padding: 0.15em 0 0.25em; }
+  .s1 { grid-area: s1; }
+  .s2 { grid-area: s2; }
+  .b-menu { grid-area: menu; }
+
+  .stat {
+    min-width: 6.4em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transition: border-color 180ms var(--ease);
+  }
+  .app.narrow .stat { min-width: 0; padding-left: 0.7em; padding-right: 0.6em; }
+  .stat.lit { border-color: var(--brand); }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .num {
+    display: block;
+    font: 600 1.25em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+  }
+  .stat.lit .num { color: var(--brand-hover); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6em;
+    min-height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.76rem, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn[hidden] { display: none; }
+  .app.narrow .head .btn { padding: 0 0.9em; }
+
+  /* ---------- table ---------- */
+  .table {
+    position: relative;
+    flex: 1; min-height: 0;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .table.snap .hs, .table.snap .hs .cd, .table.snap .seat { transition: none; }
+
+  .seat {
+    position: absolute; left: 0; top: 0;
+    padding: 0.45em 0.6em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transition: border-color 180ms var(--ease);
+  }
+  .seat.turn { border-color: var(--brand); }
+  .seat.turn .lab { color: #fff; }
+  .seat .row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.4em; }
+  .seat .sc {
+    display: block;
+    font: 300 1.75em/1.1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+  .hp {
+    font: 600 12px/1.2 var(--font);
+    font-variant-numeric: tabular-nums;
+    color: var(--brand-hover);
+    letter-spacing: 0.04em;
+  }
+  .hp.pop { animation: pop 320ms var(--ease); }
+  @keyframes pop { 40% { transform: scale(1.5); } }
+  .backs { display: flex; height: 0.95em; margin-top: 0.35em; }
+  .backs i {
+    flex: none;
+    width: 0.66em; height: 0.95em;
+    margin-left: -0.44em;
+    background: var(--brand);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+    border-radius: 1px;
+  }
+  .backs i:first-child { margin-left: 0; }
+
+  .me-seat {
+    display: flex; align-items: baseline; gap: 0.7em;
+    padding: 0.4em 0.75em 0.45em;
+  }
+  .me-seat .sc { font-size: 1.45em; line-height: 1.05; }
+  .status {
+    position: absolute; left: 0; top: 0;
+    pointer-events: none;
+    font: 600 12px/16px var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    color: #fff;
+  }
+  .status span { display: inline-block; }
+  .status span.flash { animation: fadein 260ms var(--ease); }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
+  .btn.pass { position: absolute; left: 0; top: 0; min-height: 2.9em; padding: 0 1em; }
+
+  /* ---------- cards ---------- */
+  .cd {
+    position: absolute; left: 0; top: 0;
+    width: var(--cw); height: var(--ch);
+    font-size: var(--cw);
+    background: var(--face);
+    color: var(--ink);
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+  }
+  .cd.red { color: var(--ink-red); }
+  .cd .ix {
+    position: absolute; left: 0.055em; top: 0.06em;
+    width: 0.3em;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .cd .rk {
+    font: 600 0.3em/1 var(--font);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+  .cd .rk.ten { letter-spacing: -0.09em; margin-left: -0.08em; }
+  .cd svg { display: block; fill: currentColor; }
+  .cd .pip { width: 0.2em; height: 0.2em; margin-top: 0.035em; }
+  .cd .big { position: absolute; right: 0.09em; bottom: 0.09em; width: 0.48em; height: 0.48em; }
+  .cd.back { background: var(--brand); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4); }
+  .cd.back::after {
+    content: "";
+    position: absolute; inset: 14%;
+    box-shadow: inset 0 0 0 max(1px, 0.03em) rgba(0, 0, 0, 0.3);
+  }
+
+  /* hand */
+  .layer { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .hs {
+    position: absolute; left: 0; top: 0;
+    width: var(--cw); height: var(--ch);
+    transform-origin: 50% 100%;
+    transition: transform 260ms var(--ease);
+  }
+  .hs .cd { transition: transform 180ms var(--ease), box-shadow 150ms var(--ease); }
+  .hs.ok .cd { cursor: pointer; }
+  @media (hover: hover) {
+    .hs.ok:hover .cd { transform: translateY(calc(var(--ch) * -0.09)); }
+  }
+  .hs.sel .cd, .hs.sel:hover .cd { transform: translateY(calc(var(--ch) * -0.2)); box-shadow: inset 0 0 0 2px var(--brand); }
+  .hs.off .cd::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  .hs.new .cd::before {
+    content: "";
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: max(3px, 0.05em);
+    background: var(--brand);
+  }
+  .hs.cur .cd { outline: 2px solid var(--brand-hover); outline-offset: 1px; }
+
+  /* trick */
+  .tc {
+    position: absolute; left: 0; top: 0;
+    width: var(--cw); height: var(--ch);
+    transform-origin: 50% 50%;
+  }
+  .tc.win .cd { box-shadow: inset 0 0 0 2px var(--brand); }
+  .tc.win { animation: winpop 300ms var(--ease); }
+  @keyframes winpop { 50% { scale: 1.08; } }
+  .fly { position: absolute; left: 0; top: 0; transform-origin: 50% 50%; pointer-events: none; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card h2.c-white::before { background: #fff; }
+  .card h2.c-none::before { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); }
+  .card .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .card .tag[hidden] { display: none; }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .card .line[hidden] { display: none; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats[hidden] { display: none; }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div:nth-child(2n) { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+
+  .sum { margin-top: 1.1em; border: 1px solid var(--line); border-radius: 2px; }
+  .sum .r {
+    display: grid;
+    grid-template-columns: 1fr 4.2em 4.6em;
+    align-items: baseline;
+    padding: 0.6em 0.85em;
+  }
+  .sum .r + .r { border-top: 1px solid var(--line); }
+  .sum .r.hd { padding-top: 0.55em; padding-bottom: 0.45em; }
+  .sum .r.hd .lab:not(:first-child) { text-align: right; }
+  .sum .nm {
+    font: 600 12px/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .sum .nm::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--outline);
+    vertical-align: 0.02em;
+  }
+  .sum .r.lead .nm::before { background: var(--brand); box-shadow: none; }
+  .sum .d {
+    text-align: right;
+    font: 600 0.95em/1 var(--font);
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  .sum .d.pts { color: var(--brand-hover); }
+  .sum .t {
+    text-align: right;
+    font: 300 1.6em/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hs, .hs .cd, .seat, .stat, .overlay, .card { transition: none; }
+    .tc.win, .hp.pop, .status.flash { animation: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="su0" viewBox="0 0 100 100"><circle cx="50" cy="29" r="20"/><circle cx="27" cy="59" r="20"/><circle cx="73" cy="59" r="20"/><circle cx="50" cy="52" r="11"/><path d="M46 56C46 76 42 87 33 95H67C58 87 54 76 54 56Z"/></symbol>
+    <symbol id="su1" viewBox="0 0 100 100"><path d="M50 3 86 50 50 97 14 50Z"/></symbol>
+    <symbol id="su2" viewBox="0 0 100 100"><path d="M50 5C57 17 94 39 94 62 94 76 84 84 72 84 63 84 56 79 53 73 54 82 58 89 66 95H34C42 89 46 82 47 73 44 79 37 84 28 84 16 84 6 76 6 62 6 39 43 17 50 5Z"/></symbol>
+    <symbol id="su3" viewBox="0 0 100 100"><path d="M50 92C46 87 5 61 5 32 5 17 16 7 29 7 39 7 46 13 50 21 54 13 61 7 71 7 84 7 95 17 95 32 95 61 54 87 50 92Z"/></symbol>
+  </defs>
+</svg>
+
+<div class="app narrow" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Hearts</h1></div>
+    <div class="stat s1"><span class="lab">Hand</span><span class="num" id="handNum">1</span></div>
+    <div class="stat s2" id="heartsStat"><span class="lab">Hearts</span><span class="num" id="heartsNum">Unbroken</span></div>
+    <button class="btn b-menu" id="menuBtnTop" type="button">Menu</button>
+  </header>
+  <main class="table" id="table">
+    <div class="seat" id="seat2"><div class="row"><span class="lab">North</span><span class="hp" id="hp2"></span></div><span class="sc" id="sc2">0</span><div class="backs" id="bk2"></div></div>
+    <div class="seat" id="seat1"><div class="row"><span class="lab">West</span><span class="hp" id="hp1"></span></div><span class="sc" id="sc1">0</span><div class="backs" id="bk1"></div></div>
+    <div class="seat" id="seat3"><div class="row"><span class="lab">East</span><span class="hp" id="hp3"></span></div><span class="sc" id="sc3">0</span><div class="backs" id="bk3"></div></div>
+    <div class="layer" id="trick"></div>
+    <div class="seat me-seat" id="seat0"><span class="lab">You</span><span class="sc" id="sc0">0</span><span class="hp" id="hp0"></span></div>
+    <div class="status" id="status" aria-live="polite"></div>
+    <button class="btn primary pass" id="passBtn" type="button" hidden disabled>Pass</button>
+    <div class="layer" id="hand" role="group" aria-label="Your hand"></div>
+    <div class="layer" id="fly"></div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="menuCard" role="dialog" aria-labelledby="menuTitle" hidden>
+    <h2 id="menuTitle">Hearts</h2>
+    <p class="line">Tap a card to play it. Arrow keys and Enter also work.</p>
+    <div class="ov-stats">
+      <div><span class="lab">Games won</span><span class="num" id="menuWon">0</span></div>
+      <div><span class="lab">Played</span><span class="num" id="menuPlayed">0</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="continueBtn" type="button" hidden>Continue</button>
+      <button class="btn" id="newBtn" type="button">New game</button>
+    </div>
+  </div>
+  <div class="card" id="sumCard" role="dialog" aria-live="polite" hidden>
+    <div class="card-top"><h2 id="sumTitle">Hand 1</h2><span class="tag" id="sumTag" hidden>Moon</span></div>
+    <p class="line" id="sumLine" hidden></p>
+    <div class="sum" id="sumTable"></div>
+    <div class="ov-stats" id="sumStats" hidden>
+      <div><span class="lab">Games won</span><span class="num" id="sumWon">0</span></div>
+      <div><span class="lab">Played</span><span class="num" id="sumPlayed">0</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="nextBtn" type="button">Next hand</button>
+      <button class="btn primary" id="againBtn" type="button" hidden>Play again</button>
+      <button class="btn" id="menuBtn" type="button" hidden>Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="hearts"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, onPause() {} };
+
+  /* ===== LOGIC START ===== */
+  // Cards are 0..51: suit = c / 13 (0 clubs, 1 diamonds, 2 spades, 3 hearts),
+  // rank = c % 13 + 2 (2..14). Within a suit a higher number is a higher card.
+  // Players: 0 you (south), 1 west, 2 north, 3 east. Play goes 0, 1, 2, 3.
+  const CLUB = 0, SPADE = 2, HEART = 3;
+  const QS = 36, TWO_C = 0;
+  const LIMIT = 100;
+  const PASS_OFFSETS = [1, 3, 2, 0];
+  const PASS_NAMES = ['left', 'right', 'across', 'none'];
+  const suitOf = (c) => (c / 13) | 0;
+  const rankOf = (c) => c % 13 + 2;
+  const pointsOf = (c) => (c === QS ? 13 : suitOf(c) === HEART ? 1 : 0);
+
+  function shuffled(rnd) {
+    rnd = rnd || Math.random;
+    const d = [];
+    for (let i = 0; i < 52; i++) d.push(i);
+    for (let i = 51; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const t = d[i]; d[i] = d[j]; d[j] = t;
+    }
+    return d;
+  }
+  const sortHand = (h) => h.slice().sort((a, b) => a - b);
+
+  function legalMoves(hand, trick, heartsBroken, firstTrick) {
+    if (!trick.length) {
+      if (firstTrick && hand.includes(TWO_C)) return [TWO_C];
+      if (!heartsBroken) {
+        const non = hand.filter((c) => suitOf(c) !== HEART);
+        if (non.length) return non;
+      }
+      return hand.slice();
+    }
+    const led = suitOf(trick[0].c);
+    const follow = hand.filter((c) => suitOf(c) === led);
+    if (follow.length) return follow;
+    if (firstTrick) {
+      const safe = hand.filter((c) => pointsOf(c) === 0);
+      if (safe.length) return safe;
+    }
+    return hand.slice();
+  }
+
+  function winningEntry(trick) {
+    const led = suitOf(trick[0].c);
+    let best = trick[0];
+    for (const t of trick) if (suitOf(t.c) === led && t.c > best.c) best = t;
+    return best;
+  }
+  const trickWinner = (trick) => winningEntry(trick).p;
+  const trickPoints = (trick) => trick.reduce((a, t) => a + pointsOf(t.c), 0);
+
+  function scoreHand(taken) {
+    const moon = taken.indexOf(26);
+    if (moon >= 0) return { deltas: taken.map((_, p) => (p === moon ? 0 : 26)), moon };
+    return { deltas: taken.slice(), moon: -1 };
+  }
+
+  // Null while the game goes on; otherwise the players sharing the lowest score.
+  function gameWinners(scores) {
+    if (Math.max.apply(null, scores) < LIMIT) return null;
+    const lo = Math.min.apply(null, scores);
+    const w = [];
+    scores.forEach((s, p) => { if (s === lo) w.push(p); });
+    return w;
+  }
+
+  /* ---- computer players ---- */
+  function passValue(c, h) {
+    const s = suitOf(c), r = rankOf(c);
+    const hasQ = h.includes(QS);
+    const lowSpades = h.filter((x) => suitOf(x) === SPADE && rankOf(x) < 12).length;
+    if (s === SPADE) {
+      if (c === QS) return lowSpades >= 4 ? 4 : 100;
+      if (r > 12) return hasQ ? (lowSpades >= 4 ? 6 : 34) : (lowSpades >= 3 ? 18 : 86 + r);
+      return 0;
+    }
+    if (s === HEART) return r >= 11 ? 48 + r * 2 : r * 2;
+    const len = h.filter((x) => suitOf(x) === s).length;
+    let v = r * 3;
+    if (len <= 3) v += (4 - len) * 12;
+    if (c === TWO_C) v -= 12;
+    return v;
+  }
+  function choosePass(hand) {
+    const h = hand.slice();
+    const pick = [];
+    for (let k = 0; k < 3; k++) {
+      let best = h[0], bestV = -Infinity;
+      for (const c of h) {
+        const v = passValue(c, h);
+        if (v > bestV || (v === bestV && c > best)) { bestV = v; best = c; }
+      }
+      pick.push(best);
+      h.splice(h.indexOf(best), 1);
+    }
+    return pick;
+  }
+
+  function pickBy(arr, f, wantMax) {
+    let best = arr[0], bv = f(arr[0]);
+    for (let i = 1; i < arr.length; i++) {
+      const v = f(arr[i]);
+      if (wantMax ? v > bv : v < bv) { bv = v; best = arr[i]; }
+    }
+    return best;
+  }
+  const highest = (arr) => pickBy(arr, rankOf, true);
+  const lowest = (arr) => pickBy(arr, rankOf, false);
+
+  // Who looks like they are shooting the moon: one player holds every point so far.
+  function moonThreat(taken, played, trickNo) {
+    const holders = [0, 1, 2, 3].filter((p) => taken[p] > 0);
+    if (holders.length !== 1) return -1;
+    const h = holders[0];
+    const qsTaken = played[QS];
+    const hearts = taken[h] - (qsTaken ? 13 : 0);
+    if (hearts >= 5 || (qsTaken && hearts >= 2) || (trickNo >= 8 && taken[h] >= 4)) return h;
+    return -1;
+  }
+
+  // v: { me, hand, trick, heartsBroken, trickNo, played (completed tricks), taken, voids }
+  function chooseCard(v) {
+    const legal = legalMoves(v.hand, v.trick, v.heartsBroken, v.trickNo === 0);
+    if (legal.length === 1) return legal[0];
+    const me = v.me;
+    const seen = v.played.slice();
+    for (const c of v.hand) seen[c] = true;
+    for (const t of v.trick) seen[t.c] = true;
+    const higherOut = (c) => { let n = 0; for (let x = c + 1; x < (suitOf(c) + 1) * 13; x++) if (!seen[x]) n++; return n; };
+    const lowerOut = (c) => { let n = 0; for (let x = suitOf(c) * 13; x < c; x++) if (!seen[x]) n++; return n; };
+    const suitLen = (s) => v.hand.filter((c) => suitOf(c) === s).length;
+    const hasQS = v.hand.includes(QS);
+    const qsOut = !seen[QS];
+    const noQ = (arr) => { const f = arr.filter((c) => c !== QS); return f.length ? f : arr; };
+
+    const threat = moonThreat(v.taken, v.played, v.trickNo);
+    const sure = v.hand.filter((c) => higherOut(c) === 0).length;
+    const shooting = threat === me && sure >= v.hand.length - 1;
+    const blocking = threat >= 0 && threat !== me;
+    const strength = (c) => rankOf(c) - higherOut(c) * 3;
+
+    /* leading */
+    if (!v.trick.length) {
+      if (shooting) return pickBy(legal, strength, true);
+      if (blocking) {
+        const sureHeart = legal.filter((c) => suitOf(c) === HEART && higherOut(c) === 0);
+        if (sureHeart.length) return sureHeart[0];
+        return pickBy(noQ(legal), strength, true);
+      }
+      const leadRisk = (c) => {
+        const s = suitOf(c), r = rankOf(c), ho = higherOut(c), lo = lowerOut(c);
+        let risk = ho === 0 ? 60 + r : r - ho * 2 + lo * 1.5;
+        let voidOther = false;
+        for (let p = 0; p < 4; p++) if (p !== me && v.voids[p][s]) voidOther = true;
+        if (voidOther) risk += 25;
+        if (s === SPADE) {
+          if (c === QS) risk += 200;
+          else if (hasQS) risk += 15;
+          else if (qsOut) risk += r > 12 ? 80 : -12;
+        }
+        if (s === HEART) risk += r > 10 ? 30 : 4;
+        risk -= (4 - Math.min(4, suitLen(s))) * 2;
+        return risk;
+      };
+      return pickBy(legal, leadRisk, false);
+    }
+
+    const led = suitOf(v.trick[0].c);
+    const win = winningEntry(v.trick);
+    const pts = trickPoints(v.trick);
+    const last = v.trick.length === 3;
+
+    /* following suit */
+    if (suitOf(legal[0]) === led && legal.every((c) => suitOf(c) === led)) {
+      const under = legal.filter((c) => c < win.c);
+      const over = legal.filter((c) => c > win.c);
+      if (shooting) return over.length ? highest(over) : lowest(legal);
+      if (blocking) {
+        const threatToPlay = !v.trick.some((t) => t.p === threat);
+        if (win.p === threat || threatToPlay) {
+          if (over.length) return highest(noQ(over));
+          return lowest(noQ(legal));
+        }
+      }
+      if (led === SPADE && legal.includes(QS) && win.c > QS) return QS;
+      if (last) {
+        if (pts === 0) return highest(noQ(legal));
+        if (under.length) return highest(under);
+        return highest(noQ(legal));
+      }
+      if (under.length) return highest(under);
+      let seenSuit = 0;
+      for (let x = led * 13; x < led * 13 + 13; x++) if (v.played[x]) seenSuit++;
+      let voidAfter = false;
+      for (let k = v.trick.length + 1; k < 4; k++) {
+        const p = (v.trick[0].p + k) % 4;
+        if (v.voids[p][led]) voidAfter = true;
+      }
+      const spadeSafe = led !== SPADE || hasQS || !qsOut;
+      if (spadeSafe && seenSuit === 0 && !voidAfter && pts === 0) return highest(noQ(legal));
+      return lowest(noQ(over));
+    }
+
+    /* void in the led suit */
+    const sloughValue = (c) => {
+      if (c === QS) return 1000;
+      const s = suitOf(c), r = rankOf(c);
+      if (s === SPADE && r > 12) return qsOut && !hasQS ? 500 + r : 150 + r;
+      if (s === HEART) return 200 + r * 5;
+      return r * 3 + (higherOut(c) === 0 ? 25 : 0) + (suitLen(s) <= 2 ? 15 : 0);
+    };
+    if (shooting) {
+      const safe = legal.filter((c) => pointsOf(c) === 0);
+      return lowest(safe.length ? safe : legal);
+    }
+    if (blocking) {
+      const threatPlayed = v.trick.some((t) => t.p === threat);
+      if (threatPlayed && win.p !== threat) {
+        const load = legal.filter((c) => pointsOf(c) > 0);
+        if (load.length) return pickBy(load, (c) => pointsOf(c) * 20 + rankOf(c), true);
+      } else {
+        const safe = legal.filter((c) => pointsOf(c) === 0);
+        if (safe.length) return pickBy(safe, sloughValue, true);
+      }
+    }
+    return pickBy(legal, sloughValue, true);
+  }
+
+  /* ---- game state ---- */
+  function newGame(rnd) {
+    const G = { v: 1, scores: [0, 0, 0, 0], hand: 0, history: [], phase: 'pass', recorded: false };
+    startHand(G, rnd);
+    return G;
+  }
+  function startHand(G, rnd) {
+    const d = shuffled(rnd);
+    G.hands = [0, 1, 2, 3].map((p) => sortHand(d.slice(p * 13, p * 13 + 13)));
+    G.taken = [0, 0, 0, 0];
+    G.played = new Array(52).fill(false);
+    G.voids = [0, 1, 2, 3].map(() => [false, false, false, false]);
+    G.trick = [];
+    G.trickNo = 0;
+    G.heartsBroken = false;
+    G.newCards = [];
+    G.passDir = G.hand % 4;
+    if (PASS_OFFSETS[G.passDir]) {
+      G.phase = 'pass';
+      G.aiPass = [null, choosePass(G.hands[1]), choosePass(G.hands[2]), choosePass(G.hands[3])];
+    } else {
+      G.aiPass = null;
+      beginPlay(G);
+    }
+  }
+  function beginPlay(G) {
+    G.phase = 'play';
+    for (let p = 0; p < 4; p++) if (G.hands[p].includes(TWO_C)) G.leader = G.turn = p;
+  }
+  function doPass(G, mine) {
+    const off = PASS_OFFSETS[G.passDir];
+    const out = [mine.slice(), G.aiPass[1], G.aiPass[2], G.aiPass[3]];
+    const hands = G.hands.map((h, p) => h.filter((c) => !out[p].includes(c)));
+    for (let p = 0; p < 4; p++) hands[(p + off) % 4].push(...out[p]);
+    G.hands = hands.map(sortHand);
+    G.newCards = out[(4 - off) % 4].slice();
+    G.aiPass = null;
+    beginPlay(G);
+  }
+  function viewFor(G, p) {
+    return { me: p, hand: G.hands[p], trick: G.trick, heartsBroken: G.heartsBroken, trickNo: G.trickNo, played: G.played, taken: G.taken, voids: G.voids };
+  }
+  function applyPlay(G, p, c) {
+    G.hands[p] = G.hands[p].filter((x) => x !== c);
+    if (G.trick.length && suitOf(c) !== suitOf(G.trick[0].c)) G.voids[p][suitOf(G.trick[0].c)] = true;
+    G.trick.push({ p, c });
+    if (suitOf(c) === HEART) G.heartsBroken = true;
+    G.turn = (p + 1) % 4;
+  }
+  function completeTrick(G) {
+    const w = trickWinner(G.trick), pts = trickPoints(G.trick);
+    G.taken[w] += pts;
+    for (const t of G.trick) G.played[t.c] = true;
+    G.trick = [];
+    G.trickNo++;
+    G.leader = G.turn = w;
+    return { w, pts };
+  }
+  function finishHand(G) {
+    const r = scoreHand(G.taken);
+    for (let p = 0; p < 4; p++) G.scores[p] += r.deltas[p];
+    G.history.push({ taken: G.taken.slice(), deltas: r.deltas, moon: r.moon });
+    const w = gameWinners(G.scores);
+    if (w) { G.phase = 'over'; G.winners = w; } else G.phase = 'handEnd';
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- storage ---------- */
+  const KEY_GAME = 'vela:hearts:game';
+  const KEY_WON = 'vela:hearts:won';
+  const KEY_PLAYED = 'vela:hearts:played';
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (_) {} }
+  const readNum = (k) => { const n = Number(lsGet(k)); return Number.isFinite(n) && n > 0 ? n : 0; };
+
+  function loadGame() {
+    try {
+      const g = JSON.parse(lsGet(KEY_GAME));
+      if (!g || g.v !== 1 || !Array.isArray(g.hands) || g.hands.length !== 4) return null;
+      if (!['pass', 'play', 'handEnd'].includes(g.phase)) return null;
+      const count = g.hands.reduce((a, h) => a + h.length, 0) + g.trick.length + g.played.filter(Boolean).length;
+      if (count !== 52) return null;
+      return g;
+    } catch (_) { return null; }
+  }
+  function save() { if (started) lsSet(KEY_GAME, JSON.stringify(G)); }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), table = $('table');
+  const handLayer = $('hand'), trickLayer = $('trick'), flyLayer = $('fly');
+  const seatEls = [$('seat0'), $('seat1'), $('seat2'), $('seat3')];
+  const statusEl = $('status'), passBtn = $('passBtn');
+  const overlay = $('overlay'), menuCard = $('menuCard'), sumCard = $('sumCard');
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const NAMES = ['You', 'West', 'North', 'East'];
+  const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const RANK_WORDS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King', 'Ace'];
+  const SUIT_WORDS = ['clubs', 'diamonds', 'spades', 'hearts'];
+  const T = reduceMotion
+    ? { ai: 420, fly: 0, pause: 700, collect: 0, deal: 0 }
+    : { ai: 470, fly: 270, pause: 820, collect: 340, deal: 26 };
+  const EASE = 'cubic-bezier(0.1, 0.9, 0.2, 1)';
+
+  let G = null;
+  let started = false;      // a game is under way (saved on change)
+  let sel = [];             // cards picked to pass
+  let lock = false;         // input blocked during the pass exchange
+  let paused = false, overlayOpen = false;
+  let cur = -1;             // keyboard cursor index in the hand, -1 hidden
+  let L = null;             // layout numbers
+  const handEls = new Map();
+  let trickEls = [];        // { p, el }
+
+  /* ---------- timers that respect pause and menus ---------- */
+  let gen = 0;
+  const timers = new Set();
+  let queued = [];
+  const blocked = () => paused || overlayOpen;
+  function later(fn, ms) {
+    const g = gen;
+    const run = () => { if (g !== gen) return; if (blocked()) queued.push(run); else fn(); };
+    const id = setTimeout(() => { timers.delete(id); run(); }, ms);
+    timers.add(id);
+  }
+  function clearLater() { gen++; timers.forEach(clearTimeout); timers.clear(); queued = []; }
+  function flushQueued() {
+    if (blocked() || !queued.length) return;
+    const q = queued; queued = [];
+    q.forEach((run) => later(run, 140));
+  }
+
+  /* ---------- cards ---------- */
+  const isRed = (c) => suitOf(c) === 1 || suitOf(c) === HEART;
+  const cardName = (c) => RANK_WORDS[c % 13] + ' of ' + SUIT_WORDS[suitOf(c)];
+  function cardEl(c) {
+    const d = document.createElement('div');
+    const s = suitOf(c), r = RANKS[c % 13];
+    d.className = 'cd' + (isRed(c) ? ' red' : '');
+    d.innerHTML = '<div class="ix"><span class="rk' + (r === '10' ? ' ten' : '') + '">' + r + '</span>' +
+      '<svg class="pip" viewBox="0 0 100 100"><use href="#su' + s + '"/></svg></div>' +
+      '<svg class="big" viewBox="0 0 100 100"><use href="#su' + s + '"/></svg>';
+    return d;
+  }
+  function backEl() { const d = document.createElement('div'); d.className = 'cd back'; return d; }
+
+  function tableRect() { return table.getBoundingClientRect(); }
+  function centerOf(el) {
+    const r = el.getBoundingClientRect(), t = tableRect();
+    return { x: r.left - t.left + r.width / 2, y: r.top - t.top + r.height / 2 };
+  }
+  function seatPoint(p) {
+    if (p === 0) return centerOf(seatEls[0]);
+    return centerOf($('bk' + p).childElementCount ? $('bk' + p) : seatEls[p]);
+  }
+  function slotCenter(p) {
+    const o = [[0, L.dy * L.th], [-1.08 * L.tw, 0], [0, -L.dy * L.th], [1.08 * L.tw, 0]][p];
+    return { x: L.cx + o[0], y: L.cy + o[1] };
+  }
+  const place = (x, y, w, h, k, r) =>
+    'translate(' + (x - w / 2).toFixed(1) + 'px,' + (y - h / 2).toFixed(1) + 'px) scale(' + (k == null ? 1 : k) + ') rotate(' + (r || 0) + 'deg)';
+
+  function animate(el, frames, ms, delay) {
+    if (!ms || reduceMotion || !el.animate) return null;
+    try { return el.animate(frames, { duration: ms, delay: delay || 0, easing: EASE, fill: 'backwards' }); } catch (_) { return null; }
+  }
+
+  /* ---------- rendering ---------- */
+  function setStatus(text) {
+    if (statusEl.textContent === text) return;
+    statusEl.textContent = '';
+    if (!text) return;
+    const s = document.createElement('span');
+    s.textContent = text;
+    if (!reduceMotion) s.className = 'flash';
+    statusEl.appendChild(s);
+  }
+
+  function renderHead() {
+    $('handNum').textContent = G.hand + 1;
+    $('heartsNum').textContent = G.heartsBroken ? 'Broken' : 'Unbroken';
+    $('heartsStat').classList.toggle('lit', !!G.heartsBroken);
+  }
+
+  const shownHp = [0, 0, 0, 0];
+  function renderSeats() {
+    for (let p = 0; p < 4; p++) {
+      $('sc' + p).textContent = G.scores[p];
+      const hp = $('hp' + p);
+      const t = G.taken[p];
+      hp.textContent = t ? '+' + t : '';
+      if (t > shownHp[p] && !reduceMotion) { hp.classList.remove('pop'); void hp.offsetWidth; hp.classList.add('pop'); }
+      shownHp[p] = t;
+      seatEls[p].classList.toggle('turn', G.phase === 'play' && G.turn === p && G.trick.length < 4);
+      if (p) {
+        const bk = $('bk' + p), n = G.hands[p].length;
+        while (bk.childElementCount > n) bk.lastChild.remove();
+        while (bk.childElementCount < n) bk.appendChild(document.createElement('i'));
+      }
+    }
+  }
+
+  function myLegal() {
+    if (G.phase !== 'play' || G.turn !== 0 || G.trick.length >= 4) return null;
+    return new Set(legalMoves(G.hands[0], G.trick, G.heartsBroken, G.trickNo === 0));
+  }
+
+  function handGeometry(n, i) {
+    const step = n > 1 ? Math.min(L.cw * 0.62, (L.TW - 2 * L.pad - L.cw) / (n - 1)) : 0;
+    const width = L.cw + (n - 1) * step;
+    const mid = (n - 1) / 2;
+    const t = mid ? (i - mid) / mid : 0;
+    const x = (L.TW - width) / 2 + i * step;
+    const y = L.handTop + t * t * L.arc;
+    const r = (i - mid) * Math.min(1.5, 16 / Math.max(n, 1));
+    return { x, y, r };
+  }
+
+  function renderHand(dealing) {
+    if (!L) return;
+    const h = G.hands[0];
+    const legal = myLegal();
+    const passing = G.phase === 'pass' && !lock;
+    for (const [c, el] of handEls) if (!h.includes(c)) { el.remove(); handEls.delete(c); }
+    if (cur >= h.length) cur = h.length - 1;
+    let fresh = 0;
+    h.forEach((c, i) => {
+      let el = handEls.get(c);
+      const g = handGeometry(h.length, i);
+      const tf = 'translate(' + g.x.toFixed(1) + 'px,' + g.y.toFixed(1) + 'px) rotate(' + g.r.toFixed(2) + 'deg)';
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'hs';
+        el.dataset.c = c;
+        el.setAttribute('role', 'button');
+        el.setAttribute('aria-label', cardName(c));
+        el.appendChild(cardEl(c));
+        el.style.transform = tf;
+        handLayer.appendChild(el);
+        handEls.set(c, el);
+        if (dealing || G.newCards.includes(c)) {
+          animate(el.firstChild, [{ transform: 'translateY(-60%)', opacity: 0 }, { transform: 'none', opacity: 1 }], 300, fresh * T.deal);
+          fresh++;
+        }
+      } else if (el.style.transform !== tf) el.style.transform = tf;
+      el.style.zIndex = i + 1;
+      let k = 'hs';
+      if (passing || (legal && legal.has(c))) k += ' ok';
+      if (legal && !legal.has(c)) k += ' off';
+      if (G.phase === 'pass' && sel.includes(c)) k += ' sel';
+      if (G.newCards.includes(c)) k += ' new';
+      if (i === cur) k += ' cur';
+      if (el.className !== k) el.className = k;
+    });
+    // keep DOM order equal to hand order so later cards sit on top
+    let prev = null;
+    for (const c of h) {
+      const el = handEls.get(c);
+      if (prev ? prev.nextSibling !== el : handLayer.firstChild !== el) handLayer.insertBefore(el, prev ? prev.nextSibling : handLayer.firstChild);
+      prev = el;
+    }
+  }
+
+  function renderTrick() {
+    trickLayer.textContent = '';
+    trickEls = [];
+    for (const t of G.trick) addTrickCard(t.p, t.c);
+    if (G.trick.length === 4) markWinner();
+  }
+  function addTrickCard(p, c) {
+    const el = document.createElement('div');
+    el.className = 'tc';
+    el.appendChild(cardEl(c));
+    const s = slotCenter(p);
+    el.style.transform = place(s.x, s.y, L.tw, L.th);
+    el.style.zIndex = [3, 2, 1, 2][p];
+    trickLayer.appendChild(el);
+    trickEls.push({ p, el });
+    return el;
+  }
+  function markWinner() {
+    if (G.trick.length !== 4) return;
+    const w = trickWinner(G.trick);
+    const t = trickEls.find((e) => e.p === w);
+    if (t) { t.el.classList.add('win'); t.el.style.zIndex = 4; }
+  }
+
+  function renderPassUi() {
+    const passing = G.phase === 'pass';
+    passBtn.hidden = !passing;
+    passBtn.disabled = !passing || sel.length !== 3 || lock;
+    passBtn.textContent = 'Pass ' + sel.length + '/3';
+  }
+
+  function renderStatus() {
+    if (G.phase === 'pass') { setStatus(lock ? '' : 'Pass 3 ' + PASS_NAMES[G.passDir]); return; }
+    if (G.phase === 'play' && G.turn === 0 && G.trick.length < 4) { setStatus(G.trick.length ? 'Your turn' : 'Your lead'); return; }
+    setStatus('');
+  }
+
+  function renderAll(dealing) {
+    renderHead();
+    renderSeats();
+    renderTrick();
+    renderHand(dealing);
+    renderPassUi();
+    renderStatus();
+  }
+
+  /* ---------- flow ---------- */
+  function advance() {
+    if (G.phase !== 'play') return;
+    if (G.trick.length === 4) { later(resolveTrick, 300); return; }
+    renderSeats();
+    renderHand();
+    renderStatus();
+    if (G.turn !== 0) later(aiMove, T.ai);
+  }
+
+  function aiMove() {
+    if (G.phase !== 'play' || G.turn === 0 || G.trick.length >= 4) return;
+    const p = G.turn;
+    playCard(p, chooseCard(viewFor(G, p)));
+  }
+
+  function playCard(p, c) {
+    let from;
+    if (p === 0) {
+      const el = handEls.get(c);
+      const inner = el && el.firstChild;
+      if (inner) {
+        const q = centerOf(inner);
+        from = place(q.x, q.y, L.tw, L.th, L.cw / L.tw, handGeometry(G.hands[0].length, G.hands[0].indexOf(c)).r);
+      }
+      G.newCards = [];
+    } else {
+      const q = seatPoint(p);
+      from = place(q.x, q.y, L.tw, L.th, 0.3);
+    }
+    applyPlay(G, p, c);
+    const el = addTrickCard(p, c);
+    if (from) animate(el, [{ transform: from, opacity: p === 0 ? 1 : 0.2 }, { transform: el.style.transform, opacity: 1 }], T.fly);
+    renderHead();
+    renderSeats();
+    renderHand();
+    renderStatus();
+    save();
+    if (G.trick.length === 4) {
+      later(markWinner, T.fly + 80);
+      later(resolveTrick, T.fly + T.pause);
+    } else advance();
+  }
+
+  function resolveTrick() {
+    if (G.phase !== 'play' || G.trick.length !== 4) return;
+    const res = completeTrick(G);
+    const to = seatPoint(res.w);
+    const els = trickEls;
+    trickEls = [];
+    els.forEach((t, i) => {
+      animate(t.el, [{ transform: t.el.style.transform, opacity: 1 }, { transform: place(to.x, to.y, L.tw, L.th, 0.3), opacity: 0 }], T.collect, i * 18);
+      t.el.style.opacity = '0';
+      if (T.collect) {
+        t.el.style.transform = place(to.x, to.y, L.tw, L.th, 0.3);
+        setTimeout(() => t.el.remove(), T.collect + 120);
+      } else t.el.remove();
+    });
+    renderSeats();
+    save();
+    if (G.trickNo === 13) later(endHand, T.collect + 420);
+    else later(advance, T.collect + 60);
+  }
+
+  function endHand() {
+    if (G.phase !== 'play') return;
+    finishHand(G);
+    if (G.phase === 'over') recordResult();
+    save();
+    renderAll();
+    showSummary();
+  }
+
+  function recordResult() {
+    if (G.recorded) return;
+    G.recorded = true;
+    lsSet(KEY_PLAYED, String(readNum(KEY_PLAYED) + 1));
+    if (G.winners.length === 1 && G.winners[0] === 0) lsSet(KEY_WON, String(readNum(KEY_WON) + 1));
+    lsDel(KEY_GAME);
+    started = false;
+  }
+
+  function nextHand() {
+    if (G.phase !== 'handEnd') return;
+    clearLater();
+    G.hand++;
+    startHand(G);
+    sel = [];
+    cur = -1;
+    clearTable();
+    save();
+    hideOverlay();
+    startHandUi();
+  }
+
+  function startHandUi() {
+    renderAll(true);
+    if (G.phase === 'play') {
+      setStatus('No pass');
+      later(advance, 1100);
+    }
+  }
+
+  function clearTable() {
+    for (const el of handEls.values()) el.remove();
+    handEls.clear();
+    trickLayer.textContent = '';
+    trickEls = [];
+    flyLayer.textContent = '';
+    for (let p = 0; p < 4; p++) shownHp[p] = 0;
+  }
+
+  function startNewGame() {
+    clearLater();
+    G = newGame();
+    started = true;
+    sel = []; lock = false; cur = -1;
+    clearTable();
+    save();
+    hideOverlay();
+    startHandUi();
+  }
+
+  /* ---------- passing ---------- */
+  function flyCard(el, from, to, ms, delay) {
+    el.classList.add('fly');
+    el.style.transform = to;
+    el.style.opacity = '0';
+    flyLayer.appendChild(el);
+    animate(el, [{ transform: from, opacity: 1 }, { transform: to, opacity: 0.9, offset: 0.85 }, { transform: to, opacity: 0 }], ms, delay);
+    setTimeout(() => el.remove(), (ms || 0) + (delay || 0) + 60);
+  }
+
+  function doPassUi() {
+    if (G.phase !== 'pass' || sel.length !== 3 || lock || overlayOpen) return;
+    lock = true;
+    const off = PASS_OFFSETS[G.passDir];
+    const ms = reduceMotion ? 0 : 420;
+    const target = seatPoint(off);
+    const cw = L.cw, ch = L.ch;
+    sel.forEach((c, i) => {
+      const el = handEls.get(c);
+      if (!el) return;
+      const q = centerOf(el.firstChild);
+      el.style.visibility = 'hidden';
+      const f = cardEl(c);
+      f.style.position = 'static';
+      const wrap = document.createElement('div');
+      wrap.style.cssText = '--cw:' + cw + 'px;--ch:' + ch + 'px;width:' + cw + 'px;height:' + ch + 'px';
+      wrap.appendChild(f);
+      flyCard(wrap, place(q.x, q.y, cw, ch, 1), place(target.x, target.y, cw, ch, 0.3), ms, i * 40);
+    });
+    const bw = Math.round(L.cw * 0.5), bh = Math.round(bw * 1.4);
+    for (let p = 1; p < 4; p++) {
+      const a = seatPoint(p), b = seatPoint((p + off) % 4);
+      for (let k = 0; k < 3; k++) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = '--cw:' + bw + 'px;--ch:' + bh + 'px;width:' + bw + 'px;height:' + bh + 'px';
+        const f = backEl();
+        wrap.appendChild(f);
+        flyCard(wrap, place(a.x, a.y, bw, bh, 0.5), place(b.x, b.y, bw, bh, 0.5), ms, k * 40 + p * 30);
+      }
+    }
+    renderPassUi();
+    renderStatus();
+    later(() => {
+      doPass(G, sel);
+      sel = [];
+      lock = false;
+      save();
+      renderAll();
+      later(advance, 900);
+    }, ms + 160);
+  }
+
+  /* ---------- input ---------- */
+  function activate(c) {
+    if (overlayOpen || lock || !G) return;
+    if (G.phase === 'pass') {
+      const i = sel.indexOf(c);
+      if (i >= 0) sel.splice(i, 1);
+      else if (sel.length < 3) sel.push(c);
+      else { nudge(c); return; }
+      renderHand();
+      renderPassUi();
+      return;
+    }
+    if (G.phase !== 'play' || G.turn !== 0 || G.trick.length >= 4) return;
+    const legal = legalMoves(G.hands[0], G.trick, G.heartsBroken, G.trickNo === 0);
+    if (!legal.includes(c)) { nudge(c); return; }
+    if (paused) paused = false;
+    playCard(0, c);
+  }
+  function nudge(c) {
+    const el = handEls.get(c);
+    if (el) animate(el.firstChild, [{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }], 220);
+  }
+
+  handLayer.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const hs = e.target && e.target.closest ? e.target.closest('.hs') : null;
+    if (!hs) return;
+    e.preventDefault();
+    if (cur >= 0) { cur = -1; }
+    activate(Number(hs.dataset.c));
+  });
+  table.addEventListener('pointerdown', () => window.focus());
+  table.addEventListener('contextmenu', (e) => e.preventDefault());
+  table.addEventListener('dragstart', (e) => e.preventDefault());
+  passBtn.addEventListener('click', doPassUi);
+  $('menuBtnTop').addEventListener('click', openMenu);
+
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape' && !menuCard.hidden && !$('continueBtn').hidden) { e.preventDefault(); hideOverlay(); }
+      return;
+    }
+    if (!G) return;
+    const n = G.hands[0].length;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D') {
+      e.preventDefault();
+      if (!n) return;
+      const d = e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' ? -1 : 1;
+      if (cur < 0) {
+        const legal = myLegal();
+        cur = 0;
+        if (legal) { const i = G.hands[0].findIndex((c) => legal.has(c)); if (i >= 0) cur = i; }
+      } else cur = Math.max(0, Math.min(n - 1, cur + d));
+      renderHand();
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (G.phase === 'pass' && sel.length === 3 && cur < 0) { doPassUi(); return; }
+      if (cur < 0) {
+        const legal = myLegal();
+        cur = 0;
+        if (legal) { const i = G.hands[0].findIndex((c) => legal.has(c)); if (i >= 0) cur = i; }
+        renderHand();
+        return;
+      }
+      activate(G.hands[0][cur]);
+      return;
+    }
+    if (e.key === 'p' || e.key === 'P') { doPassUi(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); openMenu(); }
+  });
+
+  V.onPause((p) => { paused = !!p; flushQueued(); });
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    menuCard.hidden = card !== menuCard;
+    sumCard.hidden = card !== sumCard;
+    overlayOpen = true;
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+    setTimeout(() => overlay.classList.add('show'), 60);
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    flushQueued();
+  }
+
+  function openMenu() {
+    if (G && G.phase === 'handEnd' && started) { showSummary(); return; }
+    $('menuWon').textContent = readNum(KEY_WON);
+    $('menuPlayed').textContent = readNum(KEY_PLAYED);
+    const canContinue = started && G && G.phase !== 'over';
+    $('continueBtn').hidden = !canContinue;
+    $('newBtn').className = canContinue ? 'btn' : 'btn primary';
+    $('newBtn').textContent = canContinue ? 'New game' : 'Play';
+    openOverlay(menuCard);
+    setTimeout(() => { try { (canContinue ? $('continueBtn') : $('newBtn')).focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  function showSummary() {
+    const last = G.history[G.history.length - 1];
+    if (!last) return;
+    const over = G.phase === 'over';
+    const title = $('sumTitle');
+    title.className = '';
+    if (over) {
+      const w = G.winners;
+      if (w.includes(0) && w.length > 1) { title.textContent = 'Draw'; title.className = 'c-none'; }
+      else if (w.includes(0)) title.textContent = 'You win';
+      else { title.textContent = 'You lose'; title.className = 'c-white'; }
+    } else title.textContent = 'Hand ' + G.history.length;
+    const tag = $('sumTag');
+    tag.hidden = last.moon < 0;
+    tag.textContent = 'Moon';
+    const lines = [];
+    if (last.moon >= 0) lines.push((last.moon === 0 ? 'You' : NAMES[last.moon]) + ' shot the moon');
+    if (over) {
+      const after = 'after ' + G.history.length + (G.history.length === 1 ? ' hand' : ' hands');
+      const others = G.winners.filter((p) => p !== 0).map((p) => NAMES[p]);
+      if (!G.winners.includes(0)) lines.push(others.join(' and ') + (others.length > 1 ? ' win ' : ' wins ') + after);
+      else if (others.length) lines.push('Tied with ' + others.join(' and ') + ' ' + after);
+      else lines.push('After ' + G.history.length + (G.history.length === 1 ? ' hand' : ' hands'));
+    }
+    $('sumLine').hidden = !lines.length;
+    $('sumLine').textContent = lines.join('. ');
+    const lo = Math.min.apply(null, G.scores);
+    let html = '<div class="r hd"><span class="lab">Player</span><span class="lab">Hand</span><span class="lab">Total</span></div>';
+    for (let p = 0; p < 4; p++) {
+      const d = last.deltas[p];
+      html += '<div class="r' + (G.scores[p] === lo ? ' lead' : '') + '"><span class="nm">' + NAMES[p] + '</span>' +
+        '<span class="d' + (d ? ' pts' : '') + '">' + (d ? '+' + d : '0') + '</span>' +
+        '<span class="t">' + G.scores[p] + '</span></div>';
+    }
+    $('sumTable').innerHTML = html;
+    $('sumStats').hidden = !over;
+    $('sumWon').textContent = readNum(KEY_WON);
+    $('sumPlayed').textContent = readNum(KEY_PLAYED);
+    $('nextBtn').hidden = over;
+    $('againBtn').hidden = !over;
+    $('menuBtn').hidden = !over;
+    openOverlay(sumCard);
+    setTimeout(() => { try { (over ? $('againBtn') : $('nextBtn')).focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  $('continueBtn').addEventListener('click', hideOverlay);
+  $('newBtn').addEventListener('click', () => {
+    // The first deal already sits behind the start menu; play that one.
+    if (!started && G && !G.history.length && (G.phase === 'pass' || G.phase === 'play') && G.trickNo === 0 && !G.trick.length) {
+      started = true;
+      save();
+      hideOverlay();
+      if (G.phase === 'play') { setStatus('No pass'); later(advance, 900); }
+      return;
+    }
+    startNewGame();
+  });
+  $('nextBtn').addEventListener('click', nextHand);
+  $('againBtn').addEventListener('click', startNewGame);
+  $('menuBtn').addEventListener('click', openMenu);
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay && !menuCard.hidden && !$('continueBtn').hidden) hideOverlay();
+  });
+
+  /* ---------- layout ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    document.documentElement.style.fontSize = clamp(12, m / 42, 16) + 'px';
+    const pad = Math.round(clamp(8, m * 0.025, 18));
+    app.style.setProperty('--pad', pad + 'px');
+
+    app.classList.add('wide'); app.classList.remove('narrow');
+    head.style.width = 'max-content';
+    const need = head.offsetWidth;
+    head.style.width = '';
+    if (need > vw) { app.classList.remove('wide'); app.classList.add('narrow'); }
+
+    const TW = table.clientWidth, TH = table.clientHeight;
+    const cw = Math.floor(clamp(38, Math.min((TW - 2 * pad) / (1 + 12 * 0.42), TH * 0.2 / 1.4), 116));
+    const ch = Math.round(cw * 1.4);
+    const lift = Math.round(ch * 0.2);
+    const arc = Math.round(ch * 0.05);
+    const handTop = TH - pad - ch - arc;
+    handLayer.style.setProperty('--cw', cw + 'px');
+    handLayer.style.setProperty('--ch', ch + 'px');
+
+    const gap = pad;
+    const sw = Math.round(clamp(76, TW * 0.12, 124));
+    for (let p = 1; p < 4; p++) seatEls[p].style.width = sw + 'px';
+
+    // Your panel and the Pass button go beside the hand when there is room,
+    // otherwise in a row above it with the status between them.
+    const me = seatEls[0];
+    const meH = me.offsetHeight;
+    const wasHidden = passBtn.hidden;
+    passBtn.hidden = false;
+    const bw = passBtn.offsetWidth, bh = passBtn.offsetHeight;
+    passBtn.hidden = wasHidden;
+    const handW = cw + 12 * Math.min(cw * 0.62, (TW - 2 * pad - cw) / 12);
+    const besideRoom = (TW - handW) / 2 - pad - gap;
+    const beside = besideRoom >= Math.max(me.offsetWidth + 30, bw);
+    const statusH = 16;
+    let meTop;
+    if (beside) {
+      me.style.transform = 'translate(' + pad + 'px,' + (TH - pad - meH) + 'px)';
+      passBtn.style.left = (TW - pad - bw) + 'px';
+      passBtn.style.top = (TH - pad - bh) + 'px';
+      meTop = Math.round(handTop - lift - 6 - statusH);
+      statusEl.style.transform = 'translate(0px,' + meTop + 'px)';
+    } else {
+      const rowH = Math.max(meH, bh);
+      meTop = Math.round(handTop - lift - Math.max(6, pad * 0.6) - rowH);
+      me.style.transform = 'translate(' + pad + 'px,' + Math.round(meTop + (rowH - meH) / 2) + 'px)';
+      passBtn.style.left = (TW - pad - bw) + 'px';
+      passBtn.style.top = Math.round(meTop + (rowH - bh) / 2) + 'px';
+      statusEl.style.transform = 'translate(0px,' + Math.round(meTop + (rowH - statusH) / 2) + 'px)';
+    }
+    statusEl.style.width = TW + 'px';
+
+    const nH = seatEls[2].offsetHeight;
+    const sH = seatEls[1].offsetHeight;
+    seatEls[2].style.transform = 'translate(' + Math.round((TW - sw) / 2) + 'px,' + pad + 'px)';
+    // Narrow portrait screens put all three opponents along the top so the
+    // trick gets the full width.
+    const topRow = TH > TW && (TW - 2 * (pad + sw + gap)) / 3.2 < cw * 1.1;
+    const top = pad + (topRow ? Math.max(nH, sH) : nH) + gap, bottom = meTop - gap;
+    const cx = TW / 2, cy = (top + bottom) / 2;
+    const sTop = topRow ? pad : Math.round(clamp(pad, cy - sH / 2, Math.max(pad, bottom - sH)));
+    seatEls[1].style.transform = 'translate(' + pad + 'px,' + sTop + 'px)';
+    seatEls[3].style.transform = 'translate(' + (TW - pad - sw) + 'px,' + sTop + 'px)';
+
+    const sideRoom = topRow ? TW - 2 * pad : TW - 2 * (pad + sw + gap);
+    // North and south trick cards close up (south overlapping north's lower
+    // half) when height is short, so the cards keep their size.
+    const want = Math.min(cw * 1.1, sideRoom / 3.2);
+    const rh = bottom - top;
+    const dy = clamp(0.3, (rh / (1.4 * want) - 1) / 2, 0.56);
+    const tw = Math.floor(clamp(30, Math.min(want, rh / ((2 * dy + 1) * 1.4)), 116));
+    const th = Math.round(tw * 1.4);
+    trickLayer.style.setProperty('--cw', tw + 'px');
+    trickLayer.style.setProperty('--ch', th + 'px');
+
+    L = { TW, TH, pad, cw, ch, lift, arc, handTop, tw, th, cx, cy, dy };
+
+    if (G) {
+      table.classList.add('snap');
+      renderHand();
+      for (const t of trickEls) {
+        const s = slotCenter(t.p);
+        t.el.style.transform = place(s.x, s.y, tw, th);
+      }
+      void table.offsetWidth;
+      table.classList.remove('snap');
+    }
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); setTimeout(layout, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  const saved = loadGame();
+  if (saved) { G = saved; started = true; }
+  else G = newGame();
+  layout();
+  renderAll(true);
+  app.classList.add('ready');
+  if (saved) {
+    if (G.phase === 'play') {
+      if (G.trick.length === 4) later(resolveTrick, 500);
+      else later(advance, 300);
+    }
+  }
+  openMenu();
+  V.ready();
+})();
+</script>
+</body>
+</html>

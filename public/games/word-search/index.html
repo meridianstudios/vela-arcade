@@ -1,0 +1,1305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Word Search</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --gap: 12px;
+    --cs: 40px;       /* cell size, set from JS */
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button, select { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    display: flex; flex-direction: column; align-items: center;
+    gap: var(--gap);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+
+  .head { display: grid; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .app.wide .head {
+    grid-template-columns: 1fr auto auto auto auto;
+    grid-template-areas: "brand s1 s2 menu new";
+  }
+  .app.narrow .head {
+    grid-template-columns: 1fr 1fr auto auto;
+    grid-template-areas: "brand brand brand brand" "s1 s2 menu new";
+  }
+  html.vela-embedded .app.narrow .head { grid-template-areas: "s1 s2 menu new"; }
+  html.vela-embedded .app.narrow .brand { display: none; }
+
+  .brand { grid-area: brand; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .app.narrow .brand { padding: 0.15em 0 0.25em; }
+
+  .s1 { grid-area: s1; }
+  .s2 { grid-area: s2; }
+  .b-menu { grid-area: menu; }
+  .b-new { grid-area: new; }
+
+  .stat {
+    min-width: 5.6em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .app.narrow .stat { min-width: 0; padding-left: 0.7em; padding-right: 0.6em; }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .num {
+    display: block;
+    font: 600 1.4em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+  }
+  .num .of { color: var(--muted); }
+  .num.bump { animation: bump 260ms var(--ease); }
+  @keyframes bump { 40% { color: var(--brand-hover); transform: translateY(-2px); } }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6em;
+    min-height: 3.3em;
+    padding: 0 1.25em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.76rem, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .app.narrow .head .btn { padding: 0 0.9em; }
+
+  /* ---------- play area ---------- */
+  .play { display: flex; align-items: flex-start; justify-content: center; gap: var(--gap); }
+  .play.below { flex-direction: column; align-items: center; }
+
+  .board {
+    position: relative;
+    flex: none;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    touch-action: none;
+    outline: none;
+    cursor: pointer;
+  }
+  .board.over { cursor: default; }
+  .bars, .grid { position: absolute; left: 0; top: 0; }
+  .bars { pointer-events: none; }
+  .grid { display: grid; transition: opacity 200ms var(--ease); }
+  .board.veil .grid { opacity: 0; }
+  .cell {
+    width: var(--cs); height: var(--cs);
+    display: grid; place-items: center;
+    font: 600 calc(var(--cs) * 0.5)/1 var(--font-display);
+    color: rgba(255, 255, 255, 0.88);
+    transition: color 150ms var(--ease);
+  }
+  .cell.on { color: #fff; }
+  .cell.pop { animation: pop 320ms var(--ease) both; }
+  @keyframes pop { 45% { transform: scale(1.28); } }
+  .cell.cur { box-shadow: inset 0 0 0 2px var(--brand-hover); }
+  @media (hover: hover) {
+    .board:not(.over):not(.dragging) .cell:hover { color: var(--brand-hover); }
+  }
+
+  .bar {
+    position: absolute;
+    left: 0; top: 0;
+    border-radius: 2px;
+    transform-origin: calc(var(--h) / 2) 50%;
+  }
+  .bar.f0 { background: rgba(234, 84, 38, 0.62); }
+  .bar.f1 { background: rgba(255, 122, 77, 0.5); }
+  .bar.f2 { background: rgba(184, 63, 25, 0.78); }
+  .bar.grow { animation: grow 300ms var(--ease) both; }
+  @keyframes grow { from { clip-path: inset(0 calc(100% - var(--h)) 0 0); } to { clip-path: inset(0 0 0 0); } }
+  .bar.sel {
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 2px var(--brand-hover);
+  }
+  .bar.sel[hidden] { display: none; }
+  .bar.miss {
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+    animation: miss 380ms var(--ease) forwards;
+  }
+  @keyframes miss {
+    0% { opacity: 1; translate: 0 0; }
+    20% { translate: -4px 0; }
+    40% { translate: 4px 0; }
+    60% { translate: -2px 0; opacity: 1; }
+    100% { translate: 0 0; opacity: 0; }
+  }
+  .bar.dup { animation: dup 360ms var(--ease) forwards; background: rgba(255, 255, 255, 0.18); }
+  @keyframes dup { to { opacity: 0; } }
+
+  /* ---------- word list ---------- */
+  .list { flex: none; min-width: 0; }
+  .list .lab { padding: 0 0 0.6em; }
+  .words {
+    display: grid;
+    grid-auto-flow: column;
+    column-gap: 1.1em;
+    margin: 0; padding: 0;
+    list-style: none;
+  }
+  .wd {
+    position: relative;
+    height: 1.95em;
+    display: flex; align-items: center;
+    font: 600 0.86rem/1 var(--font);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+    transition: color 250ms var(--ease);
+  }
+  .wd span { position: relative; display: inline-block; }
+  .wd span::after {
+    content: "";
+    position: absolute;
+    left: -0.15em; right: -0.1em; top: 50%;
+    height: 2px; margin-top: -1px;
+    background: var(--brand);
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    transition: transform 280ms var(--ease);
+  }
+  .wd.got { color: rgba(255, 255, 255, 0.38); }
+  .wd.got span::after { transform: scaleX(1); }
+  .measure { position: absolute; left: -9999px; top: 0; visibility: hidden; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    text-align: left;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; min-height: 1.6em; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card .tag {
+    padding: 0.45em 0.6em;
+    border-radius: 2px;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .card .tag[hidden] { display: none; }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .card .line[hidden] { display: none; }
+  .group { margin-top: 1.05em; }
+  .group[hidden] { display: none; }
+  .group .lab { margin-bottom: 0.45em; }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    border: 1px solid var(--outline);
+  }
+  .seg button {
+    height: 2.9em;
+    min-width: 0;
+    padding: 0 0.2em;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 clamp(11px, 0.76em, 13px) var(--font);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease);
+  }
+  .seg button + button { box-shadow: -1px 0 0 var(--line); }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; box-shadow: none; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -3px; }
+  .pick {
+    display: block;
+    width: 100%;
+    height: 2.9em;
+    padding: 0 2.4em 0 0.85em;
+    border: 1px solid var(--outline);
+    border-radius: 0;
+    background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='square'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75em center;
+    background-size: 1.2em;
+    color-scheme: dark;
+    font: 600 clamp(11px, 0.76em, 13px) var(--font);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    transition: background-color 150ms var(--ease);
+  }
+  .pick:hover { background-color: rgba(255, 255, 255, 0.08); }
+  .pick:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .pick option { background: var(--surface); color: #fff; text-transform: none; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats[hidden] { display: none; }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div:nth-child(2n) { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .ov-stats .num.none { font-size: 1.3em; line-height: 1.7; color: var(--muted); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .btns .btn[hidden] { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cell.pop, .bar.grow, .num.bump { animation: none; }
+    .bar.miss, .bar.dup { animation-duration: 1ms; }
+    .wd, .wd span::after, .overlay, .card, .cell { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app narrow" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Word Search</h1></div>
+    <div class="stat s1"><span class="lab">Found</span><span class="num" id="foundNum">0<span class="of">/0</span></span></div>
+    <div class="stat s2"><span class="lab">Time</span><span class="num" id="timeNum">0:00</span></div>
+    <button class="btn b-menu" id="menuBtnTop" type="button" aria-haspopup="dialog">
+      <span id="setName">Medium</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="btn primary b-new" id="newBtn" type="button">New game</button>
+  </header>
+  <main class="play" id="play">
+    <div class="board" id="board" tabindex="0" aria-label="Letter grid">
+      <div class="bars" id="bars"><div class="bar sel" id="sel" hidden></div></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <aside class="list" id="list">
+      <span class="lab" id="themeLab">Animals</span>
+      <ul class="words" id="words"></ul>
+    </aside>
+  </main>
+  <span class="wd measure" id="measure"><span></span></span>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="menuCard" role="dialog" aria-labelledby="menuTitle" hidden>
+    <h2 id="menuTitle">Word Search</h2>
+    <p class="line">Drag across a word, or tap its first and last letters.</p>
+    <div class="group">
+      <span class="lab">Puzzle</span>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-v="daily">Daily</button>
+        <button type="button" data-v="random">Random</button>
+      </div>
+    </div>
+    <p class="line" id="dailyLine" hidden>27 October</p>
+    <div class="group" id="sizeGroup">
+      <span class="lab">Size</span>
+      <div class="seg" id="sizeSeg">
+        <button type="button" data-v="small">8 x 8</button>
+        <button type="button" data-v="medium">11 x 11</button>
+        <button type="button" data-v="large">14 x 14</button>
+      </div>
+    </div>
+    <div class="group" id="themeGroup">
+      <label class="lab" for="themePick">Theme</label>
+      <select class="pick" id="themePick"></select>
+    </div>
+    <div class="ov-stats" id="menuStats">
+      <div><span class="lab" id="mLab1">Best time</span><span class="num" id="mVal1">None</span></div>
+      <div><span class="lab" id="mLab2">Solved</span><span class="num" id="mVal2">0</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Play</button>
+      <button class="btn" id="resumeBtn" type="button" hidden>Resume</button>
+    </div>
+  </div>
+  <div class="card" id="resultCard" role="dialog" aria-live="polite" hidden>
+    <div class="card-top"><h2 id="resTitle">Solved</h2><span class="tag" id="resTag" hidden>New best</span></div>
+    <p class="line" id="resSub">Animals, 11 x 11</p>
+    <div class="ov-stats">
+      <div><span class="lab">Time</span><span class="num" id="resTime">0:00</span></div>
+      <div><span class="lab" id="resLab2">Best time</span><span class="num" id="resVal2">0:00</span></div>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn" type="button">Play again</button>
+      <button class="btn" id="menuBtn" type="button">Menu</button>
+    </div>
+  </div>
+</div>
+
+<script src="words.js"></script>
+<script src="../_shared/bridge.js" data-game="word-search"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, onPause() {} };
+  const THEMES = window.WORD_THEMES || [{ name: 'Animals', words: ['LION', 'TIGER', 'ZEBRA', 'HORSE', 'CAMEL', 'PANDA', 'KOALA', 'OTTER'] }];
+
+  /* ===== LOGIC START ===== */
+  // Directions as [dr, dc]. Small: across and down. Medium: also the two
+  // forward diagonals. Large: all eight, backwards included.
+  const DIR = {
+    E: [0, 1], S: [1, 0], SE: [1, 1], NE: [-1, 1],
+    W: [0, -1], N: [-1, 0], NW: [-1, -1], SW: [1, -1],
+  };
+  const ALL_DIRS = Object.keys(DIR).map((k) => DIR[k]);
+  const SIZES = {
+    small: { n: 8, count: 8, minLen: 3, maxLen: 8, fill: 0.8, dirs: ['E', 'S'] },
+    medium: { n: 11, count: 12, minLen: 4, maxLen: 11, fill: 0.66, dirs: ['E', 'S', 'SE', 'NE'] },
+    large: { n: 14, count: 16, minLen: 4, maxLen: 13, fill: 0.58, dirs: ['E', 'S', 'SE', 'NE', 'W', 'N', 'NW', 'SW'] },
+  };
+
+  // Small seeded PRNG so the daily puzzle is the same for everyone.
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(list, rnd) {
+    const a = list.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  // Whole days since 2026-01-01 in the player's local calendar.
+  function dayIndex(date) {
+    const here = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    return Math.floor((here - Date.UTC(2026, 0, 1)) / 86400000);
+  }
+  const reverse = (s) => s.split('').reverse().join('');
+
+  // English letter weights for filler, mixed with the puzzle's own letters
+  // so the blanks look like they belong.
+  const FREQ = 'EEEEEEEEEEEETTTTTTTTTAAAAAAAAOOOOOOOIIIIIIINNNNNNNSSSSSSRRRRRRHHHHHLLLLDDDDCCCUUUMMMFFPPGGWWYYBVKXJQZ';
+
+  // Every place `word` can be read in the grid, as distinct cell sets.
+  function occurrences(grid, n, word) {
+    const out = new Map();
+    const L = word.length;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (grid[r * n + c] !== word[0]) continue;
+        for (const [dr, dc] of ALL_DIRS) {
+          const er = r + dr * (L - 1), ec = c + dc * (L - 1);
+          if (er < 0 || er >= n || ec < 0 || ec >= n) continue;
+          let k = 1;
+          while (k < L && grid[(r + dr * k) * n + c + dc * k] === word[k]) k++;
+          if (k < L) continue;
+          const cells = [];
+          for (let j = 0; j < L; j++) cells.push((r + dr * j) * n + c + dc * j);
+          out.set(cells.slice().sort((x, y) => x - y).join(','), cells);
+        }
+      }
+    }
+    return Array.from(out.values());
+  }
+
+  function pickWords(pool, cfg, rnd) {
+    let best = [];
+    for (let tries = 0; tries < 30 && best.length < cfg.count; tries++) {
+      const list = pickOnce(pool, cfg, rnd);
+      if (list.length > best.length) best = list;
+    }
+    return best;
+  }
+  function pickOnce(pool, cfg, rnd) {
+    const budget = Math.floor(cfg.n * cfg.n * cfg.fill);
+    const ok = pool.filter((w) => w.length >= cfg.minLen && w.length <= Math.min(cfg.maxLen, cfg.n));
+    const chosen = [];
+    let used = 0;
+    for (const w of shuffle(ok, rnd)) {
+      if (chosen.length >= cfg.count) break;
+      // Leave room for the rest of the list at the shortest length.
+      if (used + w.length + cfg.minLen * (cfg.count - chosen.length - 1) > budget) continue;
+      // A word inside another chosen word (either way round) would appear twice.
+      const rw = reverse(w);
+      if (chosen.some((o) => o.includes(w) || o.includes(rw) || w.includes(o) || rw.includes(o))) continue;
+      chosen.push(w);
+      used += w.length;
+    }
+    return chosen;
+  }
+
+  function tryPlace(grid, n, word, dirs, rnd) {
+    const L = word.length;
+    const spots = [];
+    for (const d of dirs) {
+      const [dr, dc] = DIR[d];
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          const er = r + dr * (L - 1), ec = c + dc * (L - 1);
+          if (er < 0 || er >= n || ec < 0 || ec >= n) continue;
+          let overlap = 0, fits = true;
+          for (let j = 0; j < L; j++) {
+            const g = grid[(r + dr * j) * n + c + dc * j];
+            if (g === '') continue;
+            if (g !== word[j]) { fits = false; break; }
+            overlap++;
+          }
+          // Never lay a word completely on top of letters already there.
+          if (fits && overlap < L) spots.push({ r, c, dr, dc, d, overlap });
+        }
+      }
+    }
+    if (!spots.length) return null;
+    // Crossings make a better puzzle; take one about a third of the time.
+    const crossing = spots.filter((s) => s.overlap > 0);
+    let from = crossing.length && rnd() < 0.35 ? crossing : spots;
+    // Every allowed direction equally likely, so diagonals are not rare.
+    const ds = Array.from(new Set(from.map((x) => x.d)));
+    const dd = ds[Math.floor(rnd() * ds.length)];
+    from = from.filter((x) => x.d === dd);
+    const s = from[Math.floor(rnd() * from.length)];
+    const cells = [];
+    for (let j = 0; j < L; j++) {
+      const i = (s.r + s.dr * j) * n + s.c + s.dc * j;
+      grid[i] = word[j];
+      cells.push(i);
+    }
+    return cells;
+  }
+
+  // Build a puzzle: { n, grid: [letters], words: [{ w, cells }] }.
+  function generate(sizeKey, pool, rnd) {
+    const cfg = SIZES[sizeKey];
+    const n = cfg.n;
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const want = pickWords(pool, cfg, rnd).sort((a, b) => b.length - a.length);
+      const grid = new Array(n * n).fill('');
+      const words = [];
+      for (const w of want) {
+        const cells = tryPlace(grid, n, w, cfg.dirs, rnd);
+        if (cells) words.push({ w, cells });
+      }
+      // Want the full list; settle for a word or two short only after many tries.
+      const short = attempt < 40 ? 0 : 2;
+      if (words.length < want.length - short || words.length < Math.min(5, cfg.count)) continue;
+
+      // Fill the blanks, then re-roll any blank that completes a second copy
+      // of a listed word.
+      const free = [];
+      for (let i = 0; i < n * n; i++) if (grid[i] === '') free.push(i);
+      const own = words.map((x) => x.w).join('');
+      const letter = () => (rnd() < 0.5 ? own[Math.floor(rnd() * own.length)] : FREQ[Math.floor(rnd() * FREQ.length)]);
+      for (const i of free) grid[i] = letter();
+      const isFree = new Set(free);
+      let clean = false;
+      for (let pass = 0; pass < 300 && !clean; pass++) {
+        clean = true;
+        for (const x of words) {
+          const occ = occurrences(grid, n, x.w);
+          if (occ.length <= 1) continue;
+          clean = false;
+          const home = x.cells.slice().sort((a, b) => a - b).join(',');
+          for (const cells of occ) {
+            if (cells.slice().sort((a, b) => a - b).join(',') === home) continue;
+            const loose = cells.filter((i) => isFree.has(i));
+            if (!loose.length) { pass = 1e9; break; }
+            const i = loose[Math.floor(rnd() * loose.length)];
+            grid[i] = FREQ[Math.floor(rnd() * FREQ.length)];
+          }
+          if (pass >= 1e9) break;
+        }
+      }
+      if (!clean) continue;
+      words.sort((a, b) => (a.w < b.w ? -1 : 1));
+      return { n, grid, words };
+    }
+    return null;
+  }
+
+  // The cells on the straight line from a to b, or null if not a line.
+  function lineCells(n, a, b) {
+    const ar = Math.floor(a / n), ac = a % n, br = Math.floor(b / n), bc = b % n;
+    const dr = br - ar, dc = bc - ac;
+    if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return null;
+    const steps = Math.max(Math.abs(dr), Math.abs(dc));
+    const sr = Math.sign(dr), sc = Math.sign(dc);
+    const out = [];
+    for (let k = 0; k <= steps; k++) out.push((ar + sr * k) * n + ac + sc * k);
+    return out;
+  }
+
+  // Which listed word, if any, the selected cells spell (either direction).
+  function matchWord(puzzle, cells, found) {
+    if (!cells || cells.length < 2) return -1;
+    const s = cells.map((i) => puzzle.grid[i]).join('');
+    const r = reverse(s);
+    for (let k = 0; k < puzzle.words.length; k++) {
+      if (found[k]) continue;
+      const w = puzzle.words[k].w;
+      if (w === s || w === r) return k;
+    }
+    return -1;
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:word-search:';
+  function lsGet(k) { try { return localStorage.getItem(KEY + k); } catch (_) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(KEY + k, v); } catch (_) {} }
+  function readJson(k) { try { return JSON.parse(lsGet(k)); } catch (_) { return null; } }
+  function readNum(k) { const v = Number(lsGet(k)); return Number.isFinite(v) && v > 0 ? v : 0; }
+  const bestTime = (s) => readNum('best:' + s);
+  const solvedCount = (s) => readNum('solved:' + s);
+
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const SIZE_NAME = { small: 'Small', medium: 'Medium', large: 'Large' };
+  const sizeText = (s) => SIZES[s].n + ' x ' + SIZES[s].n;
+  function fmtClock(ms) {
+    const s = Math.floor(ms / 1000);
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function dateText(day) {
+    const d = new Date(2026, 0, 1 + day);
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  }
+
+  const DAILY_THEMES = shuffle(THEMES.map((_, i) => i), mulberry32(20261027));
+  function dailyPuzzle(day) {
+    const t = THEMES[DAILY_THEMES[((day % THEMES.length) + THEMES.length) % THEMES.length]];
+    const p = generate('medium', t.words, mulberry32((day + 1) * 2654435761));
+    return { p, theme: t.name };
+  }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), play = $('play'), board = $('board');
+  const grid = $('grid'), bars = $('bars'), sel = $('sel'), list = $('list'), wordsEl = $('words');
+  const overlay = $('overlay'), menuCard = $('menuCard'), resultCard = $('resultCard');
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  $('themePick').innerHTML = '<option value="any">Any</option>' +
+    THEMES.map((t) => '<option value="' + t.name + '">' + t.name + '</option>').join('');
+
+  /* ---------- state ---------- */
+  let size = SIZES[lsGet('size')] ? lsGet('size') : 'medium';
+  let mode = lsGet('mode') === 'random' ? 'random' : 'daily';
+  let themeChoice = lsGet('theme') || 'any';
+  if (themeChoice !== 'any' && !THEMES.some((t) => t.name === themeChoice)) themeChoice = 'any';
+  let menuMode = mode, menuSize = size;
+
+  let game = null;        // { mode, size, theme, day, p, found: [bool], colors: [] }
+  let cells = [], items = [], barEls = [];
+  let status = 'idle';    // idle, playing, over
+  let elapsed = 0, startedAt = 0, running = false;
+  let paused = false, overlayOpen = false;
+  let cs = 40, N = 11;
+  let lastTheme = '';
+  let resultTimer = 0;
+
+  // Selection: a drag from dragA, or a tap anchor waiting for its end.
+  let drag = null;        // { a, b, id, moved }
+  let anchor = -1;
+  let cur = -1, curShown = false;
+
+  /* ---------- timer ---------- */
+  function getElapsed() { return running ? elapsed + (performance.now() - startedAt) : elapsed; }
+  function syncTimer() {
+    const should = status === 'playing' && !paused && !overlayOpen;
+    if (should && !running) { startedAt = performance.now(); running = true; }
+    else if (!should && running) { elapsed += performance.now() - startedAt; running = false; saveDaily(); }
+  }
+  let shownClock = '';
+  function tick() {
+    const t = fmtClock(getElapsed());
+    if (t !== shownClock) {
+      $('timeNum').textContent = t;
+      shownClock = t;
+      if (running && game && game.mode === 'daily' && t.endsWith('0')) saveDaily();
+    }
+  }
+  setInterval(tick, 200);
+
+  /* ---------- daily save ---------- */
+  function saveDaily() {
+    if (!game || game.mode !== 'daily') return;
+    lsSet('daily', JSON.stringify({
+      day: game.day,
+      found: game.p.words.filter((_, k) => game.found[k]).map((x) => x.w),
+      elapsed: Math.round(getElapsed()),
+      done: status === 'over',
+    }));
+  }
+  function loadDailySave(day, p) {
+    const s = readJson('daily');
+    if (!s || s.day !== day || !Array.isArray(s.found)) return null;
+    const found = p.words.map((x) => s.found.includes(x.w));
+    const done = found.every(Boolean);
+    return { found, elapsed: Math.max(0, Number(s.elapsed) || 0), done };
+  }
+
+  /* ---------- building ---------- */
+  function startGame(m, s) {
+    clearTimeout(resultTimer); resultTimer = 0;
+    cancelSelection();
+    let p, theme, day = 0;
+    if (m === 'daily') {
+      day = dayIndex(new Date());
+      const d = dailyPuzzle(day);
+      p = d.p; theme = d.theme; s = 'medium';
+    } else {
+      let options = THEMES;
+      if (themeChoice !== 'any') options = THEMES.filter((t) => t.name === themeChoice);
+      else if (THEMES.length > 1) options = THEMES.filter((t) => t.name !== lastTheme);
+      const t = options[Math.floor(Math.random() * options.length)];
+      theme = t.name;
+      p = generate(s, t.words, Math.random);
+      for (let k = 0; !p && k < 5; k++) p = generate(s, t.words, Math.random);
+    }
+    lastTheme = theme;
+    mode = m; lsSet('mode', m);
+    if (m === 'random') { size = s; lsSet('size', s); }
+    game = { mode: m, size: s, theme, day, p, found: p.words.map(() => false), colors: [] };
+    N = p.n;
+    elapsed = 0; running = false; shownClock = '';
+    status = 'playing';
+
+    let restored = null;
+    if (m === 'daily') restored = loadDailySave(day, p);
+    if (restored) {
+      game.found = restored.found;
+      elapsed = restored.elapsed;
+    }
+    game.found.forEach((f, k) => { if (f) game.colors[k] = colorFor(k); });
+    if (restored && restored.done) status = 'over';
+
+    buildBoard();
+    if (status === 'over') board.classList.add('over');
+    layout();
+    updateHud();
+  }
+  function begin(m, s) {
+    startGame(m, s);
+    if (status === 'over') showResult(false);
+    else hideOverlay();
+  }
+
+  let colorTurn = 0;
+  function colorFor() { return 'f' + (colorTurn++ % 3); }
+
+  function buildBoard() {
+    grid.textContent = '';
+    board.classList.remove('over');
+    cells = new Array(N * N);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < N * N; i++) {
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.textContent = game.p.grid[i];
+      cells[i] = el;
+      frag.appendChild(el);
+    }
+    grid.appendChild(frag);
+    grid.style.gridTemplateColumns = 'repeat(' + N + ', var(--cs))';
+
+    barEls.forEach((b) => b && b.remove());
+    barEls = [];
+    bars.querySelectorAll('.miss, .dup').forEach((b) => b.remove());
+    game.p.words.forEach((x, k) => { if (game.found[k]) addBar(k, false); });
+    markOn();
+
+    wordsEl.textContent = '';
+    items = game.p.words.map((x, k) => {
+      const li = document.createElement('li');
+      li.className = 'wd' + (game.found[k] ? ' got' : '');
+      const sp = document.createElement('span');
+      sp.textContent = x.w;
+      li.appendChild(sp);
+      wordsEl.appendChild(li);
+      return li;
+    });
+    $('themeLab').textContent = game.mode === 'daily' ? 'Daily, ' + game.theme : game.theme;
+    if (cur >= N * N) cur = 0;
+  }
+
+  function markOn() {
+    const on = new Set();
+    game.p.words.forEach((x, k) => { if (game.found[k]) x.cells.forEach((i) => on.add(i)); });
+    cells.forEach((el, i) => el.classList.toggle('on', on.has(i)));
+  }
+
+  // Place a bar element over the straight run of cells from a to b.
+  function placeBar(el, a, b) {
+    const ar = Math.floor(a / N), ac = a % N, br = Math.floor(b / N), bc = b % N;
+    const h = Math.round(cs * (ar !== br && ac !== bc ? 0.72 : 0.8));
+    const x0 = (ac + 0.5) * cs, y0 = (ar + 0.5) * cs;
+    const len = Math.hypot((bc - ac) * cs, (br - ar) * cs);
+    const ang = Math.atan2(br - ar, bc - ac) * 180 / Math.PI;
+    el.style.setProperty('--h', h + 'px');
+    el.style.width = (len + h) + 'px';
+    el.style.height = h + 'px';
+    el.style.transform = 'translate(' + (x0 - h / 2) + 'px,' + (y0 - h / 2) + 'px) rotate(' + ang + 'deg)';
+  }
+
+  function addBar(k, animate) {
+    const el = document.createElement('div');
+    const c = game.p.words[k].cells;
+    el.className = 'bar ' + (game.colors[k] || 'f0') + (animate && !reduceMotion ? ' grow' : '');
+    el._a = c[0]; el._b = c[c.length - 1];
+    placeBar(el, el._a, el._b);
+    bars.insertBefore(el, sel);
+    barEls[k] = el;
+  }
+
+  function placeAllBars() {
+    barEls.forEach((el) => { if (el) placeBar(el, el._a, el._b); });
+    bars.querySelectorAll('.miss, .dup').forEach((b) => b.remove());
+    showSelection();
+  }
+
+  function updateHud() {
+    const total = game ? game.p.words.length : 0;
+    const got = game ? game.found.filter(Boolean).length : 0;
+    $('foundNum').innerHTML = got + '<span class="of">/' + total + '</span>';
+    $('setName').textContent = game && game.mode === 'daily' ? 'Daily' : SIZE_NAME[size];
+    shownClock = '';
+    tick();
+  }
+
+  /* ---------- selection ---------- */
+  function showSelection() {
+    let a = -1, b = -1;
+    if (drag) { a = drag.a; b = drag.b; }
+    else if (anchor >= 0) {
+      a = anchor; b = anchor;
+      if (curShown && cur >= 0 && lineCells(N, anchor, cur)) b = cur;
+    }
+    if (a < 0) { sel.hidden = true; return; }
+    sel.hidden = false;
+    placeBar(sel, a, b);
+  }
+
+  function cancelSelection() {
+    drag = null;
+    anchor = -1;
+    board.classList.remove('dragging');
+    sel.hidden = true;
+  }
+
+  function submit(a, b) {
+    if (status !== 'playing') return;
+    const line = lineCells(N, a, b);
+    if (!line || line.length < 2) return;
+    const k = matchWord(game.p, line, game.found);
+    if (k >= 0) { foundWord(k, line); return; }
+    // Already found: a quiet flash. Anything else: a short shake.
+    const s = line.map((i) => game.p.grid[i]).join(''), r = reverse(s);
+    const again = game.p.words.some((x, j) => game.found[j] && (x.w === s || x.w === r));
+    const ghost = document.createElement('div');
+    ghost.className = 'bar ' + (again ? 'dup' : 'miss');
+    placeBar(ghost, a, b);
+    bars.appendChild(ghost);
+    ghost.addEventListener('animationend', () => ghost.remove());
+    setTimeout(() => ghost.remove(), 800);
+  }
+
+  function foundWord(k, line) {
+    game.found[k] = true;
+    game.colors[k] = colorFor(k);
+    // The bar follows the cells the player actually traced.
+    game.p.words[k].cells = line;
+    addBar(k, true);
+    const wc = game.p.words[k].cells;
+    wc.forEach((i, j) => {
+      const el = cells[i];
+      el.classList.add('on');
+      if (reduceMotion) return;
+      el.classList.remove('pop');
+      setTimeout(() => {
+        void el.offsetWidth;
+        el.classList.add('pop');
+        setTimeout(() => el.classList.remove('pop'), 360);
+      }, 30 * j);
+    });
+    items[k].classList.add('got');
+    const num = $('foundNum');
+    updateHud();
+    if (!reduceMotion) { num.classList.remove('bump'); void num.offsetWidth; num.classList.add('bump'); }
+    if (game.found.every(Boolean)) finish();
+    else saveDaily();
+  }
+
+  function finish() {
+    status = 'over';
+    syncTimer();
+    elapsed = Math.max(1000, Math.round(getElapsed()));
+    tick();
+    board.classList.add('over');
+    cancelSelection();
+    let isBest = false;
+    if (game.mode === 'random') {
+      const prev = bestTime(game.size);
+      isBest = !prev || elapsed < prev;
+      if (isBest) lsSet('best:' + game.size, String(elapsed));
+      lsSet('solved:' + game.size, String(solvedCount(game.size) + 1));
+    } else {
+      saveDaily();
+      lsSet('daily-solved', String(readNum('daily-solved') + 1));
+    }
+    // A wave across the grid, then the result.
+    if (!reduceMotion) {
+      cells.forEach((el, i) => {
+        const d = Math.floor(i / N) + (i % N);
+        setTimeout(() => { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }, 260 + d * 22);
+      });
+    }
+    resultTimer = setTimeout(() => showResult(isBest), reduceMotion ? 300 : 900 + N * 30);
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    menuCard.hidden = card !== menuCard;
+    resultCard.hidden = card !== resultCard;
+    overlayOpen = true;
+    cancelSelection();
+    // The letters stay hidden behind the menu so the clock is fair.
+    board.classList.toggle('veil', card === menuCard && status === 'playing');
+    syncTimer();
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    board.classList.remove('veil');
+    if (game) game.started = true;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    syncTimer();
+  }
+  function setNum(el, v, text) {
+    el.textContent = v ? text : 'None';
+    el.classList.toggle('none', !v);
+  }
+
+  function showResult(isBest) {
+    resultTimer = 0;
+    $('resTag').hidden = !isBest;
+    $('resTime').textContent = fmtClock(elapsed);
+    if (game.mode === 'daily') {
+      $('resSub').textContent = 'Daily, ' + dateText(game.day) + ', ' + game.theme;
+      $('resLab2').textContent = 'Words';
+      $('resVal2').textContent = game.p.words.length;
+      $('resVal2').classList.remove('none');
+      $('againBtn').textContent = 'Random puzzle';
+    } else {
+      $('resSub').textContent = game.theme + ', ' + sizeText(game.size);
+      $('resLab2').textContent = 'Best time';
+      const b = bestTime(game.size);
+      setNum($('resVal2'), b, fmtClock(b));
+      $('againBtn').textContent = 'Play again';
+    }
+    openOverlay(resultCard);
+    setTimeout(() => { try { $('againBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  function renderMenu() {
+    $('modeSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === menuMode ? 'true' : 'false'));
+    $('sizeSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === menuSize ? 'true' : 'false'));
+    $('themePick').value = themeChoice;
+    const daily = menuMode === 'daily';
+    $('sizeGroup').hidden = daily;
+    $('themeGroup').hidden = daily;
+    const today = dayIndex(new Date());
+    $('dailyLine').hidden = !daily;
+    $('dailyLine').textContent = dateText(today) + ', ' + sizeText('medium');
+    if (daily) {
+      const s = readJson('daily');
+      const doneToday = s && s.day === today && s.done;
+      $('mLab1').textContent = 'Today';
+      setNum($('mVal1'), doneToday, doneToday ? fmtClock(s.elapsed) : '');
+      $('mLab2').textContent = 'Solved';
+      $('mVal2').textContent = readNum('daily-solved');
+    } else {
+      const b = bestTime(menuSize);
+      $('mLab1').textContent = 'Best time';
+      setNum($('mVal1'), b, fmtClock(b));
+      $('mLab2').textContent = 'Solved';
+      $('mVal2').textContent = solvedCount(menuSize);
+    }
+    $('mVal2').classList.remove('none');
+    const canResume = game && game.started && status === 'playing' && menuMode === game.mode &&
+      (daily ? game.day === today : menuSize === game.size);
+    $('resumeBtn').hidden = !canResume;
+  }
+
+  function openMenu() {
+    clearTimeout(resultTimer); resultTimer = 0;
+    menuMode = game ? game.mode : mode;
+    menuSize = size;
+    renderMenu();
+    openOverlay(menuCard);
+    setTimeout(() => { try { $('playBtn').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+
+  $('modeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    menuMode = b.dataset.v;
+    renderMenu();
+  });
+  $('sizeSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    menuSize = b.dataset.v;
+    renderMenu();
+  });
+  $('themePick').addEventListener('change', (e) => {
+    themeChoice = e.target.value;
+    lsSet('theme', themeChoice);
+  });
+  $('playBtn').addEventListener('click', () => {
+    const today = dayIndex(new Date());
+    if (menuMode === 'daily' && game && game.mode === 'daily' && game.day === today) {
+      if (status === 'over') { showResult(false); return; }
+      hideOverlay();
+      return;
+    }
+    begin(menuMode, menuSize);
+  });
+  $('resumeBtn').addEventListener('click', hideOverlay);
+  $('againBtn').addEventListener('click', () => begin('random', size));
+  $('menuBtn').addEventListener('click', openMenu);
+  $('menuBtnTop').addEventListener('click', openMenu);
+  $('newBtn').addEventListener('click', () => {
+    if (game && game.mode === 'daily') { openMenu(); menuMode = 'random'; renderMenu(); return; }
+    begin('random', size);
+  });
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target !== overlay) return;
+    if (!menuCard.hidden && !$('resumeBtn').hidden) hideOverlay();
+  });
+
+  /* ---------- layout ---------- */
+  let wordW = 0;
+  function layout() {
+    if (!game) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = Math.round(clamp(8, m * 0.03, 24));
+    const gap = Math.round(clamp(8, m * 0.024, 16));
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.padding = pad + 'px';
+    app.style.setProperty('--gap', gap + 'px');
+    const availW = vw - 2 * pad;
+
+    // Widest word in the list, in px.
+    const ms = $('measure').firstChild;
+    wordW = 0;
+    for (const x of game.p.words) { ms.textContent = x.w; wordW = Math.max(wordW, ms.offsetWidth); }
+    const colW = Math.ceil(wordW + fs * 1.1);
+    const itemH = $('measure').offsetHeight || fs * 1.7;
+    const labH = Math.ceil(fs * 1.4);
+    const count = game.p.words.length;
+
+    function fit(headH) {
+      const availH = vh - 2 * pad - headH - gap;
+      // Word list beside the grid.
+      let side = null;
+      for (let cols = 1; cols <= 3; cols++) {
+        const rows = Math.ceil(count / cols);
+        const lw = cols * colW + (cols - 1) * fs * 1.1;
+        const S = Math.min(availH, availW - gap - lw);
+        if (labH + rows * itemH <= S) { side = { mode: 'side', S, cols, rows, lw }; break; }
+      }
+      // Word list under the grid.
+      let below = null;
+      let S = Math.min(availW, availH);
+      for (let it = 0; it < 4; it++) {
+        const cols = clamp(1, Math.floor((Math.max(S, Math.min(availW, 360)) + fs * 1.1) / (colW + fs * 1.1)), 5);
+        const rows = Math.ceil(count / cols);
+        const S2 = Math.min(availW, availH - gap - labH - rows * itemH);
+        below = { mode: 'below', S: S2, cols, rows };
+        if (Math.abs(S2 - S) < 1) break;
+        S = S2;
+      }
+      let best = side && (!below || side.S >= below.S * 0.94) ? side : below;
+      best.cs = Math.max(14, Math.floor(Math.min(best.S, 760) / N));
+      best.bw = best.cs * N + 2;
+      best.cw = best.mode === 'side' ? best.bw + gap + best.lw : Math.max(best.bw, best.cols * colW + (best.cols - 1) * fs * 1.1);
+      return best;
+    }
+    function trial(narrow) {
+      app.classList.toggle('narrow', narrow);
+      app.classList.toggle('wide', !narrow);
+      head.style.width = availW + 'px';
+      let f = fit(head.offsetHeight);
+      const hw = Math.min(availW, Math.max(f.cw, 320));
+      head.style.width = hw + 'px';
+      f = fit(head.offsetHeight);
+      f.hw = hw;
+      return f;
+    }
+    app.classList.add('wide'); app.classList.remove('narrow');
+    head.style.width = 'max-content';
+    const wideNeed = head.offsetWidth;
+    let f = trial(false);
+    if (wideNeed > f.hw) f = trial(true);
+
+    cs = f.cs;
+    board.style.setProperty('--cs', cs + 'px');
+    board.style.width = board.style.height = (cs * N + 2) + 'px';
+    play.classList.toggle('below', f.mode === 'below');
+    wordsEl.style.gridTemplateRows = 'repeat(' + f.rows + ', auto)';
+    wordsEl.style.gridAutoColumns = colW + 'px';
+    list.style.width = f.mode === 'side' ? Math.ceil(f.lw) + 'px' : Math.min(f.hw, f.cols * colW + (f.cols - 1) * fs * 1.1) + 'px';
+    placeAllBars();
+  }
+
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { if (drag) cancelSelection(); layout(); }); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- pointer input ---------- */
+  function cellAt(x, y, snapFrom) {
+    const r = grid.getBoundingClientRect();
+    const fx = (x - r.left) / cs, fy = (y - r.top) / cs;
+    if (snapFrom === undefined) {
+      if (fx < 0 || fy < 0 || fx >= N || fy >= N) return -1;
+      return Math.floor(fy) * N + Math.floor(fx);
+    }
+    // Snap to the nearest of the eight directions from the start cell.
+    const sr = Math.floor(snapFrom / N), sc = snapFrom % N;
+    const dx = fx - (sc + 0.5), dy = fy - (sr + 0.5);
+    if (Math.hypot(dx, dy) < 0.5) return snapFrom;
+    const k = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+    const ux = Math.round(Math.cos(k * Math.PI / 4)), uy = Math.round(Math.sin(k * Math.PI / 4));
+    const len = Math.hypot(ux, uy);
+    let steps = Math.round((dx * ux + dy * uy) / (len * len));
+    // Stay inside the grid.
+    for (; steps > 0; steps--) {
+      const er = sr + uy * steps, ec = sc + ux * steps;
+      if (er >= 0 && er < N && ec >= 0 && ec < N) break;
+    }
+    return (sr + uy * Math.max(0, steps)) * N + sc + ux * Math.max(0, steps);
+  }
+
+  function hideCursor() {
+    if (!curShown) return;
+    curShown = false;
+    if (cells[cur]) cells[cur].classList.remove('cur');
+  }
+
+  board.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (paused) { paused = false; syncTimer(); }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (status !== 'playing' || overlayOpen) return;
+    const c = cellAt(e.clientX, e.clientY);
+    if (c < 0) return;
+    e.preventDefault();
+    hideCursor();
+    if (drag) return;
+    if (anchor >= 0) {
+      if (c === anchor) { cancelSelection(); return; }
+      if (lineCells(N, anchor, c)) {
+        const a = anchor;
+        cancelSelection();
+        submit(a, c);
+        return;
+      }
+      anchor = -1;
+    }
+    drag = { a: c, b: c, id: e.pointerId, moved: false };
+    try { board.setPointerCapture(e.pointerId); } catch (_) {}
+    board.classList.add('dragging');
+    showSelection();
+  });
+  board.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const b = cellAt(e.clientX, e.clientY, drag.a);
+    if (b !== drag.b) { drag.b = b; drag.moved = true; showSelection(); }
+  });
+  function endDrag(e, cancel) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    board.classList.remove('dragging');
+    if (cancel) { cancelSelection(); return; }
+    if (d.a === d.b) {
+      // A tap: hold this letter until the last letter is tapped.
+      anchor = d.a;
+      showSelection();
+      return;
+    }
+    sel.hidden = true;
+    submit(d.a, d.b);
+  }
+  board.addEventListener('pointerup', (e) => endDrag(e, false));
+  board.addEventListener('pointercancel', (e) => endDrag(e, true));
+  board.addEventListener('contextmenu', (e) => e.preventDefault());
+  board.addEventListener('dragstart', (e) => e.preventDefault());
+
+  // No page scroll, rubber-banding or pull to refresh.
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+
+  /* ---------- keyboard ---------- */
+  const MOVES = {
+    ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0],
+    a: [0, -1], d: [0, 1], w: [-1, 0], s: [1, 0], A: [0, -1], D: [0, 1], W: [-1, 0], S: [1, 0],
+  };
+  function moveCursor(dr, dc) {
+    if (cells[cur]) cells[cur].classList.remove('cur');
+    if (cur < 0) cur = Math.floor(N / 2) * N + Math.floor(N / 2);
+    else if (curShown) {
+      const r = clamp(0, Math.floor(cur / N) + dr, N - 1);
+      const c = clamp(0, cur % N + dc, N - 1);
+      cur = r * N + c;
+    }
+    curShown = true;
+    cells[cur].classList.add('cur');
+    showSelection();
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (overlayOpen) {
+      if (e.key === 'Escape' && !menuCard.hidden && !$('resumeBtn').hidden) { e.preventDefault(); hideOverlay(); }
+      return;
+    }
+    if (paused) { paused = false; syncTimer(); }
+    const mv = MOVES[e.key];
+    if (mv) { e.preventDefault(); if (status === 'playing') moveCursor(mv[0], mv[1]); return; }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      e.preventDefault();
+      if (status !== 'playing' || e.repeat) return;
+      if (!curShown) { moveCursor(0, 0); return; }
+      if (anchor < 0) { anchor = cur; showSelection(); return; }
+      if (cur === anchor) { cancelSelection(); return; }
+      if (lineCells(N, anchor, cur)) { const a = anchor; cancelSelection(); submit(a, cur); }
+      return;
+    }
+    if ((e.key === 'n' || e.key === 'N') && !e.repeat) { $('newBtn').click(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (anchor >= 0 || drag) { cancelSelection(); return; }
+      openMenu();
+    }
+  });
+
+  V.onPause((p) => { paused = !!p; syncTimer(); });
+  window.addEventListener('pagehide', saveDaily);
+
+  /* ---------- boot ---------- */
+  // Today's daily sits behind the start menu until a game starts.
+  startGame(mode, size);
+  app.classList.add('ready');
+  openMenu();
+  V.ready();
+
+})();
+</script>
+</body>
+</html>

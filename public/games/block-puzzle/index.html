@@ -1,0 +1,1245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Block Puzzle</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #fff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-h: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+
+  #cv { position: fixed; left: 0; top: 0; display: block; touch-action: none; outline: none; }
+  #app { visibility: hidden; }
+  #app.ready { visibility: visible; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; display: grid; min-width: 0; }
+  #hud.col {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "title title" "stats btn";
+    align-items: end; column-gap: 0.6em; row-gap: 0.8em;
+  }
+  html.vela-embedded #hud.col { grid-template-areas: "stats btn"; }
+  html.vela-embedded #hud.col .title { display: none; }
+  #hud.row { display: flex; flex-direction: column; justify-content: center; gap: 1.1em; }
+
+  .title {
+    grid-area: title; margin: 0;
+    font: 600 1em/1.3 var(--font);
+    letter-spacing: 0.22em; text-transform: uppercase; white-space: nowrap;
+  }
+  .title::before {
+    content: ""; display: inline-block;
+    width: 0.62em; height: 0.62em; margin-right: 0.62em;
+    background: var(--brand); vertical-align: 0.02em;
+  }
+  #hud.row .title { white-space: normal; }
+
+  .stats { grid-area: stats; display: flex; gap: 0.4em; min-width: 0; }
+  #hud.row .stats { flex-direction: column; gap: 0; border: 1px solid var(--line); background: var(--surface); border-radius: 2px; }
+  .stat {
+    position: relative; min-width: 4.9em;
+    padding: 0.5em 0.75em 0.55em;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 2px;
+  }
+  #hud.row .stat { border: 0; border-radius: 0; padding: 0.75em 0.95em 0.8em; }
+  #hud.row .stat + .stat { border-top: 1px solid var(--line); }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.7em, 12px)/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .num {
+    display: block;
+    font: 600 1.3em/1.15 var(--font-display, var(--font));
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.12em; white-space: nowrap;
+  }
+  #hud.row .num { font-size: 2em; font-weight: 300; }
+  .num.bump { animation: bump 300ms var(--ease); }
+  @keyframes bump { 0% { color: var(--brand-h); } 100% { color: var(--text); } }
+  .plus {
+    position: absolute; right: 0.75em; bottom: 0.55em;
+    font: 600 0.78em var(--font); color: var(--brand-h);
+    pointer-events: none;
+    animation: rise 650ms cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+  @keyframes rise { from { opacity: 1; transform: translateY(0.4em); } to { opacity: 0; transform: translateY(-1.2em); } }
+  .pips { position: absolute; right: 0.75em; bottom: 0.75em; display: flex; gap: 3px; visibility: hidden; }
+  #hud.row .pips { bottom: 1.1em; right: 0.95em; }
+  .pips.on { visibility: visible; }
+  .pips i { width: 6px; height: 6px; background: rgba(255, 255, 255, 0.16); transition: background-color 150ms var(--ease); }
+  .pips i.on { background: var(--brand); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 3.1em; padding: 0 1.1em;
+    border-radius: 0; border: 1px solid var(--outline); background: transparent;
+    font: 600 clamp(11px, 0.74em, 13px) var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background-color 150ms var(--ease), border-color 150ms var(--ease), color 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-h); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-h); border-color: var(--brand-h); }
+  .btn.primary:active { background: var(--brand-d); border-color: var(--brand-d); }
+  .btn.armed, .btn.armed:hover { background: var(--surface); border-color: var(--brand); color: var(--brand-h); }
+  #newBtn { grid-area: btn; }
+  #hud.col #newBtn { height: auto; align-self: stretch; }
+  #hud.row #newBtn { width: 100%; }
+
+  /* ---------- board layer: pops and overlays sit over the board ---------- */
+  #boardLayer { position: absolute; pointer-events: none; }
+  #pops { position: absolute; inset: 0; overflow: visible; }
+  .pop {
+    position: absolute; left: 0; top: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 0.35em;
+    transform: translate(-50%, -50%);
+    animation: pop 900ms var(--ease) forwards;
+  }
+  .pop .pts {
+    padding: 0.12em 0.3em 0.16em;
+    background: #000;
+    font: 600 1.6em/1 var(--font-display, var(--font));
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+  }
+  .pop .tagl {
+    padding: 0.42em 0.6em;
+    background: #000; border: 1px solid var(--line);
+    font: 600 clamp(11px, 0.72em, 12px)/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+  }
+  .pop .tagl.o { background: var(--brand); border-color: var(--brand); }
+  @keyframes pop {
+    0% { opacity: 0; margin-top: 8px; }
+    14% { opacity: 1; margin-top: 0; }
+    72% { opacity: 1; margin-top: -4px; }
+    100% { opacity: 0; margin-top: -14px; }
+  }
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center; padding: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    visibility: hidden; opacity: 0; pointer-events: none;
+    transition: opacity 200ms var(--ease), visibility 0s linear 200ms;
+  }
+  .overlay.show { visibility: visible; opacity: 1; pointer-events: auto; transition: opacity 200ms var(--ease); }
+  .card {
+    width: 100%; max-width: 17em; text-align: center;
+    background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--brand);
+    border-radius: 0;
+    padding: 1.3em 1.1em 1.2em;
+    transform: translateY(12px);
+    transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .name { font-weight: 700; font-size: 1.15em; line-height: 1.25; letter-spacing: 0.2em; text-transform: uppercase; }
+  .ctl { margin: 0.9em 0 0; font-size: 0.86em; line-height: 1.5; color: var(--muted); }
+  .card .btns { display: flex; flex-direction: column; gap: 0.5em; margin-top: 1.1em; }
+  .card .btns .btn { width: 100%; }
+  .go-score {
+    margin-top: 0.3em;
+    font: 300 2.6em/1.05 var(--font-display, var(--font));
+    font-variant-numeric: tabular-nums;
+  }
+  .go-best { margin-top: 0.8em; }
+  .go-best .v { color: var(--text); margin-left: 0.5em; font-variant-numeric: tabular-nums; }
+  .tag {
+    display: none; margin: 0.7em auto 0; width: max-content;
+    padding: 0.45em 0.6em; background: var(--brand); color: #fff;
+    font: 600 0.62em/1 var(--font); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .tag.show { display: block; }
+  [hidden] { display: none !important; }
+
+  html.touch .keys-only { display: none !important; }
+  html:not(.touch) .touch-only { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pop { animation-name: popfade; }
+    @keyframes popfade { 0% { opacity: 0; } 10%, 75% { opacity: 1; } 100% { opacity: 0; } }
+    .card { transform: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="cv" tabindex="-1" aria-label="Game board"></canvas>
+<div id="app">
+  <div id="hud" class="col">
+    <h1 class="title">Block Puzzle</h1>
+    <div class="stats">
+      <div class="stat" id="scoreBox"><span class="lab">Score</span><span class="num" id="score">0</span></div>
+      <div class="stat"><span class="lab">Best</span><span class="num" id="best">0</span></div>
+      <div class="stat"><span class="lab">Streak</span><span class="num" id="streak">0</span><span class="pips" id="pips"><i></i><i></i><i></i></span></div>
+    </div>
+    <button class="btn" id="newBtn" type="button">New game</button>
+  </div>
+
+  <div id="boardLayer">
+    <div id="pops" aria-live="polite"></div>
+
+    <div class="overlay show" id="startOv">
+      <div class="card">
+        <div class="name">Block Puzzle</div>
+        <p class="ctl keys-only">Drag a piece onto the grid, or press 1 to 3, arrows and Enter.</p>
+        <p class="ctl touch-only">Drag a piece onto the grid.</p>
+        <div class="btns">
+          <button class="btn primary" id="playBtn" type="button">Play</button>
+          <button class="btn" id="freshBtn" type="button" hidden>New game</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="overOv">
+      <div class="card" role="dialog" aria-live="polite">
+        <div class="lab">Game over</div>
+        <div class="go-score" id="goScore">0</div>
+        <div class="tag" id="goNew">New best</div>
+        <div class="lab go-best">Best<span class="v" id="goBest">0</span></div>
+        <div class="btns"><button class="btn primary" id="againBtn" type="button">Play again</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="block-puzzle"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || {
+    embedded: window.parent !== window,
+    ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {},
+  };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const N = 10;                 // grid is N x N
+  const STREAK_WINDOW = 3;      // a streak survives two placements without a clear, breaks on the third
+  const LINE_POINTS = 10;
+  const BOARD_CLEAR_BONUS = 300;
+
+  function normalize(cells) {
+    let mr = Infinity, mc = Infinity;
+    for (const [r, c] of cells) { if (r < mr) mr = r; if (c < mc) mc = c; }
+    return cells.map(([r, c]) => [r - mr, c - mc]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  }
+  function fromRows(rows) {
+    const out = [];
+    rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === '#') out.push([r, c]); });
+    return normalize(out);
+  }
+  const rotate = (cells) => normalize(cells.map(([r, c]) => [c, -r]));
+  const mirror = (cells) => normalize(cells.map(([r, c]) => [r, -c]));
+
+  // color: index into the palette (1 white .. 7 dark orange)
+  const FAMILIES = [
+    { name: 'dot',     weight: 3, color: 4, rows: ['#'] },
+    { name: 'line2',   weight: 5, color: 2, rows: ['##'], rotate: true },
+    { name: 'line3',   weight: 6, color: 3, rows: ['###'], rotate: true },
+    { name: 'line4',   weight: 5, color: 1, rows: ['####'], rotate: true },
+    { name: 'line5',   weight: 4, color: 6, rows: ['#####'], rotate: true },
+    { name: 'square2', weight: 6, color: 5, rows: ['##', '##'] },
+    { name: 'square3', weight: 3, color: 7, rows: ['###', '###', '###'] },
+    { name: 'corner3', weight: 6, color: 1, rows: ['#.', '##'], rotate: true },
+    { name: 'corner5', weight: 4, color: 6, rows: ['#..', '#..', '###'], rotate: true },
+    { name: 'l4',      weight: 6, color: 4, rows: ['#.', '#.', '##'], rotate: true, mirror: true },
+  ];
+
+  const SHAPES = [];
+  FAMILIES.forEach((f, fi) => {
+    const seen = new Set();
+    f.ids = [];
+    const bases = [fromRows(f.rows)];
+    if (f.mirror) bases.push(mirror(bases[0]));
+    for (const b of bases) {
+      let cur = b;
+      for (let k = 0; k < (f.rotate ? 4 : 1); k++) {
+        const key = JSON.stringify(cur);
+        if (!seen.has(key)) {
+          seen.add(key);
+          let w = 0, h = 0;
+          for (const [r, c] of cur) { if (r + 1 > h) h = r + 1; if (c + 1 > w) w = c + 1; }
+          f.ids.push(SHAPES.length);
+          SHAPES.push({ id: SHAPES.length, family: fi, cells: cur, w, h, color: f.color });
+        }
+        cur = rotate(cur);
+      }
+    }
+  });
+  const TOTAL_WEIGHT = FAMILIES.reduce((a, f) => a + f.weight, 0);
+
+  function emptyGrid() { return new Array(N * N).fill(0); }
+
+  function canPlace(grid, shape, r, c) {
+    if (r < 0 || c < 0 || r + shape.h > N || c + shape.w > N) return false;
+    for (const [dr, dc] of shape.cells) if (grid[(r + dr) * N + c + dc]) return false;
+    return true;
+  }
+
+  function fitsAnywhere(grid, shape) {
+    for (let r = 0; r + shape.h <= N; r++) {
+      for (let c = 0; c + shape.w <= N; c++) if (canPlace(grid, shape, r, c)) return true;
+    }
+    return false;
+  }
+
+  function anyFits(grid, tray) {
+    return tray.some((id) => id != null && fitsAnywhere(grid, SHAPES[id]));
+  }
+
+  function fullLines(grid) {
+    const rows = [], cols = [];
+    for (let r = 0; r < N; r++) {
+      let full = true;
+      for (let c = 0; c < N; c++) if (!grid[r * N + c]) { full = false; break; }
+      if (full) rows.push(r);
+    }
+    for (let c = 0; c < N; c++) {
+      let full = true;
+      for (let r = 0; r < N; r++) if (!grid[r * N + c]) { full = false; break; }
+      if (full) cols.push(c);
+    }
+    return { rows, cols };
+  }
+
+  function lineCells(rows, cols) {
+    const set = new Set();
+    rows.forEach((r) => { for (let c = 0; c < N; c++) set.add(r * N + c); });
+    cols.forEach((c) => { for (let r = 0; r < N; r++) set.add(r * N + c); });
+    return set;
+  }
+
+  // What placing `shape` at r,c would clear (assumes the placement is legal).
+  function previewClear(grid, shape, r, c) {
+    const g = grid.slice();
+    for (const [dr, dc] of shape.cells) g[(r + dr) * N + c + dc] = shape.color;
+    const { rows, cols } = fullLines(g);
+    return lineCells(rows, cols);
+  }
+
+  // Lines cleared together score 10, 30, 60, 100 ... times the streak.
+  function linePoints(lines, streak) {
+    return LINE_POINTS * (lines * (lines + 1) / 2) * Math.max(1, streak);
+  }
+
+  function randomShapeId(rng) {
+    let x = rng() * TOTAL_WEIGHT;
+    let f = FAMILIES[FAMILIES.length - 1];
+    for (const fam of FAMILIES) { if (x < fam.weight) { f = fam; break; } x -= fam.weight; }
+    return f.ids[Math.min(f.ids.length - 1, Math.floor(rng() * f.ids.length))];
+  }
+
+  // Three random pieces; re-dealt a few times so at least one of them fits.
+  function dealTray(grid, rng) {
+    let tray = null;
+    for (let i = 0; i < 40; i++) {
+      tray = [randomShapeId(rng), randomShapeId(rng), randomShapeId(rng)];
+      if (anyFits(grid, tray)) return tray;
+    }
+    return tray;
+  }
+
+  function newState(rng) {
+    const grid = emptyGrid();
+    return { grid, tray: dealTray(grid, rng), score: 0, streak: 0, since: 0, over: false };
+  }
+
+  // Place tray[slot] at r,c. Returns null when illegal, otherwise the next
+  // state and what happened (for scoring display and animation).
+  function applyMove(state, slot, r, c, rng) {
+    if (state.over) return null;
+    const id = state.tray[slot];
+    if (id == null) return null;
+    const shape = SHAPES[id];
+    if (!canPlace(state.grid, shape, r, c)) return null;
+
+    const grid = state.grid.slice();
+    const placed = [];
+    for (const [dr, dc] of shape.cells) {
+      const i = (r + dr) * N + c + dc;
+      grid[i] = shape.color;
+      placed.push(i);
+    }
+    const { rows, cols } = fullLines(grid);
+    const set = lineCells(rows, cols);
+    const cleared = [];
+    set.forEach((i) => cleared.push({ i, color: grid[i] }));
+    set.forEach((i) => { grid[i] = 0; });
+
+    const lines = rows.length + cols.length;
+    let streak = state.streak, since = state.since, lp = 0, bonus = 0;
+    if (lines) {
+      streak += 1;
+      since = 0;
+      lp = linePoints(lines, streak);
+      if (grid.every((v) => !v)) bonus = BOARD_CLEAR_BONUS;
+    } else {
+      since += 1;
+      if (since >= STREAK_WINDOW) streak = 0;
+    }
+    const points = shape.cells.length + lp + bonus;
+
+    const tray = state.tray.slice();
+    tray[slot] = null;
+    let dealt = false;
+    if (tray.every((t) => t == null)) {
+      const fresh = dealTray(grid, rng);
+      for (let i = 0; i < 3; i++) tray[i] = fresh[i];
+      dealt = true;
+    }
+    const over = !anyFits(grid, tray);
+    return {
+      state: { grid, tray, score: state.score + points, streak, since, over },
+      events: { shape, r, c, placed, rows, cols, cleared, lines, linePts: lp, bonus, points, streak, dealt, over },
+    };
+  }
+  /* ===== LOGIC END ===== */
+
+  /* ---------- look ---------- */
+  const PALETTE = [null, '#ffffff', '#c9cbd1', '#8a8f99', '#ffb08f', '#ff7a4d', '#ea5426', '#b83f19'];
+  function rgbOf(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  function shade(hex, k) { return '#' + rgbOf(hex).map((v) => Math.round(v * k).toString(16).padStart(2, '0')).join(''); }
+  function mix(hex, hex2, t) {
+    const a = rgbOf(hex), b = rgbOf(hex2);
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t) + ',' + Math.round(a[1] + (b[1] - a[1]) * t) + ',' + Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+  }
+  const EDGES = PALETTE.map((c) => c && shade(c, 0.7));
+  const DEAD = '#3a3d44', DEAD_EDGE = '#2a2c31';
+  const EMPTY = '#16181c', BOARD_BG = '#0b0c0f', HAIR = 'rgba(255,255,255,0.1)';
+
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const LIFT_MS = reduceMotion ? 1 : 140;
+  const RETURN_MS = reduceMotion ? 1 : 220;
+  const LAND_MS = reduceMotion ? 1 : 80;
+  const CLEAR_MS = reduceMotion ? 160 : 300;
+  const CLEAR_STAGGER = reduceMotion ? 0 : 22;
+  const DEAL_MS = reduceMotion ? 1 : 300;
+
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const X = (u) => ((ax * u + bx) * u + cx) * u;
+    const Y = (u) => ((ay * u + by) * u + cy) * u;
+    return function (t) {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      let lo = 0, hi = 1, u = t;
+      for (let i = 0; i < 24; i++) { if (X(u) < t) lo = u; else hi = u; u = (lo + hi) / 2; }
+      return Y(u);
+    };
+  }
+  const EASE = cubicBezier(0.1, 0.9, 0.2, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const app = $('app'), hud = $('hud'), boardLayer = $('boardLayer'), popsEl = $('pops');
+  const scoreEl = $('score'), bestEl = $('best'), streakEl = $('streak'), pipsEl = $('pips'), scoreBox = $('scoreBox');
+  const newBtn = $('newBtn');
+  const startOv = $('startOv'), overOv = $('overOv');
+
+  /* ---------- state ---------- */
+  const SAVE_KEY = 'vela:block-puzzle:save';
+  let state = null;
+  let fits = [true, true, true];
+  let started = false;          // start card dismissed
+  let overlayOpen = true;
+  let paused = false;
+
+  // animation and input state
+  let drag = null;              // { slot, id, pid, touch, px, py, t0, from:{x,y,p,gp}, target }
+  let ret = null;               // piece flying back to its slot
+  let kb = null;                // keyboard placement { slot, r, c }
+  let landing = null;           // { t0, items:[{i,color,from,to}] }
+  let hidden = new Set();       // grid cells drawn by an animation instead
+  let clears = [];              // { i, color, start, placed }
+  let particles = [];
+  let dealAnim = null;          // { t0 }
+  let shakeAnim = null;         // { t0, amp }
+  let deadStart = 0;
+  let nudgeAnim = null;         // keyboard piece refused
+
+  // layout
+  const L = { vw: 0, vh: 0, dpr: 1, bx: 0, by: 0, S: 0, D: 0, g: 1, tD: 0, tg: 1, slots: [], row: false };
+
+  function save() {
+    try {
+      if (!state || state.over) { localStorage.removeItem(SAVE_KEY); return; }
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ g: state.grid, t: state.tray, s: state.score, k: state.streak, n: state.since }));
+    } catch (_) {}
+  }
+
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (!d || !Array.isArray(d.g) || d.g.length !== N * N) return null;
+      if (!d.g.every((v) => Number.isInteger(v) && v >= 0 && v < PALETTE.length)) return null;
+      if (!Array.isArray(d.t) || d.t.length !== 3) return null;
+      if (!d.t.every((t) => t === null || (Number.isInteger(t) && t >= 0 && t < SHAPES.length))) return null;
+      if (d.t.every((t) => t === null)) return null;
+      if (!Number.isFinite(d.s) || d.s < 0 || !Number.isInteger(d.k) || d.k < 0 || !Number.isInteger(d.n) || d.n < 0) return null;
+      if (!anyFits(d.g, d.t)) return null;
+      return { grid: d.g, tray: d.t, score: d.s, streak: d.k, since: d.n, over: false };
+    } catch (_) { return null; }
+  }
+
+  function updateFits() {
+    fits = state.tray.map((id) => id != null && fitsAnywhere(state.grid, SHAPES[id]));
+  }
+
+  /* ---------- HUD ---------- */
+  let shownScore = -1;
+  function updateHud(gained) {
+    if (state.score !== shownScore) {
+      scoreEl.textContent = state.score.toLocaleString('en-US');
+      shownScore = state.score;
+      V.score(state.score);
+      if (gained > 0) {
+        scoreEl.classList.remove('bump'); void scoreEl.offsetWidth; scoreEl.classList.add('bump');
+        const p = document.createElement('span');
+        p.className = 'plus';
+        p.textContent = '+' + gained;
+        scoreBox.appendChild(p);
+        setTimeout(() => p.remove(), 700);
+      }
+    }
+    bestEl.textContent = Math.max(V.best(), state.score).toLocaleString('en-US');
+    streakEl.textContent = state.streak;
+    pipsEl.classList.toggle('on', state.streak > 0);
+    const left = state.streak > 0 ? STREAK_WINDOW - state.since : 0;
+    Array.prototype.forEach.call(pipsEl.children, (el, i) => el.classList.toggle('on', i < left));
+  }
+
+  function showPop(ev) {
+    if (!ev.lines) return;
+    // centre of the cleared cells, kept inside the board
+    let sx = 0, sy = 0;
+    ev.cleared.forEach(({ i }) => { sx += i % N; sy += Math.floor(i / N); });
+    const n = ev.cleared.length;
+    const D = L.D;
+    let x = L.g / 2 + (sx / n + 0.5) * D, y = L.g / 2 + (sy / n + 0.5) * D;
+    x = clamp(L.S * 0.22, x, L.S * 0.78);
+    y = clamp(L.S * 0.16, y, L.S * 0.84);
+    const el = document.createElement('div');
+    el.className = 'pop';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    const pts = document.createElement('div');
+    pts.className = 'pts';
+    pts.textContent = '+' + (ev.linePts + ev.bonus);
+    el.appendChild(pts);
+    const tag = (txt, o) => { const t = document.createElement('div'); t.className = 'tagl' + (o ? ' o' : ''); t.textContent = txt; el.appendChild(t); };
+    tag(ev.lines === 1 ? '1 line' : ev.lines + ' lines', true);
+    if (ev.streak > 1) tag('Streak ' + ev.streak);
+    if (ev.bonus) tag('Board clear', true);
+    popsEl.appendChild(el);
+    setTimeout(() => el.remove(), 950);
+  }
+
+  /* ---------- overlays ---------- */
+  function showOv(ov) {
+    [startOv, overOv].forEach((o) => o.classList.toggle('show', o === ov));
+    overlayOpen = !!ov;
+    boardLayer.style.pointerEvents = ov ? 'auto' : 'none';
+    if (ov) {
+      const b = ov.querySelector('.btn.primary');
+      setTimeout(() => { try { b.focus({ preventScroll: true }); } catch (_) {} }, 60);
+    }
+  }
+
+  /* ---------- flow ---------- */
+  function clearAnims() {
+    drag = null; ret = null; kb = null; landing = null; hidden = new Set();
+    clears = []; particles = []; shakeAnim = null; nudgeAnim = null; deadStart = 0;
+    popsEl.textContent = '';
+  }
+
+  let overTimer = 0;
+  function newGame() {
+    clearTimeout(overTimer);
+    if (state && !state.over && state.score > 0) V.gameOver(state.score);   // abandoning a run still counts toward best
+    disarmNew();
+    clearAnims();
+    state = newState(Math.random);
+    updateFits();
+    shownScore = -1;
+    updateHud(0);
+    save();
+    started = true;
+    showOv(null);
+    dealAnim = { t0: performance.now() };
+    kick();
+  }
+
+  function play() {
+    if (!state || state.over) { newGame(); return; }
+    started = true;
+    showOv(null);
+    dealAnim = { t0: performance.now() };
+    kick();
+  }
+
+  function commit(slot, r, c, fromRects) {
+    const res = applyMove(state, slot, r, c, Math.random);
+    if (!res) return false;
+    const ev = res.events;
+    const now = performance.now();
+    state = res.state;
+    disarmNew();
+
+    // landing: the piece settles into its cells
+    const D = L.D, s = D - L.g;
+    const items = ev.placed.map((i, k) => {
+      const to = { x: L.bx + L.g + (i % N) * D, y: L.by + L.g + Math.floor(i / N) * D, s };
+      const from = fromRects ? fromRects[k] : { x: to.x - s * 0.08, y: to.y - s * 0.08, s: s * 1.16 };
+      return { i, color: ev.shape.color, from, to };
+    });
+    landing = { t0: now, items };
+    hidden = new Set(ev.placed);
+
+    // clears sweep outward from the placed piece
+    const placedSet = new Set(ev.placed);
+    const startBase = now + LAND_MS;
+    let lastEnd = startBase;
+    ev.cleared.forEach(({ i, color }) => {
+      const r0 = Math.floor(i / N), c0 = i % N;
+      let dist = Infinity;
+      ev.placed.forEach((p) => {
+        const d = Math.max(Math.abs(Math.floor(p / N) - r0), Math.abs((p % N) - c0));
+        if (d < dist) dist = d;
+      });
+      const start = startBase + dist * CLEAR_STAGGER;
+      lastEnd = Math.max(lastEnd, start + CLEAR_MS);
+      clears.push({ i, color, start, placed: placedSet.has(i) });
+      if (!reduceMotion) spawnChips(i, color, start + CLEAR_MS * 0.35);
+    });
+    if (ev.lines >= 2 && !reduceMotion) shakeAnim = { t0: startBase, amp: Math.min(5, 1 + ev.lines) };
+
+    if (ev.dealt) dealAnim = { t0: now + LAND_MS + 60 };
+    updateFits();
+    updateHud(ev.points);
+    if (ev.lines) setTimeout(() => showPop(ev), LAND_MS);
+    save();
+
+    if (state.over) endGame(lastEnd + 120);
+    kick();
+    return true;
+  }
+
+  function endGame(at) {
+    const isBest = state.score > 0 && V.gameOver(state.score);
+    kb = null;
+    deadStart = at;
+    save();
+    const wait = Math.max(0, at - performance.now()) + N * 45 + 420;
+    overTimer = setTimeout(() => {
+      if (!state.over) return;
+      $('goScore').textContent = state.score.toLocaleString('en-US');
+      $('goBest').textContent = Math.max(V.best(), state.score).toLocaleString('en-US');
+      $('goNew').classList.toggle('show', isBest);
+      showOv(overOv);
+    }, wait);
+    kick();
+  }
+
+  function spawnChips(i, color, t0) {
+    const D = L.D, s = D - L.g;
+    const cx = L.bx + L.g + (i % N) * D + s / 2, cy = L.by + L.g + Math.floor(i / N) * D + s / 2;
+    for (let k = 0; k < 2; k++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = D * (2.5 + Math.random() * 4);
+      particles.push({
+        x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - D * 3,
+        size: Math.max(2, s * (0.16 + Math.random() * 0.12)),
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 10,
+        color: PALETTE[color], t0, life: 420 + Math.random() * 180,
+      });
+    }
+  }
+
+  /* ---------- New game confirm (only when there is a real run to lose) ---------- */
+  let armTimer = 0;
+  function requestNew() {
+    if (!started || state.over || state.score < 100 || newBtn.classList.contains('armed')) { newGame(); return; }
+    newBtn.classList.add('armed');
+    newBtn.textContent = 'Start over?';
+    clearTimeout(armTimer);
+    armTimer = setTimeout(disarmNew, 2600);
+  }
+  function disarmNew() {
+    clearTimeout(armTimer);
+    if (!newBtn.classList.contains('armed')) return;
+    newBtn.classList.remove('armed');
+    newBtn.textContent = 'New game';
+  }
+
+  /* ---------- geometry helpers ---------- */
+  function slotCenter(k) { const s = L.slots[k]; return { x: s.x + s.w / 2, y: s.y + s.h / 2 }; }
+
+  // Touch: the piece floats above the finger so it stays visible. When there
+  // is little screen below the board (landscape), the gap closes over the last
+  // stretch of the screen so the bottom row is still reachable.
+  function liftFor(shape, touch, py) {
+    if (!touch) return 0;
+    const full = L.D * 1.3;
+    const room = L.vh - 2 - (L.by + L.S);
+    let gap = full;
+    if (room < full) {
+      const zone = L.D * 3;
+      const t = clamp(0, (py - (L.vh - 2 - zone)) / zone, 1);
+      gap = lerp(full, Math.max(0, room), t);
+    }
+    return shape.h * L.D / 2 + gap;
+  }
+
+  function dragCenter() {
+    const shape = SHAPES[drag.id];
+    return { x: drag.px, y: drag.py - liftFor(shape, drag.touch, drag.py) };
+  }
+
+  // Board cell whose top-left the floating piece is nearest to, if legal.
+  function snapFor(shape, cx, cy) {
+    const D = L.D;
+    const fc = (cx - shape.w * D / 2 - L.bx - L.g / 2) / D;
+    const fr = (cy - shape.h * D / 2 - L.by - L.g / 2) / D;
+    const r0 = Math.round(fr), c0 = Math.round(fc);
+    let best = null, bd = Infinity;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const r = r0 + dr, c = c0 + dc;
+      const d = Math.hypot(r - fr, c - fc);
+      if (d < 0.72 && d < bd && canPlace(state.grid, shape, r, c)) { best = { r, c }; bd = d; }
+    }
+    return best;
+  }
+
+  // Current drawn geometry of the floating piece.
+  function dragGeom(now) {
+    const k = EASE(Math.min(1, (now - drag.t0) / LIFT_MS));
+    const tc = dragCenter();
+    return {
+      x: lerp(drag.from.x, tc.x, k), y: lerp(drag.from.y, tc.y, k),
+      p: lerp(drag.from.p, L.D, k), gp: lerp(drag.from.gp, L.g, k),
+    };
+  }
+  function retGeom(now) {
+    const k = EASE(Math.min(1, (now - ret.t0) / RETURN_MS));
+    const to = slotCenter(ret.slot);
+    return { x: lerp(ret.from.x, to.x, k), y: lerp(ret.from.y, to.y, k), p: lerp(ret.from.p, L.tD, k), gp: lerp(ret.from.gp, L.tg, k), done: k >= 1 };
+  }
+
+  function cellRects(shape, gm) {
+    const s = gm.p - gm.gp;
+    const x0 = gm.x - (shape.w * gm.p - gm.gp) / 2, y0 = gm.y - (shape.h * gm.p - gm.gp) / 2;
+    return shape.cells.map(([r, c]) => ({ x: x0 + c * gm.p, y: y0 + r * gm.p, s }));
+  }
+
+  /* ---------- drawing ---------- */
+  function cell(x, y, s, main, edge) {
+    if (s <= 0) return;
+    const e = Math.max(1, Math.round(s * 0.09));
+    ctx.fillStyle = edge;
+    ctx.fillRect(x, y, s, s);
+    ctx.fillStyle = main;
+    ctx.fillRect(x + e, y + e, s - 2 * e, s - 2 * e);
+  }
+  function colorCell(x, y, s, ci) { cell(x, y, s, PALETTE[ci], EDGES[ci]); }
+
+  function drawShape(shape, gm, dead, alpha) {
+    const rects = cellRects(shape, gm);
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    const snap = gm.p === Math.round(gm.p);
+    rects.forEach((q) => {
+      const x = snap ? Math.round(q.x) : q.x, y = snap ? Math.round(q.y) : q.y;
+      if (dead) cell(x, y, q.s, DEAD, DEAD_EDGE); else colorCell(x, y, q.s, shape.color);
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  let pvKey = '', pvCache = null;
+  function preview() {
+    let shape = null, r = 0, c = 0, valid = false;
+    if (drag && drag.target) { shape = SHAPES[drag.id]; r = drag.target.r; c = drag.target.c; valid = true; }
+    else if (kb && state.tray[kb.slot] != null) { shape = SHAPES[state.tray[kb.slot]]; r = kb.r; c = kb.c; valid = canPlace(state.grid, shape, r, c); }
+    if (!shape || state.over) return null;
+    const key = shape.id + ':' + r + ':' + c + ':' + valid + ':' + state.score + ':' + state.tray.join(',');
+    if (key !== pvKey) {
+      pvKey = key;
+      const cells = shape.cells.map(([dr, dc]) => (r + dr) * N + c + dc);
+      pvCache = { shape, r, c, valid, cells, clear: valid ? previewClear(state.grid, shape, r, c) : new Set() };
+    }
+    return pvCache;
+  }
+
+  function render(now) {
+    const { D, g, bx, by, S } = L;
+    const s = D - g;
+    ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0);
+    ctx.clearRect(0, 0, L.vw, L.vh);
+
+    // board, with a short stepped shake on multi-line clears
+    let ox = 0, oy = 0;
+    if (shakeAnim) {
+      const t = now - shakeAnim.t0;
+      if (t > 200) shakeAnim = null;
+      else if (t >= 0) {
+        const step = Math.floor(t / 40);
+        const a = shakeAnim.amp * (1 - t / 200);
+        ox = Math.round((step % 2 ? -1 : 1) * a); oy = Math.round((step % 3 - 1) * a * 0.6);
+      }
+    }
+    if (landing && now - landing.t0 >= LAND_MS && !clears.some((q) => q.placed && now < q.start)) {
+      landing = null;
+      hidden = new Set();
+    }
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.fillStyle = HAIR;
+    ctx.fillRect(bx - 1, by - 1, S + 2, S + 2);
+    ctx.fillStyle = BOARD_BG;
+    ctx.fillRect(bx, by, S, S);
+
+    const pv = preview();
+    const deadOn = state.over && deadStart && now >= deadStart;
+    for (let i = 0; i < N * N; i++) {
+      const r = Math.floor(i / N), c = i % N;
+      const x = bx + g + c * D, y = by + g + r * D;
+      const v = state.grid[i];
+      if (!v || hidden.has(i)) { ctx.fillStyle = EMPTY; ctx.fillRect(x, y, s, s); continue; }
+      if (deadOn && now >= deadStart + r * 45) cell(x, y, s, DEAD, DEAD_EDGE);
+      else if (pv && pv.clear.has(i)) colorCell(x, y, s, pv.shape.color);
+      else colorCell(x, y, s, v);
+    }
+
+    // ghost of the piece where it would land
+    if (pv) {
+      const full = pv.valid && pv.clear.size > 0;
+      pv.cells.forEach((i) => {
+        const r = Math.floor(i / N), c = i % N;
+        if (r < 0 || r >= N || c < 0 || c >= N) return;
+        const x = bx + g + c * D, y = by + g + r * D;
+        if (!pv.valid) {
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = state.grid[i] ? '#000' : DEAD;
+          ctx.fillRect(x, y, s, s);
+          ctx.strokeStyle = '#8a8f99'; ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, s - 1, s - 1);
+        } else {
+          ctx.globalAlpha = full ? 1 : 0.4;
+          colorCell(x, y, s, pv.shape.color);
+        }
+        ctx.globalAlpha = 1;
+      });
+      // the lines that will clear blink a flat white wash
+      if (pv.clear.size) {
+        ctx.globalAlpha = 0.1 + 0.12 * (0.5 + 0.5 * Math.sin(now / 95));
+        ctx.fillStyle = '#ffffff';
+        pv.clear.forEach((i) => ctx.fillRect(bx + g + (i % N) * D, by + g + Math.floor(i / N) * D, s, s));
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // landing piece
+    if (landing) {
+      const k = EASE(Math.min(1, (now - landing.t0) / LAND_MS));
+      landing.items.forEach((it) => {
+        const isCleared = clears.some((q) => q.i === it.i && now >= q.start);
+        if (isCleared) return;
+        const x = lerp(it.from.x, it.to.x, k), y = lerp(it.from.y, it.to.y, k), sz = lerp(it.from.s, it.to.s, k);
+        colorCell(k >= 1 ? Math.round(x) : x, k >= 1 ? Math.round(y) : y, sz, it.color);
+      });
+    }
+
+    // clearing cells: flash white, then pinch to nothing
+    if (clears.length) {
+      clears = clears.filter((q) => now < q.start + CLEAR_MS);
+      clears.forEach((q) => {
+        const x = bx + g + (q.i % N) * D, y = by + g + Math.floor(q.i / N) * D;
+        const t = now - q.start;
+        if (t < 0) { if (!q.placed) colorCell(x, y, s, q.color); return; }
+        const p = t / CLEAR_MS;
+        if (p < 0.35) {
+          const w = p / 0.35;
+          cell(x, y, s, mix(PALETTE[q.color], '#ffffff', w), mix(EDGES[q.color], '#ffffff', w));
+        } else {
+          const qq = EASE((p - 0.35) / 0.65);
+          const sz = Math.round(s * (1 - qq));
+          if (sz > 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x + (s - sz) / 2), Math.round(y + (s - sz) / 2), sz, sz); }
+        }
+      });
+    }
+    ctx.restore();
+
+    // tray
+    if (started) {
+      for (let k = 0; k < 3; k++) {
+        const id = state.tray[k];
+        if (id == null) continue;
+        if (drag && drag.slot === k) continue;
+        if (ret && ret.slot === k) continue;
+        const shape = SHAPES[id];
+        const c = slotCenter(k);
+        let dx = 0, dy = 0, alpha = 1;
+        if (dealAnim) {
+          const t = (now - dealAnim.t0 - k * 60) / DEAL_MS;
+          if (t < 0) continue;
+          const e = EASE(Math.min(1, t));
+          const dist = L.D * 3;
+          if (L.row) dy = (1 - e) * dist; else dx = (1 - e) * dist;
+          alpha = e;
+        }
+        const selected = kb && kb.slot === k;
+        if (selected) alpha *= 0.3;
+        const dead = state.over ? (deadStart && now >= deadStart) : !fits[k];
+        let nx = 0;
+        if (nudgeAnim && nudgeAnim.slot === k) {
+          const t = now - nudgeAnim.t0;
+          if (t > 200) nudgeAnim = null; else nx = Math.round(Math.sin(t / 200 * Math.PI * 4) * 4 * (1 - t / 200));
+        }
+        drawShape(shape, { x: Math.round(c.x + dx + nx), y: Math.round(c.y + dy), p: L.tD, gp: L.tg }, dead, alpha);
+        if (selected) {
+          const sl = L.slots[k];
+          ctx.fillStyle = '#ea5426';
+          const w = Math.min(sl.w * 0.5, L.tD * 3);
+          ctx.fillRect(Math.round(sl.x + (sl.w - w) / 2), Math.round(sl.y + sl.h - 3), Math.round(w), 2);
+        }
+      }
+      if (dealAnim && now - dealAnim.t0 > DEAL_MS + 180) dealAnim = null;
+    }
+
+    // chips
+    if (particles.length) {
+      particles = particles.filter((q) => now < q.t0 + q.life);
+      const G = L.D * 22;
+      particles.forEach((q) => {
+        const t = (now - q.t0) / 1000;
+        if (t < 0) return;
+        const x = q.x + q.vx * t, y = q.y + q.vy * t + 0.5 * G * t * t;
+        const a = 1 - (now - q.t0) / q.life;
+        ctx.globalAlpha = Math.max(0, Math.min(1, a * 1.6));
+        ctx.fillStyle = q.color;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(q.rot + q.vr * t);
+        ctx.fillRect(-q.size / 2, -q.size / 2, q.size, q.size);
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    // the piece in hand, or flying home
+    if (ret) {
+      const gm = retGeom(now);
+      drawShape(SHAPES[ret.id], gm, !fits[ret.slot], 1);
+      if (gm.done) ret = null;
+    }
+    if (drag) {
+      const gm = dragGeom(now);
+      drawShape(SHAPES[drag.id], gm, false, 1);
+    }
+  }
+
+  function animating(now) {
+    return !!(drag || ret || landing || clears.length || particles.length || dealAnim || shakeAnim || nudgeAnim ||
+      (kb && preview() && preview().clear.size) ||
+      (state.over && deadStart && now < deadStart + N * 45 + 50));
+  }
+
+  let raf = 0;
+  function frame() {
+    raf = 0;
+    const now = performance.now();
+    render(now);
+    if (animating(now)) raf = requestAnimationFrame(frame);
+  }
+  function kick() {
+    render(performance.now());
+    if (!raf) raf = requestAnimationFrame(frame);
+  }
+
+  /* ---------- layout: everything sized from the viewport ---------- */
+  const TRAY = 0.3;   // tray depth as a fraction of the board
+
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    L.vw = vw; L.vh = vh; L.dpr = dpr;
+    cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr);
+    cv.style.width = vw + 'px'; cv.style.height = vh + 'px';
+
+    const m = Math.min(vw, vh);
+    const pad = clamp(10, m * 0.035, 28);
+    const gap = clamp(8, m * 0.026, 18);
+    const fs = clamp(12, m / 42, 16);
+    root.style.fontSize = fs + 'px';
+
+    // column layout: header, board, tray below
+    hud.className = 'col';
+    hud.style.width = Math.max(200, Math.min(vw - 2 * pad, 560)) + 'px';
+    hud.style.height = '';
+    const headH = hud.offsetHeight;
+    const sCol = Math.min(vw - 2 * pad, (vh - 2 * pad - headH - 2 * gap) / (1 + TRAY));
+
+    // row layout: side panel, board, tray to the right
+    const side = clamp(150, m * 0.36, 240);
+    const sRow = Math.min(vh - 2 * pad, (vw - 2 * pad - side - gap * 2.4) / (1 + TRAY));
+
+    const useRow = vw >= 560 && sRow > sCol * 1.05;
+    const S0 = clamp(150, Math.floor(useRow ? sRow : sCol), 900);
+    const D = Math.floor((S0 - 1) / N);
+    const g = Math.max(1, Math.round(D * 0.07));
+    const S = D * N + g;
+    L.D = D; L.g = g; L.S = S; L.row = useRow;
+    L.tD = Math.max(5, Math.round(D * 0.52));
+    L.tg = Math.max(1, Math.round(L.tD * 0.08));
+
+    if (!useRow) {
+      const trayH = Math.round(S * TRAY);
+      const total = headH + gap + S + gap + trayH;
+      const top = Math.max(pad, Math.round((vh - total) / 2));
+      L.bx = Math.round((vw - S) / 2);
+      L.by = Math.round(top + headH + gap);
+      hud.style.left = L.bx + 'px'; hud.style.top = top + 'px'; hud.style.width = S + 'px';
+      const ty = L.by + S + gap;
+      L.slots = [0, 1, 2].map((k) => ({ x: L.bx + k * S / 3, y: ty, w: S / 3, h: trayH }));
+    } else {
+      const trayW = Math.round(S * TRAY);
+      const total = side + gap * 1.4 + S + gap + trayW;
+      const left = Math.round((vw - total) / 2);
+      L.by = Math.round((vh - S) / 2);
+      L.bx = Math.round(left + side + gap * 1.4);
+      hud.className = 'row';
+      hud.style.left = left + 'px'; hud.style.top = L.by + 'px';
+      hud.style.width = side + 'px'; hud.style.height = S + 'px';
+      const tx = L.bx + S + gap;
+      L.slots = [0, 1, 2].map((k) => ({ x: tx, y: L.by + k * S / 3, w: trayW, h: S / 3 }));
+    }
+    boardLayer.style.left = L.bx + 'px'; boardLayer.style.top = L.by + 'px';
+    boardLayer.style.width = S + 'px'; boardLayer.style.height = S + 'px';
+
+    if (drag) { drag = null; }
+    ret = null;
+    if (state) kick();
+  }
+
+  let resizeRaf = 0;
+  function onResize() { cancelAnimationFrame(resizeRaf); resizeRaf = requestAnimationFrame(layout); setTimeout(layout, 120); }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', onResize);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- pointer: drag pieces from the tray ---------- */
+  function slotAt(x, y) {
+    for (let k = 0; k < 3; k++) {
+      const s = L.slots[k];
+      if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return k;
+    }
+    return -1;
+  }
+  function canGrab() { return started && !overlayOpen && !paused && state && !state.over; }
+
+  cv.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (e.pointerType === 'touch') root.classList.add('touch');
+    if (!canGrab() || drag) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const k = slotAt(e.clientX, e.clientY);
+    if (k < 0 || state.tray[k] == null) return;
+    e.preventDefault();
+    const now = performance.now();
+    let from;
+    if (ret && ret.slot === k) { const gm = retGeom(now); from = { x: gm.x, y: gm.y, p: gm.p, gp: gm.gp }; ret = null; }
+    else { const c = slotCenter(k); from = { x: c.x, y: c.y, p: L.tD, gp: L.tg }; }
+    kb = null;
+    drag = {
+      slot: k, id: state.tray[k], pid: e.pointerId, touch: e.pointerType !== 'mouse',
+      px: e.clientX, py: e.clientY, t0: now, from, target: null,
+    };
+    drag.target = snapFor(SHAPES[drag.id], dragCenter().x, dragCenter().y);
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    cv.style.cursor = 'grabbing';
+    kick();
+  });
+
+  cv.addEventListener('pointermove', (e) => {
+    if (!drag) {
+      if (e.pointerType === 'mouse') {
+        const k = canGrab() ? slotAt(e.clientX, e.clientY) : -1;
+        cv.style.cursor = k >= 0 && state.tray[k] != null ? 'grab' : '';
+      }
+      return;
+    }
+    if (e.pointerId !== drag.pid) return;
+    drag.px = e.clientX; drag.py = e.clientY;
+    const c = dragCenter();
+    drag.target = snapFor(SHAPES[drag.id], c.x, c.y);
+    if (!raf) kick();
+  });
+
+  function endDrag(e, cancel) {
+    if (!drag || (e && e.pointerId !== drag.pid)) return;
+    const d = drag;
+    const now = performance.now();
+    if (e && !cancel) {
+      d.px = e.clientX; d.py = e.clientY;
+      const c = dragCenter();
+      d.target = snapFor(SHAPES[d.id], c.x, c.y);
+    }
+    const gm = dragGeom(now);
+    drag = null;
+    cv.style.cursor = '';
+    if (!cancel && d.target && state.tray[d.slot] === d.id) {
+      const rects = cellRects(SHAPES[d.id], gm);
+      if (commit(d.slot, d.target.r, d.target.c, rects)) return;
+    }
+    ret = { slot: d.slot, id: d.id, t0: now, from: { x: gm.x, y: gm.y, p: gm.p, gp: gm.gp } };
+    kick();
+  }
+  cv.addEventListener('pointerup', (e) => endDrag(e, false));
+  cv.addEventListener('pointercancel', (e) => endDrag(e, true));
+  cv.addEventListener('lostpointercapture', (e) => { if (drag && e.pointerId === drag.pid) endDrag(e, false); });
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  /* ---------- keyboard ---------- */
+  function selectSlot(k) {
+    if (state.tray[k] == null) return;
+    if (kb && kb.slot === k) { kb = null; kick(); return; }
+    const shape = SHAPES[state.tray[k]];
+    let r, c;
+    if (kb) { r = kb.r; c = kb.c; }
+    else { r = Math.floor((N - shape.h) / 2); c = Math.floor((N - shape.w) / 2); }
+    kb = { slot: k, r: clamp(0, r, N - shape.h), c: clamp(0, c, N - shape.w) };
+    kick();
+  }
+  function firstSlot() { for (let k = 0; k < 3; k++) if (state.tray[k] != null) return k; return -1; }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (overlayOpen) {
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+      if (e.key === 'Enter') { e.preventDefault(); const b = document.querySelector('.overlay.show .btn.primary'); if (b) b.click(); }
+      return;
+    }
+    if (!canGrab() || drag) {
+      if ((e.key === 'n' || e.key === 'N') && started && !overlayOpen && !e.repeat) requestNew();
+      return;
+    }
+    const k = e.key;
+    if (k === '1' || k === '2' || k === '3') { e.preventDefault(); selectSlot(+k - 1); return; }
+    if (k === 'n' || k === 'N') { if (!e.repeat) requestNew(); return; }
+    const dirs = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0], a: [0, -1], d: [0, 1], w: [-1, 0], s: [1, 0] };
+    const dv = dirs[k] || dirs[k.toLowerCase && k.toLowerCase()];
+    if (dv) {
+      e.preventDefault();
+      if (!kb) { const f = firstSlot(); if (f >= 0) selectSlot(f); return; }
+      const shape = SHAPES[state.tray[kb.slot]];
+      kb.r = clamp(0, kb.r + dv[0], N - shape.h);
+      kb.c = clamp(0, kb.c + dv[1], N - shape.w);
+      kick();
+      return;
+    }
+    if (k === 'Tab') {
+      e.preventDefault();
+      const from = kb ? kb.slot : -1;
+      for (let i = 1; i <= 3; i++) {
+        const n = (from + (e.shiftKey ? -i : i) + 6) % 3;
+        if (n !== from && state.tray[n] != null) { selectSlot(n); break; }
+      }
+      return;
+    }
+    if (k === 'Enter' || k === ' ') {
+      e.preventDefault();
+      if (!kb) { const f = firstSlot(); if (f >= 0) selectSlot(f); return; }
+      if (e.repeat) return;
+      const slot = kb.slot, r = kb.r, c = kb.c;
+      if (canPlace(state.grid, SHAPES[state.tray[slot]], r, c)) {
+        kb = null;
+        commit(slot, r, c, null);
+        const nxt = firstSlot();
+        if (nxt >= 0 && !state.over) {
+          const sh = SHAPES[state.tray[nxt]];
+          kb = { slot: nxt, r: clamp(0, r, N - sh.h), c: clamp(0, c, N - sh.w) };
+          kick();
+        }
+      } else {
+        nudgeAnim = { slot, t0: performance.now() };
+        kick();
+      }
+      return;
+    }
+    if (k === 'Escape') { if (kb) { kb = null; kick(); } }
+  });
+
+  /* ---------- buttons ---------- */
+  newBtn.addEventListener('click', () => { newBtn.blur(); requestNew(); });
+  $('playBtn').addEventListener('click', play);
+  $('freshBtn').addEventListener('click', newGame);
+  $('againBtn').addEventListener('click', newGame);
+
+  // No page scroll, pull to refresh or double-tap zoom.
+  document.addEventListener('touchmove', (e) => { e.preventDefault(); }, { passive: false });
+  document.addEventListener('dblclick', (e) => { e.preventDefault(); });
+  document.addEventListener('pointerdown', (e) => {
+    window.focus();
+    paused = false;
+    if (e.pointerType === 'touch') root.classList.add('touch');
+  }, true);
+
+  V.onPause((p) => {
+    paused = !!p;
+    if (paused && drag) endDrag(null, true);
+  });
+
+  /* ---------- boot ---------- */
+  if (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches) root.classList.add('touch');
+  const saved = load();
+  if (saved) {
+    state = saved;
+    $('playBtn').textContent = 'Continue';
+    $('freshBtn').hidden = false;
+  } else {
+    state = newState(Math.random);
+  }
+  updateFits();
+  updateHud(0);
+  layout();
+  app.classList.add('ready');
+  showOv(startOv);
+  kick();
+  V.ready();
+})();
+</script>
+</body>
+</html>

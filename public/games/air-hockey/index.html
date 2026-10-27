@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Air Hockey</title>
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --s1: #16181c;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-2: rgba(255, 255, 255, 0.22);
+    --text: #fff;
+    --dim: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-l: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; overflow: hidden; background: #000; }
+  canvas { display: block; }
+  #ui {
+    position: absolute;
+    left: 0; top: 0;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .ov {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s;
+  }
+  .ov.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.25s var(--ease), visibility 0s;
+  }
+  .card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 22px 24px 24px;
+    text-align: left;
+    transform: translateY(14px);
+    transition: transform 0.3s var(--ease);
+  }
+  .ov.show .card { transform: none; }
+  .label {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .name {
+    font: 300 44px/1 var(--font-display, sans-serif);
+    letter-spacing: -0.01em;
+  }
+  .controls { color: var(--dim); font-size: 13px; font-weight: 400; line-height: 1.5; margin: 10px 0 18px; min-height: 39px; }
+  .opt { margin-bottom: 14px; }
+  .opt .label { display: block; margin-bottom: 8px; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0;
+    min-width: 0;
+    font: 600 12px/1 var(--font, sans-serif);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+    background: transparent;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    padding: 11px 4px;
+    margin-left: -1px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .seg button:first-child { margin-left: 0; }
+  .seg button:hover { color: #fff; border-color: rgba(255, 255, 255, 0.4); z-index: 1; }
+  .seg button.on { background: var(--brand); border-color: var(--brand); color: #fff; z-index: 2; }
+  .seg button:focus { outline: none; }
+  .seg button:focus-visible { outline: 1px solid #fff; outline-offset: -3px; z-index: 3; }
+  .btn {
+    display: block;
+    width: 100%;
+    font: 600 13px/1 var(--font, sans-serif);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #fff;
+    background: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 0;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-l); border-color: var(--brand-l); }
+  .btn:active { background: var(--brand-d); border-color: var(--brand-d); transform: scale(0.985); }
+  .btn:focus { outline: none; }
+  .btn:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+  .btn.ghost { background: transparent; border-color: var(--line-2); }
+  .btn.ghost:hover { background: transparent; border-color: rgba(255, 255, 255, 0.5); }
+  .btn.ghost:active { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.5); }
+  .btn + .btn { margin-top: 8px; }
+  .play { margin-top: 18px; }
+  .rows { margin: 16px 0 18px; border-bottom: 1px solid var(--line); }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--line);
+    padding: 11px 0;
+  }
+  .row b { font: 600 16px/1 var(--font-display, sans-serif); font-variant-numeric: tabular-nums; }
+  .row.big b { font: 300 28px/1 var(--font-display, sans-serif); }
+  .row.win .label { color: var(--brand-l); }
+  .badge {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-l);
+    margin-left: 10px;
+  }
+  .gap { height: 18px; }
+  #pauseBtn {
+    position: absolute;
+    width: 34px; height: 34px;
+    margin: -17px 0 0 -17px;
+    background: #000;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    cursor: pointer;
+    display: none;
+    transition: border-color 0.15s var(--ease);
+  }
+  #pauseBtn.on { display: block; }
+  #pauseBtn:hover { border-color: rgba(255, 255, 255, 0.5); }
+  #pauseBtn:focus { outline: none; }
+  #pauseBtn i { position: absolute; top: 11px; width: 3px; height: 10px; background: var(--dim); }
+  #pauseBtn i:first-child { left: 12px; }
+  #pauseBtn i:last-child { left: 17px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ov, .ov.show, .card, .btn, .seg button { transition: none; }
+    .card { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" aria-label="Air hockey table"></canvas>
+  <button id="pauseBtn" type="button" aria-label="Pause"><i></i><i></i></button>
+  <div id="ui">
+    <section id="ovStart" class="ov show">
+      <div class="card">
+        <div class="name">Air Hockey</div>
+        <p class="controls" id="ctrlText"></p>
+        <div class="opt">
+          <span class="label">Players</span>
+          <div class="seg" data-key="players">
+            <button type="button" data-v="1">1 player</button>
+            <button type="button" data-v="2">2 players</button>
+          </div>
+        </div>
+        <div class="opt" id="optDiff">
+          <span class="label">Computer</span>
+          <div class="seg" data-key="diff">
+            <button type="button" data-v="easy">Easy</button>
+            <button type="button" data-v="normal">Normal</button>
+            <button type="button" data-v="hard">Hard</button>
+          </div>
+        </div>
+        <button class="btn play" id="btnPlay" type="button">Play</button>
+      </div>
+    </section>
+
+    <section id="ovPause" class="ov">
+      <div class="card">
+        <div class="label">Paused</div>
+        <div class="gap"></div>
+        <button class="btn" id="btnResume" type="button">Resume</button>
+        <button class="btn ghost" id="btnPauseMode" type="button">Change mode</button>
+      </div>
+    </section>
+
+    <section id="ovOver" class="ov">
+      <div class="card">
+        <div class="name" id="overTitle">You win</div>
+        <div class="rows" id="overRows"></div>
+        <button class="btn" id="btnAgain" type="button">Play again</button>
+        <button class="btn ghost" id="btnMode" type="button">Change mode</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="air-hockey"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Bridge (with a standalone fallback if the bridge failed to load) ----------
+  const V = window.Vela || (() => {
+    const key = 'vela:best:air-hockey';
+    const rb = () => { try { return Number(localStorage.getItem(key)) || 0; } catch (_) { return 0; } };
+    return {
+      embedded: false, ready() {}, score() {}, best: rb, onPause() {},
+      gameOver(n) { const p = rb(); if (n > p) { try { localStorage.setItem(key, String(n)); } catch (_) {} } return n > p; },
+    };
+  })();
+
+  /* CORE-BEGIN
+   * Table physics and the computer player. No DOM in here, so it can be tested on its own.
+   * Game space is landscape: x runs from the left goal (side 0) to the right goal (side 1).
+   */
+  const Core = (() => {
+    const W = 840, H = 480, CY = H / 2;
+    const PR = 18, MR = 32, R = PR + MR;          // puck radius, mallet radius
+    const GW = 170, GH = GW / 2;                  // goal mouth width
+    const MAXV = 1900;                            // puck speed cap
+    const DRAG = 0.3, DECEL = 8;                  // light air-table friction
+    const E_WALL = 0.86, E_MAL = 0.8;             // restitution
+    const SUCK = 1800;                            // pull into the goal slot once over the line
+    const HUMAN_FOLLOW = 48, HUMAN_MAX = 3600;    // pointer follow rate and max mallet speed
+    const RC = 72;                                // corner radius: a square corner would trap a still puck
+
+    const DIFF = {
+      easy: {
+        delay: 0.2, look: 0, speed: 900, accel: 6000, strike: 1050, windup: 30, err: 44, aimErr: 0.32,
+        attackV: 240, lineTol: 30, bounceErr: 2, bank: 0, smartAim: false, counter: 0, hesitate: 0.3, home: 70, recover: 0.4,
+      },
+      normal: {
+        delay: 0.12, look: 0.6, speed: 1250, accel: 10000, strike: 1500, windup: 40, err: 28, aimErr: 0.15,
+        attackV: 450, lineTol: 24, bounceErr: 1.2, bank: 0.12, smartAim: false, counter: 0.3, hesitate: 0.1, home: 90, recover: 0.25,
+      },
+      hard: {
+        delay: 0.05, look: 1, speed: 1900, accel: 15000, strike: 2000, windup: 50, err: 6, aimErr: 0.05,
+        attackV: 700, lineTol: 20, bounceErr: 0.3, bank: 0.3, smartAim: true, counter: 0.65, hesitate: 0, home: 105, recover: 0.15,
+      },
+    };
+
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    function bounds(side) { return side === 0 ? [MR, W / 2 - MR] : [W / 2 + MR, W - MR]; }
+    function clampX(side, x) { const b = bounds(side); return clamp(x, b[0], b[1]); }
+    function clampY(y) { return clamp(y, MR, H - MR); }
+    function clampM(m) { m.x = clampX(m.side, m.x); m.y = clampY(m.y); corner(m, MR); }
+
+    // Keep a round body of radius r inside the rounded table corners. Returns the speed
+    // it was moving into the corner, after bouncing it, for objects that carry velocity.
+    function corner(o, r, e) {
+      const cx = o.x < RC ? RC : o.x > W - RC ? W - RC : 0;
+      const cy = o.y < RC ? RC : o.y > H - RC ? H - RC : 0;
+      if (!cx || !cy) return 0;
+      const dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy), lim = RC - r;
+      if (d <= lim || d < 1e-6) return 0;
+      const nx = dx / d, ny = dy / d;
+      o.x = cx + nx * lim; o.y = cy + ny * lim;
+      if (e === undefined) return 0;
+      const vn = o.vx * nx + o.vy * ny;
+      if (vn <= 0) return 0;
+      o.vx -= (1 + e) * vn * nx; o.vy -= (1 + e) * vn * ny;
+      return vn;
+    }
+
+    function makeMallet(side) {
+      const x = side === 0 ? 90 : W - 90;
+      return { side, x, y: CY, px: x, py: CY, ex: x, ey: CY, vx: 0, vy: 0, cvx: 0, cvy: 0, tx: x, ty: CY, pop: 0, pin: 0 };
+    }
+
+    function makeWorld() {
+      return {
+        puck: { x: W / 2, y: CY, px: W / 2, py: CY, vx: 0, vy: 0, live: false, shown: false },
+        m: [makeMallet(0), makeMallet(1)],
+        onHit: null, onWall: null,
+      };
+    }
+
+    function resetMallets(w) {
+      for (const m of w.m) {
+        const x = m.side === 0 ? 90 : W - 90;
+        m.x = m.px = m.ex = m.tx = x; m.y = m.py = m.ey = m.ty = CY;
+        m.vx = m.vy = m.cvx = m.cvy = 0; m.pop = 0; m.pin = 0;
+      }
+    }
+
+    // Put the puck on a side's serve spot, still and not yet in play.
+    function placePuck(w, side) {
+      const p = w.puck;
+      p.x = p.px = side === 0 ? W * 0.25 : W * 0.75;
+      p.y = p.py = CY;
+      p.vx = p.vy = 0;
+      p.live = false; p.shown = true;
+    }
+
+    function releasePuck(w) {
+      const p = w.puck;
+      p.live = true;
+      // A mallet parked on the serve spot steps back toward its own goal.
+      for (const m of w.m) {
+        const dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy);
+        if (d < R + 1) {
+          const back = m.side === 0 ? -1 : 1;
+          m.x = clampX(m.side, p.x + back * (R + 2));
+          if (Math.hypot(m.x - p.x, m.y - p.y) < R + 1) m.y = clampY(p.y + (dy >= 0 ? 1 : -1) * (R + 2));
+          m.px = m.ex = m.x; m.py = m.ey = m.y;
+        }
+      }
+    }
+
+    // Human mallet: eases toward the pointer target, within its half, at a capped speed.
+    function followHuman(m, dt) {
+      const tx = clampX(m.side, m.tx), ty = clampY(m.ty);
+      const k = 1 - Math.exp(-HUMAN_FOLLOW * dt);
+      let dx = (tx - m.x) * k, dy = (ty - m.y) * k;
+      const L = Math.hypot(dx, dy), max = HUMAN_MAX * dt;
+      if (L > max) { dx *= max / L; dy *= max / L; }
+      m.x += dx; m.y += dy;
+      clampM(m);
+    }
+
+    // Computer mallet: accelerates toward its target with a speed and acceleration limit.
+    function driveAI(m, ai, dt) {
+      const d = DIFF[ai.diff];
+      const tx = clampX(m.side, m.tx), ty = clampY(m.ty);
+      const dx = tx - m.x, dy = ty - m.y, dist = Math.hypot(dx, dy);
+      const sp = Math.min(ai.spd, dist * 11);
+      const wx = dist > 0.5 ? (dx / dist) * sp : 0, wy = dist > 0.5 ? (dy / dist) * sp : 0;
+      let ax = wx - m.vx, ay = wy - m.vy;
+      const al = Math.hypot(ax, ay), a = d.accel * dt;
+      if (al > a) { ax *= a / al; ay *= a / al; }
+      m.vx += ax; m.vy += ay;
+      m.x += m.vx * dt; m.y += m.vy * dt;
+      const bx = m.x, by = m.y;
+      clampM(m);
+      if (m.x !== bx) m.vx = 0;
+      if (m.y !== by) m.vy = 0;
+    }
+
+    function capSpeed(p) {
+      const s = Math.hypot(p.vx, p.vy);
+      if (s > MAXV) { p.vx *= MAXV / s; p.vy *= MAXV / s; }
+    }
+
+    // One end of the table. left: the x = 0 end. Works in a mirrored frame where x is
+    // the distance in front of that end wall and vx > 0 means moving away from it.
+    function endWall(p, left) {
+      const s = left ? 1 : -1;
+      let x = left ? p.x : W - p.x, vx = s * p.vx, hit = 0;
+      const dy = p.y - CY;
+      if (x < 0) {
+        // Inside the goal slot: its side walls keep the puck in the slot.
+        const lim = GH - PR;
+        if (dy < -lim) { p.y = CY - lim; if (p.vy < 0) p.vy = -p.vy * E_WALL; }
+        else if (dy > lim) { p.y = CY + lim; if (p.vy > 0) p.vy = -p.vy * E_WALL; }
+      } else if (x < PR) {
+        if (Math.abs(dy) >= GH) {
+          x = PR;
+          if (vx < 0) { hit = -vx; vx = -vx * E_WALL; p.vy *= 0.97; }
+        } else {
+          // Goal posts are the two corners of the mouth.
+          for (const py of [CY - GH, CY + GH]) {
+            const ddx = x, ddy = p.y - py, dd = Math.hypot(ddx, ddy);
+            if (dd < PR && dd > 1e-6) {
+              const nx = ddx / dd, ny = ddy / dd;
+              x = nx * PR; p.y = py + ny * PR;
+              const vn = vx * nx + p.vy * ny;
+              if (vn < 0) { vx -= (1 + E_WALL) * vn * nx; p.vy -= (1 + E_WALL) * vn * ny; hit = Math.max(hit, -vn); }
+            }
+          }
+        }
+      }
+      p.x = left ? x : W - x;
+      p.vx = s * vx;
+      return hit;
+    }
+
+    function walls(w, p, quiet) {
+      let hit = 0;
+      if (p.y < PR) { p.y = PR; if (p.vy < 0) { hit = -p.vy; p.vy = -p.vy * E_WALL; p.vx *= 0.97; } }
+      else if (p.y > H - PR) { p.y = H - PR; if (p.vy > 0) { hit = p.vy; p.vy = -p.vy * E_WALL; p.vx *= 0.97; } }
+      hit = Math.max(hit, endWall(p, true), endWall(p, false), corner(p, PR, E_WALL));
+      if (hit > 0 && !quiet && w.onWall) w.onWall(p.x, p.y, hit);
+    }
+
+    function collide(w, p, m) {
+      const dx = p.x - m.x, dy = p.y - m.y, d2 = dx * dx + dy * dy;
+      if (d2 >= R * R) return;
+      const d = Math.sqrt(d2);
+      const nx = d > 1e-6 ? dx / d : (m.side === 0 ? 1 : -1), ny = d > 1e-6 ? dy / d : 0;
+      const vn = (p.vx - m.cvx) * nx + (p.vy - m.cvy) * ny;
+      if (vn < 0) {
+        const j = -(1 + E_MAL) * vn;
+        p.vx += j * nx; p.vy += j * ny;
+        capSpeed(p);
+        if (!m.pin) m.pop = Math.min(1, m.pop + 0.4 + Math.min(0.6, -vn / 1500));
+        // A puck held against a wall is not a fresh hit every step.
+        if (w.onHit && !m.pin) w.onHit(m.side, m.x + nx * MR, m.y + ny * MR, nx, ny, -vn);
+      }
+      p.x = m.x + nx * R; p.y = m.y + ny * R;
+      walls(w, p, true);
+      // Puck pinned against a wall: the mallet cannot pass through it, so the mallet gives way.
+      const ex = p.x - m.x, ey = p.y - m.y, e = Math.hypot(ex, ey);
+      if (e < R - 0.01) {
+        const ux = e > 1e-6 ? ex / e : nx, uy = e > 1e-6 ? ey / e : ny, sh = R - e;
+        m.x -= ux * sh; m.y -= uy * sh; clampM(m);
+        const end = { x: clampX(m.side, m.ex - ux * sh), y: clampY(m.ey - uy * sh) };
+        corner(end, MR);
+        m.ex = end.x; m.ey = end.y;
+        // Trapped between mallet and wall the puck cannot move along that line, so it
+        // keeps no speed there (otherwise it rattles and gains energy every step).
+        m.pin = 3;
+        const pv = p.vx * ux + p.vy * uy;
+        p.vx -= pv * ux; p.vy -= pv * uy;
+        // The mallet is blocked along that line for the rest of this step too.
+        const mv = m.cvx * ux + m.cvy * uy;
+        if (mv > 0) { m.cvx -= mv * ux; m.cvy -= mv * uy; }
+      }
+    }
+
+    // Advance the puck one fixed step. Mallets have already moved from (px, py) to (x, y).
+    // Returns the side that scored, or -1.
+    function step(w, dt) {
+      const p = w.puck;
+      p.px = p.x; p.py = p.y;
+      let travel = Math.hypot(p.vx, p.vy) * dt;
+      for (const m of w.m) {
+        m.ex = m.x; m.ey = m.y;
+        m.cvx = (m.x - m.px) / dt; m.cvy = (m.y - m.py) / dt;
+        travel = Math.max(travel, Math.hypot(m.x - m.px, m.y - m.py));
+        m.pop = Math.max(0, m.pop - dt / 0.18);
+        if (m.pin > 0) m.pin--;
+      }
+      if (!p.live) return -1;
+      // Substeps keep every move under a fraction of the puck radius, so nothing tunnels.
+      const n = clamp(Math.ceil(travel / (PR * 0.35)), 1, 40);
+      const sdt = dt / n;
+      for (let i = 1; i <= n; i++) {
+        const f = i / n;
+        for (const m of w.m) { m.x = m.px + (m.ex - m.px) * f; m.y = m.py + (m.ey - m.py) * f; }
+        if (Math.abs(p.y - CY) < GH) {
+          if (p.x < 0) p.vx -= SUCK * sdt;
+          else if (p.x > W) p.vx += SUCK * sdt;
+        }
+        p.x += p.vx * sdt; p.y += p.vy * sdt;
+        walls(w, p, false);
+        for (let it = 0; it < 2; it++) for (const m of w.m) collide(w, p, m);
+        if (p.x < -PR - 1) { p.live = false; return 1; }
+        if (p.x > W + PR + 1) { p.live = false; return 0; }
+      }
+      for (const m of w.m) { m.x = m.ex; m.y = m.ey; }
+      const s = Math.hypot(p.vx, p.vy);
+      if (s > 0) {
+        const ns = Math.max(0, s * Math.exp(-DRAG * dt) - DECEL * dt);
+        p.vx *= ns / s; p.vy *= ns / s;
+      }
+      capSpeed(p);
+      return -1;
+    }
+
+    // ---------- Computer player ----------
+    // It reasons in a frame where its own goal is at x = W, so it can play either side.
+    function makeAI(side, diff) {
+      return {
+        side, diff, mode: 'idle', t: 0, spd: 0, errY: 0, errT: 0, hist: [], aim: null,
+        attackT: 0, hit: false, freeze: 0, wasMine: false, counterOK: false, flip: false, stx: 0, sty: 0,
+      };
+    }
+
+    // Fold a straight-line y into the table, as the puck would bounce off the side walls.
+    function fold(y) {
+      const span = H - 2 * PR, u = y - PR;
+      let m = ((u % (2 * span)) + 2 * span) % (2 * span);
+      if (m > span) m = 2 * span - m;
+      return m + PR;
+    }
+
+    function pickAim(d, oy) {
+      let y = d.smartAim
+        ? CY + (oy < CY ? 1 : -1) * GH * rand(0.3, 0.65)    // the side the opponent is not covering
+        : CY + rand(-0.6, 0.6) * GH;
+      if (Math.random() < d.bank) y = Math.random() < 0.5 ? -y : 2 * H - y;   // off a side wall
+      return { x: 0, y, err: rand(-1, 1) * d.aimErr };
+    }
+
+    function aiUpdate(ai, w, dt) {
+      const d = DIFF[ai.diff], me = w.m[ai.side], op = w.m[1 - ai.side], p = w.puck;
+      const mir = ai.side === 0;
+      const fx = (x) => (mir ? W - x : x);
+      let setT = (x, y, v) => { me.tx = fx(x); me.ty = y; ai.spd = v; };
+
+      // What it sees is a little late; better players also read ahead.
+      ai.hist.push({ x: fx(p.x), y: p.y, vx: mir ? -p.vx : p.vx, vy: p.vy, live: p.live });
+      if (ai.hist.length > 90) ai.hist.shift();
+      const k = Math.min(ai.hist.length - 1, Math.round(d.delay / dt));
+      const s0 = ai.hist[ai.hist.length - 1 - k];
+      const la = d.delay * d.look;
+      const sx = s0.x + s0.vx * la, sy = fold(s0.y + s0.vy * la), svx = s0.vx, svy = s0.vy;
+      const mx = fx(me.x), my = me.y, oy = op.y;
+
+      // Moving back toward its own goal, it steps round the puck instead of knocking it in.
+      const raw = setT;
+      setT = (x, y, v) => {
+        if (ai.mode !== 'strike' && s0.live && x > mx + 1) {
+          const ux = x - mx, uy = y - my, L = Math.hypot(ux, uy);
+          const t = clamp(((sx - mx) * ux + (sy - my) * uy) / (L * L), 0, 1);
+          const cx = mx + ux * t, cy = my + uy * t;
+          if (t > 0 && Math.hypot(sx - cx, sy - cy) < R + 8) {
+            const nx = -uy / L, ny = ux / L;
+            let side = Math.sign((cx - sx) * nx + (cy - sy) * ny) || (sy > CY ? -1 : 1);
+            let wy = sy + ny * side * (R + 20);
+            if (wy < MR || wy > H - MR) { side = -side; wy = sy + ny * side * (R + 20); }
+            raw(clamp(sx + nx * side * (R + 20), W / 2 + MR, W - MR), clamp(wy, MR, H - MR), v);
+            return;
+          }
+        }
+        raw(x, y, v);
+      };
+
+      ai.errT -= dt;
+      if (ai.errT <= 0) { ai.errT = rand(0.35, 0.8); ai.errY = rand(-1, 1) * d.err; }
+
+      if (!s0.live) {
+        ai.mode = 'idle'; ai.freeze = 0; ai.wasMine = false;
+        setT(W - d.home, CY, d.speed * 0.6);
+        return;
+      }
+
+      if (ai.mode === 'strike') {
+        ai.t -= dt;
+        if (ai.hit || ai.t <= 0) { ai.mode = 'recover'; ai.t = d.recover; ai.hit = false; }
+        else { setT(ai.stx, ai.sty, d.strike); return; }
+      }
+      const mine = sx > W / 2 - PR * 0.5;
+      if (ai.mode === 'recover') {
+        ai.t -= dt;
+        // Back to position after a shot, unless the puck is already back in its half.
+        if (ai.t > 0 && !mine) { setT(W - d.home, CY + ai.errY, d.speed); return; }
+        ai.mode = 'idle';
+      }
+      if (mine && !ai.wasMine) {
+        if (Math.random() < d.hesitate) ai.freeze = rand(0.12, 0.32);
+        ai.counterOK = Math.random() < d.counter;
+      }
+      ai.wasMine = mine;
+      if (ai.freeze > 0) { ai.freeze -= dt; return; }
+
+      const sp = Math.hypot(svx, svy);
+      if (mine && (sp < d.attackV || (svx < 0 && sp < d.attackV * 1.6))) {
+        attack(ai, d, dt, sx, sy, svx, svy, mx, my, oy, setT);
+      } else if (svx > 60) {
+        defend(ai, d, sx, sy, svx, svy, mx, my, mine, setT);
+      } else {
+        ai.mode = 'idle';
+        const g = guard(d.home, sx, sy);
+        setT(g.x, g.y + ai.errY * 0.5, d.speed * 0.7);
+      }
+    }
+
+    // A point on the line from its own goal to the puck: between the two, never past the puck.
+    function guard(dist, sx, sy) {
+      const vx = sx - W, vy = sy - CY, L = Math.hypot(vx, vy) || 1;
+      const k = Math.max(0, Math.min(dist, L - R - 4));
+      return { x: clamp(W + (vx / L) * k, W / 2 + MR, W - MR), y: clamp(CY + (vy / L) * k, MR, H - MR) };
+    }
+
+    function attack(ai, d, dt, sx, sy, svx, svy, mx, my, oy, setT) {
+      if (ai.mode !== 'attack') { ai.mode = 'attack'; ai.attackT = 0; ai.aim = pickAim(d, oy); }
+      ai.attackT += dt;
+      if (ai.attackT > 2.5) { ai.attackT = 0; ai.aim = pickAim(d, oy); ai.flip = !ai.flip; }
+      const px = sx + svx * 0.05, py = fold(sy + svy * 0.05);
+      const back = R + d.windup;
+      const x0 = W / 2 + MR, x1 = W - MR;
+      const base = Math.atan2(ai.aim.y - py, ai.aim.x - px) + ai.aim.err;
+      // Turn the shot outward until the mallet has room behind the puck.
+      const sgn = py >= CY ? 1 : -1;
+      let dx = 0, dy = 0, bx = 0, by = 0;
+      for (const off of [0, 0.35, 0.7, 1.05, 1.4, 1.65]) {
+        const a = base - sgn * off;
+        dx = Math.cos(a); dy = Math.sin(a);
+        bx = px - dx * back; by = py - dy * back;
+        if (bx >= x0 - 2 && bx <= x1 + 2 && by >= MR - 2 && by <= H - MR + 2) break;
+      }
+      bx = clamp(bx, x0, x1); by = clamp(by, MR, H - MR);
+      // Already on the shooting side of the puck: go round it, not through it.
+      const rx = mx - px, ry = my - py;
+      const along = rx * dx + ry * dy;
+      const perpX = -dy, perpY = dx;
+      if (along > -R * 0.45) {
+        const side = Math.sign(rx * perpX + ry * perpY) || (ai.flip ? 1 : -1);
+        const wx = clamp(px + perpX * side * (R + 24) - dx * R * 0.6, x0, x1);
+        const wy = clamp(py + perpY * side * (R + 24) - dy * R * 0.6, MR, H - MR);
+        setT(wx, wy, d.speed);
+        return;
+      }
+      if (Math.hypot(mx - bx, my - by) < d.lineTol) {
+        ai.mode = 'strike'; ai.t = 0.3; ai.hit = false;
+        ai.stx = px + dx * (R * 0.5 + 40); ai.sty = py + dy * (R * 0.5 + 40);
+        setT(ai.stx, ai.sty, d.strike);
+        return;
+      }
+      setT(bx, by, d.speed);
+    }
+
+    function defend(ai, d, sx, sy, svx, svy, mx, my, mine, setT) {
+      ai.mode = 'defend';
+      const defX = W - d.home;
+      let y = sy, bounces = 0;
+      if (d.look > 0) {
+        const t = (defX - sx) / svx;
+        if (t > 0) {
+          const raw = sy + svy * t, span = H - 2 * PR;
+          bounces = raw < PR ? Math.floor((PR - raw) / span) + 1 : Math.floor((raw - PR) / span);
+          y = fold(raw);
+        }
+      }
+      // Bank shots are harder to read.
+      y = clamp(y + ai.errY * (1 + bounces * d.bounceErr), CY - GH - 40, CY + GH + 40);
+      // Meet a puck that is about to arrive with a counter hit.
+      if (mine && ai.counterOK) {
+        const tc = (mx - R - sx) / svx;
+        if (tc > 0 && tc < 0.14) {
+          const cx = sx + svx * tc, cy = fold(sy + svy * tc);
+          const ux = cx - mx, uy = cy - my, ul = Math.hypot(ux, uy) || 1;
+          ai.mode = 'strike'; ai.t = 0.16; ai.hit = false; ai.counterOK = false;
+          ai.stx = cx + (ux / ul) * 40; ai.sty = cy + (uy / ul) * 40;
+          setT(ai.stx, ai.sty, d.strike);
+          return;
+        }
+      }
+      // The puck is already level with or behind it: fall back and cover the goal mouth.
+      if (sx > defX - R * 0.6) {
+        const g = guard(d.home, sx, sy);
+        setT(g.x, g.y, d.speed);
+        return;
+      }
+      setT(defX, y, d.speed);
+    }
+
+    return {
+      W, H, CY, PR, MR, GW, GH, MAXV, RC, DIFF,
+      makeWorld, resetMallets, placePuck, releasePuck, followHuman, driveAI, step, makeAI, aiUpdate, fold, bounds,
+    };
+  })();
+  /* CORE-END */
+
+  // ---------- Constants ----------
+  const { W, H, CY, PR, MR, GH } = Core;
+  const M = 22;                             // rail width around the table, in game units
+  const STEP = 1 / 120;
+  const TARGET = 7;
+  const SERVE_FIRST = 1.0, SERVE_T = 0.7, POINT_T = 1.1, FLASH_T = 1.1;
+  const KEY_SPEED = 900;
+  const C = { orange: '#ea5426', light: '#ff7a4d', dark: '#b83f19' };
+  const NAMES = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+  const rootStyle = getComputedStyle(document.documentElement);
+  const FONT = rootStyle.getPropertyValue('--font').trim() || '"Segoe UI", system-ui, sans-serif';
+  const FONT_D = rootStyle.getPropertyValue('--font-display').trim() || FONT;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // ---------- Storage ----------
+  const OPTS_KEY = 'vela:air-hockey:options', STREAK_KEY = 'vela:air-hockey:streaks';
+  function loadJSON(key, def) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' ? Object.assign({}, def, v) : def; }
+    catch (_) { return def; }
+  }
+  function saveJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (_) {} }
+  const opts = loadJSON(OPTS_KEY, { players: 1, diff: 'normal' });
+  if (opts.players !== 1 && opts.players !== 2) opts.players = 1;
+  if (!Core.DIFF[opts.diff]) opts.diff = 'normal';
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), cv = $('c'), ctx = cv.getContext('2d'), ui = $('ui'), pauseBtn = $('pauseBtn');
+  const ovStart = $('ovStart'), ovPause = $('ovPause'), ovOver = $('ovOver');
+
+  const LW0 = W + 2 * M, LH0 = H + 2 * M;   // landscape logical size
+  let rot = false;                           // portrait: table drawn rotated, side 0 at the bottom
+  let devK = 1, dpr = 1;
+
+  function resize() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const wasRot = rot;
+    rot = vh > vw;
+    const LW = rot ? LH0 : LW0, LH = rot ? LW0 : LH0;
+    const pad = V.embedded ? 0 : Math.round(Math.min(24, Math.min(vw, vh) * 0.03));
+    const s = Math.max(0.1, Math.min((vw - pad * 2) / LW, (vh - pad * 2) / LH));
+    const cw = Math.max(1, Math.floor(LW * s)), ch = Math.max(1, Math.floor(LH * s));
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    stage.style.width = cw + 'px';
+    stage.style.height = ch + 'px';
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+    cv.width = Math.round(cw * dpr);
+    cv.height = Math.round(ch * dpr);
+    devK = cv.width / LW;
+    const cssK = cw / LW;
+    const u = Math.max(0.5, Math.min(1.15, cw / 380, ch / 450));
+    ui.style.width = (cw / u) + 'px';
+    ui.style.height = (ch / u) + 'px';
+    ui.style.transform = 'scale(' + u + ')';
+    const p = toScreen(W / 2, -M / 2);
+    pauseBtn.style.left = (p.x * cssK) + 'px';
+    pauseBtn.style.top = (p.y * cssK) + 'px';
+    if (wasRot !== rot) { drags.clear(); updateTexts(); }
+  }
+
+  // game point -> logical screen point (before scale)
+  function toScreen(x, y) { return rot ? { x: y + M, y: W - x + M } : { x: x + M, y: y + M }; }
+  function toGame(cx, cy) {
+    const r = cv.getBoundingClientRect();
+    const u = (rot ? LH0 : LW0) / (r.width || 1);
+    const sx = (cx - r.left) * u, sy = (cy - r.top) * u;
+    return rot ? { x: W + M - sy, y: sx - M } : { x: sx - M, y: sy - M };
+  }
+
+  // ---------- State ----------
+  let state = 'title';      // title, serve, play, point, over
+  let paused = false, pausedBy = null;
+  let mode = { players: 1, diff: 'normal' };
+  let stateT = 0, overT = 0, winner = -1, lastScorer = -1;
+  let parts = [], shake = 0, goalFlash = 0, goalSide = 0;
+  const score = [0, 0], flash = [0, 0];
+  const world = Core.makeWorld();
+  let ai = Core.makeAI(1, 'normal');
+  const keys = { u0: false, d0: false, l0: false, r0: false, u1: false, d1: false, l1: false, r1: false };
+  const drags = new Map();
+  const trail = [];
+  let lastPointer = matchMedia('(hover: none) and (pointer: coarse)').matches ? 'touch' : 'mouse';
+
+  const active = () => state === 'serve' || state === 'play' || state === 'point';
+  const sideName = (s) => (s === 0 ? 'Orange' : 'White');
+
+  world.onHit = (side, x, y, nx, ny, imp) => {
+    if (side === ai.side) ai.hit = true;
+    sparks(x, y, nx, ny, imp);
+    if (imp > 900) addShake(Math.min(5, imp / 400));
+  };
+  world.onWall = (x, y, imp) => {
+    if (imp > 350) wallSparks(x, y, imp);
+  };
+
+  // ---------- Game flow ----------
+  function newGame() {
+    mode = { players: opts.players, diff: opts.diff };
+    hideAll();
+    paused = false; pausedBy = null;
+    score[0] = score[1] = 0; flash[0] = flash[1] = 0;
+    parts = []; trail.length = 0; shake = 0; goalFlash = 0;
+    drags.clear();
+    ai = Core.makeAI(1, mode.diff);
+    Core.resetMallets(world);
+    winner = -1;
+    Core.placePuck(world, Math.random() < 0.5 ? 0 : 1);
+    state = 'serve';
+    stateT = SERVE_FIRST;
+  }
+
+  function goal(s) {
+    score[s]++;
+    flash[s] = FLASH_T;
+    lastScorer = s;
+    goalSide = 1 - s;                 // the goal the puck went into
+    goalFlash = FLASH_T;
+    const gx = goalSide === 0 ? 0 : W;
+    burst(gx, clamp(world.puck.y, CY - GH, CY + GH), goalSide === 0 ? 1 : -1);
+    addShake(7);
+    world.puck.shown = false;
+    world.puck.live = false;
+    trail.length = 0;
+    state = 'point';
+    stateT = POINT_T;
+    if (score[s] >= TARGET) winner = s;
+  }
+
+  function endGame() {
+    state = 'over';
+    overT = 0;
+    const leftWon = winner === 0;
+    const rows = [];
+    let title;
+    if (mode.players === 1) {
+      title = leftWon ? 'You win' : 'You lose';
+      rows.push(row('You', score[0], leftWon, true));
+      rows.push(row('Computer', score[1], !leftWon, true));
+      const st = loadJSON(STREAK_KEY, { easy: 0, normal: 0, hard: 0 });
+      st[mode.diff] = leftWon ? (Number(st[mode.diff]) || 0) + 1 : 0;
+      saveJSON(STREAK_KEY, st);
+      const name = NAMES[mode.diff];
+      if (mode.diff === 'hard') {
+        const isBest = V.gameOver(st.hard);
+        rows.push(row(name + ' win streak', st.hard));
+        rows.push(row('Best', V.best(), false, false, isBest && st.hard > 0 ? 'New best' : ''));
+      } else {
+        rows.push(row(name + ' win streak', st[mode.diff]));
+      }
+    } else {
+      title = sideName(winner) + ' wins';
+      rows.push(row(sideName(0), score[0], leftWon, true));
+      rows.push(row(sideName(1), score[1], !leftWon, true));
+    }
+    $('overTitle').textContent = title;
+    $('overRows').innerHTML = rows.join('');
+    show(ovOver);
+  }
+
+  function row(label, value, win, big, badge) {
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return '<div class="row' + (big ? ' big' : '') + (win ? ' win' : '') + '"><span class="label">' + esc(label) +
+      (badge ? '<span class="badge">' + esc(badge) + '</span>' : '') + '</span><b>' + esc(value) + '</b></div>';
+  }
+
+  function toTitle() {
+    state = 'title';
+    paused = false; pausedBy = null;
+    drags.clear();
+    parts = []; trail.length = 0; shake = 0; goalFlash = 0;
+    score[0] = score[1] = 0; flash[0] = flash[1] = 0;
+    Core.resetMallets(world);
+    world.puck.shown = false; world.puck.live = false;
+    hideAll();
+    syncOptions();
+    show(ovStart);
+  }
+
+  // ---------- Juice ----------
+  function addShake(a) { if (!reduceMotion.matches) shake = Math.max(shake, a); }
+  function burst(x, y, dir) {
+    if (reduceMotion.matches) return;
+    const cols = ['#ffffff', C.orange, C.light];
+    for (let i = 0; i < 26; i++) {
+      parts.push({ x, y, vx: dir * rand(80, 520), vy: rand(-320, 320),
+        life: rand(0.45, 0.9), max: 0.9, size: rand(4, 8), color: cols[i % 3] });
+    }
+  }
+  function sparks(x, y, nx, ny, imp) {
+    if (reduceMotion.matches || parts.length > 220) return;
+    const n = Math.round(clamp(imp / 160, 2, 9));
+    for (let i = 0; i < n; i++) {
+      const a = Math.atan2(ny, nx) + rand(-0.9, 0.9), s = rand(80, 160 + imp * 0.25);
+      parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        life: rand(0.15, 0.32), max: 0.32, size: rand(2.5, 4.5), color: i % 3 === 0 ? C.light : '#ffffff' });
+    }
+  }
+  function wallSparks(x, y, imp) {
+    if (reduceMotion.matches || parts.length > 220) return;
+    const n = Math.round(clamp(imp / 350, 1, 4));
+    for (let i = 0; i < n; i++) {
+      parts.push({ x, y, vx: rand(-120, 120), vy: rand(-120, 120),
+        life: rand(0.12, 0.24), max: 0.24, size: rand(2, 3.5), color: '#ffffff' });
+    }
+  }
+
+  // ---------- Input to mallets ----------
+  function keyDir(side) {
+    const sx = (keys['r' + side] ? 1 : 0) - (keys['l' + side] ? 1 : 0);
+    const sy = (keys['d' + side] ? 1 : 0) - (keys['u' + side] ? 1 : 0);
+    if (!sx && !sy) return null;
+    const L = Math.hypot(sx, sy);
+    // screen direction -> game direction
+    return rot ? { x: -sy / L, y: sx / L } : { x: sx / L, y: sy / L };
+  }
+
+  function updateHuman(side, dt) {
+    const m = world.m[side];
+    let dir;
+    if (mode.players === 1) {
+      const a = keyDir(0), b = keyDir(1);
+      dir = a && b ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : a || b;
+    } else {
+      dir = keyDir(side);
+    }
+    if (dir) {
+      // Keys move the mallet at a steady speed.
+      const b = Core.bounds(side);
+      m.x = m.tx = clamp(m.x + dir.x * KEY_SPEED * dt, b[0], b[1]);
+      m.y = m.ty = clamp(m.y + dir.y * KEY_SPEED * dt, MR, H - MR);
+      return;
+    }
+    Core.followHuman(m, dt);
+  }
+
+  function setTarget(side, g) {
+    const b = Core.bounds(side), m = world.m[side];
+    m.tx = clamp(g.x, b[0], b[1]);
+    m.ty = clamp(g.y, MR, H - MR);
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const q = parts[i];
+      q.life -= dt;
+      if (q.life <= 0) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+      const f = Math.exp(-3 * dt);
+      q.vx *= f; q.vy *= f;
+      q.x += q.vx * dt; q.y += q.vy * dt;
+    }
+    flash[0] = Math.max(0, flash[0] - dt);
+    flash[1] = Math.max(0, flash[1] - dt);
+    goalFlash = Math.max(0, goalFlash - dt);
+    shake = Math.max(0, shake - dt * 30);
+
+    if (state === 'over') { overT += dt; for (const m of world.m) { m.px = m.x; m.py = m.y; } world.puck.px = world.puck.x; world.puck.py = world.puck.y; return; }
+    if (!active()) return;
+
+    for (const m of world.m) { m.px = m.x; m.py = m.y; }
+    updateHuman(0, dt);
+    if (mode.players === 2) updateHuman(1, dt);
+    else { Core.aiUpdate(ai, world, dt); Core.driveAI(world.m[1], ai, dt); }
+
+    const g = Core.step(world, dt);
+    if (world.puck.live) {
+      trail.push(world.puck.x, world.puck.y);
+      if (trail.length > 12) trail.splice(0, 2);
+    }
+    if (g >= 0 && state === 'play') { goal(g); return; }
+
+    if (state === 'serve') {
+      stateT -= dt;
+      if (stateT <= 0) { Core.releasePuck(world); state = 'play'; }
+    } else if (state === 'point') {
+      stateT -= dt;
+      if (stateT <= 0) {
+        if (winner >= 0) endGame();
+        else { Core.placePuck(world, 1 - lastScorer); state = 'serve'; stateT = SERVE_T; }
+      }
+    }
+  }
+
+  // ---------- Render ----------
+  function gameTransform(ox, oy) {
+    const k = devK;
+    if (rot) ctx.setTransform(0, -k, k, 0, (M + ox) * k, (W + M + oy) * k);
+    else ctx.setTransform(k, 0, 0, k, (M + ox) * k, (M + oy) * k);
+  }
+
+  function render(alpha) {
+    const k = devK;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    let ox = 0, oy = 0;
+    if (shake > 0 && !paused) { ox = rand(-1, 1) * shake; oy = rand(-1, 1) * shake; }
+
+    gameTransform(ox, oy);
+    drawTable();
+    if (state !== 'title') drawScores(ox, oy);
+    gameTransform(ox, oy);
+    drawTrail();
+    drawPuck(alpha);
+    drawMallets(alpha);
+    drawParticles();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function drawTable() {
+    const hl = 1 / devK;                     // one device pixel in game units
+    // rails
+    ctx.fillStyle = '#16181c';
+    ctx.fillRect(-M, -M, W + 2 * M, H + 2 * M);
+    // playing surface, with the rounded corners the puck plays off
+    ctx.fillStyle = '#0b0c0f';
+    tablePath(0);
+    ctx.fill();
+    // goal slots cut through the end rails
+    for (let s = 0; s < 2; s++) {
+      const x = s === 0 ? -M : W;
+      let col = '#000';
+      if (goalFlash > 0 && goalSide === s && Math.floor((FLASH_T - goalFlash) * 8) % 2 === 0) col = C.orange;
+      ctx.fillStyle = col;
+      ctx.fillRect(x, CY - GH, M, Core.GW);
+    }
+    // markings
+    ctx.fillStyle = 'rgba(234,84,38,0.55)';
+    ctx.fillRect(W / 2 - 1.5, 0, 3, H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = Math.max(hl, 1.5);
+    ctx.beginPath(); ctx.arc(W / 2, CY, 72, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, CY, GH + 34, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W, CY, GH + 34, Math.PI / 2, Math.PI * 1.5); ctx.stroke();
+    // serve spots
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(W * 0.25 - 3, CY - 3, 6, 6);
+    ctx.fillRect(W * 0.75 - 3, CY - 3, 6, 6);
+    // table edge
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = hl;
+    tablePath(hl / 2);
+    ctx.stroke();
+  }
+
+  function tablePath(o) {
+    const r = Core.RC + o;
+    ctx.beginPath();
+    ctx.moveTo(Core.RC, -o);
+    ctx.arcTo(W + o, -o, W + o, H + o, r);
+    ctx.arcTo(W + o, H + o, -o, H + o, r);
+    ctx.arcTo(-o, H + o, -o, -o, r);
+    ctx.arcTo(-o, -o, W + o, -o, r);
+    ctx.closePath();
+  }
+
+  function drawScores(ox, oy) {
+    const k = devK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '300 ' + Math.round(96 * k) + 'px ' + FONT_D;
+    for (let s = 0; s < 2; s++) {
+      const g = toScreen(s === 0 ? W / 2 - 140 : W / 2 + 140, CY);
+      const on = flash[s] > 0 && Math.floor((FLASH_T - flash[s]) * 7) % 2 === 0;
+      ctx.fillStyle = on ? C.orange : 'rgba(255,255,255,0.2)';
+      // In 2 player portrait the top player reads their number from the far end.
+      ctx.setTransform(1, 0, 0, 1, (g.x + ox) * k, (g.y + oy) * k);
+      if (rot && mode.players === 2 && s === 1) ctx.rotate(Math.PI);
+      ctx.fillText(String(score[s]), 0, 5 * k);
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+
+  function drawTrail() {
+    const p = world.puck;
+    if (!p.shown || !p.live || reduceMotion.matches) return;
+    const sp = Math.hypot(p.vx, p.vy);
+    if (sp < 700) return;
+    const a0 = Math.min(1, (sp - 700) / 900);
+    const n = trail.length / 2;
+    for (let i = 0; i < n - 1; i++) {
+      const t = (i + 1) / n;
+      ctx.globalAlpha = 0.14 * t * a0;
+      ctx.fillStyle = '#fff';
+      circle(trail[i * 2], trail[i * 2 + 1], PR * (0.55 + 0.4 * t));
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPuck(alpha) {
+    const p = world.puck;
+    if (!p.shown) return;
+    if (state === 'serve' && !paused && stateT < SERVE_T && Math.floor(stateT * 10) % 2 === 1) return;
+    const x = p.px + (p.x - p.px) * alpha, y = p.py + (p.y - p.py) * alpha;
+    ctx.fillStyle = '#fff';
+    circle(x, y, PR);
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, PR * 0.58, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function drawMallets(alpha) {
+    const rm = reduceMotion.matches;
+    for (let s = 0; s < 2; s++) {
+      const m = world.m[s];
+      const x = m.px + (m.x - m.px) * alpha, y = m.py + (m.y - m.py) * alpha;
+      const q = rm ? 0 : m.pop * m.pop;
+      const r = MR * (1 + 0.08 * q);
+      const orange = s === 0;
+      ctx.fillStyle = orange ? C.orange : '#ffffff';
+      circle(x, y, r);
+      ctx.fillStyle = orange ? C.dark : '#b9bcc2';
+      circle(x, y, r * 0.66);
+      ctx.fillStyle = orange ? C.light : '#ffffff';
+      circle(x, y, r * 0.4);
+    }
+  }
+
+  function drawParticles() {
+    for (const q of parts) {
+      ctx.globalAlpha = clamp((q.life / q.max) * 1.5, 0, 1);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x - q.size / 2, q.y - q.size / 2, q.size, q.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Overlays + pause ----------
+  function show(el) { el.classList.add('show'); }
+  function hideAll() {
+    for (const el of [ovStart, ovPause, ovOver]) el.classList.remove('show');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  function clearKeys() { for (const k in keys) keys[k] = false; }
+
+  function setPaused(p, by) {
+    if (p) {
+      if (paused || !active()) return;
+      paused = true; pausedBy = by || 'user';
+      clearKeys();
+      drags.clear();
+      show(ovPause);
+    } else {
+      if (!paused) return;
+      paused = false; pausedBy = null;
+      ovPause.classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+  }
+
+  // The arcade hiding the game always pauses. When it comes back, resume on our own
+  // only if the puck is not in play; otherwise the players pick it up when ready.
+  V.onPause((p) => {
+    if (p) setPaused(true, 'host');
+    else if (paused && pausedBy === 'host' && state !== 'play') setPaused(false);
+  });
+
+  function updateTexts() {
+    const touch = lastPointer === 'touch';
+    let t;
+    if (opts.players === 1) {
+      t = touch ? 'Drag to move your mallet.' : 'Move your mallet with the mouse, W A S D or the arrow keys. P to pause.';
+    } else if (touch) {
+      t = 'Each player drags a mallet in their own half.';
+    } else {
+      t = 'Orange W A S D, white arrow keys, or drag a mallet. P to pause.';
+    }
+    $('ctrlText').textContent = t;
+  }
+
+  function syncOptions() {
+    for (const seg of document.querySelectorAll('.seg')) {
+      const key = seg.dataset.key;
+      for (const b of seg.querySelectorAll('button')) {
+        const on = String(opts[key]) === b.dataset.v;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+    }
+    $('optDiff').style.display = opts.players === 1 ? '' : 'none';
+    updateTexts();
+  }
+
+  for (const seg of document.querySelectorAll('.seg')) {
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const key = seg.dataset.key, v = b.dataset.v;
+      opts[key] = key === 'diff' ? v : Number(v);
+      saveJSON(OPTS_KEY, opts);
+      syncOptions();
+    });
+  }
+
+  // ---------- Input ----------
+  window.addEventListener('pointerdown', (e) => {
+    try { window.focus(); } catch (_) {}
+    const isTouch = e.pointerType !== 'mouse';
+    if ((lastPointer === 'touch') !== isTouch) { lastPointer = isTouch ? 'touch' : 'mouse'; updateTexts(); }
+    if (e.target.closest && (e.target.closest('.ov.show') || e.target.closest('#pauseBtn'))) return;
+    if (!active() || paused) return;
+    const g = toGame(e.clientX, e.clientY);
+    const side = mode.players === 1 ? 0 : (g.x < W / 2 ? 0 : 1);
+    // A new finger on a side takes over from any older one there.
+    for (const [id, d] of drags) if (d.side === side) drags.delete(id);
+    drags.set(e.pointerId, { side });
+    setTarget(side, g);
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (paused || !active()) return;
+    const d = drags.get(e.pointerId);
+    if (d) setTarget(d.side, toGame(e.clientX, e.clientY));
+    else if (e.pointerType === 'mouse' && mode.players === 1) {
+      if (lastPointer !== 'mouse') { lastPointer = 'mouse'; updateTexts(); }
+      setTarget(0, toGame(e.clientX, e.clientY));
+    }
+  });
+
+  const endPtr = (e) => { drags.delete(e.pointerId); };
+  window.addEventListener('pointerup', endPtr);
+  window.addEventListener('pointercancel', endPtr);
+
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const KEYMAP = {
+    KeyW: 'u0', KeyS: 'd0', KeyA: 'l0', KeyD: 'r0',
+    ArrowUp: 'u1', ArrowDown: 'd1', ArrowLeft: 'l1', ArrowRight: 'r1',
+  };
+  window.addEventListener('keydown', (e) => {
+    const code = e.code || '';
+    const k = KEYMAP[code];
+    const onButton = e.target && e.target.tagName === 'BUTTON';
+    if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
+    if (k) {
+      if (!paused && active()) keys[k] = true;
+      if (lastPointer !== 'mouse') { lastPointer = 'mouse'; updateTexts(); }
+      return;
+    }
+    if (e.repeat) return;
+    if (code === 'Space' || code === 'Enter' || code === 'NumpadEnter') {
+      if (onButton) return;          // let the focused button handle it
+      if (state === 'title') newGame();
+      else if (state === 'over') { if (overT > 0.4) newGame(); }
+      else if (paused) setPaused(false);
+      return;
+    }
+    if (code === 'KeyP' || e.key === 'Escape') {
+      if (paused) setPaused(false); else setPaused(true, 'user');
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = KEYMAP[e.code];
+    if (k) keys[k] = false;
+  });
+  window.addEventListener('blur', clearKeys);
+
+  $('btnPlay').addEventListener('click', () => { if (state === 'title') newGame(); });
+  $('btnResume').addEventListener('click', () => setPaused(false));
+  $('btnPauseMode').addEventListener('click', toTitle);
+  $('btnAgain').addEventListener('click', () => { if (state === 'over') newGame(); });
+  $('btnMode').addEventListener('click', () => { if (state === 'over') toTitle(); });
+  pauseBtn.addEventListener('click', () => setPaused(true, 'user'));
+
+  window.addEventListener('resize', resize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+  // ---------- Main loop ----------
+  let last = performance.now(), acc = 0, btnShown = false;
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1;
+    if (!paused && state !== 'title') {
+      acc += dt;
+      let n = 0;
+      while (acc >= STEP && n < 16) { update(STEP); acc -= STEP; n++; }
+      if (n >= 16) acc = 0;
+    }
+    const wantBtn = active() && !paused;
+    if (wantBtn !== btnShown) { btnShown = wantBtn; pauseBtn.classList.toggle('on', wantBtn); }
+    render(paused || state === 'title' ? 1 : Math.min(1, acc / STEP));
+    requestAnimationFrame(frame);
+  }
+
+
+  // ---------- Boot ----------
+  resize();
+  syncOptions();
+
+  // Wait for the shared type (Segoe UI or bundled Selawik) before the first canvas text draw.
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    requestAnimationFrame((t) => { last = t; frame(t); });
+    V.ready();
+  }
+  try {
+    const f = document.fonts;
+    Promise.all([f.load('300 96px ' + FONT_D), f.load('400 13px ' + FONT), f.load('600 12px ' + FONT)])
+      .catch(() => {}).then(() => f.ready).then(start, start);
+    setTimeout(start, 2500);
+  } catch (_) { start(); }
+})();
+</script>
+</body>
+</html>

@@ -7,6 +7,12 @@
  * ordered by time and capped at MAX entries, and only accept the server's own
  * clock as the timestamp.
  *
+ * Totals: stats/allTime counts browsers that have ever visited and
+ * stats/days/<date> counts browsers seen on that day (US Eastern date). Each
+ * browser adds one the first time, remembered in localStorage; the rules only
+ * accept a write that is exactly the current value plus one, so two visitors
+ * racing just means one retries.
+ *
  * This lives in the Realtime Database rather than Firestore on purpose: its
  * free tier bills by bandwidth, not per write, so heartbeats never eat into
  * the Firestore quota that online rooms depend on.
@@ -53,12 +59,43 @@ async function beat(id) {
   } catch {}
 }
 
+const today = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(Date.now() + offset))
+
+async function readNumber(path) {
+  const res = await fetch(url(path))
+  if (!res.ok) throw new Error(res.status)
+  return Number(await res.json()) || 0
+}
+
+async function addOne(path) {
+  for (let tries = 0; tries < 6; tries++) {
+    try {
+      const n = await readNumber(path)
+      const res = await fetch(url(path), { method: 'PUT', body: JSON.stringify(n + 1) })
+      if (res.ok) return true
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200 + Math.random() * 600))
+  }
+  return false
+}
+
+// Each browser counts once ever and once a day. Without working storage there
+// is no way to tell a return visit from a new one, so those are not counted.
+async function countVisit() {
+  let store
+  try { store = window.localStorage; store.setItem('vela:probe', '1') } catch { return }
+  if (!store.getItem('vela:counted') && await addOne('stats/allTime')) store.setItem('vela:counted', '1')
+  const day = today()
+  if (store.getItem('vela:counted-day') !== day && await addOne(`stats/days/${day}`)) store.setItem('vela:counted-day', day)
+}
+
 let started = false
 export function startHeartbeat() {
   if (started) return
   started = true
   const id = myId()
-  beat(id)
+  beat(id).then(countVisit)
   setInterval(() => beat(id), BEAT_MS)
   document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(id) })
 }
@@ -74,4 +111,11 @@ export async function countOnline() {
   } catch {
     return null
   }
+}
+
+/* Resolves to { today, allTime }; either is null if it cannot be reached. */
+export async function visitTotals() {
+  const get = (path) => readNumber(path).catch(() => null)
+  const [todayCount, allTime] = await Promise.all([get(`stats/days/${today()}`), get('stats/allTime')])
+  return { today: todayCount, allTime }
 }

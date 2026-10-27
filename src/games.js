@@ -459,6 +459,89 @@ export const CATALOGUE = [
       <rect x="40" y="8" width="16" height="16" opacity=".55"/>
     </g>`,
   },
+  {
+    slug: 'air-hockey',
+    title: 'Air Hockey',
+    description:
+      'Knock the puck into the other goal and guard your own. The puck takes the speed of your mallet and keeps most of it off the walls. Play the computer on Easy, Normal or Hard, or two players on one device. First to 7.',
+    kind: 'inhouse',
+    src: '/games/air-hockey/index.html',
+    tags: ['Solo', 'Multiplayer', 'Action', 'Sports'],
+    players: '1 or 2 players',
+    controls: 'One player: mouse, drag, W A S D or arrows. Two players: W A S D against the arrows; on touch each player drags in their own half.',
+    scores: true,
+    bestLabel: 'Best Hard streak',
+    art: `<g fill="currentColor"><rect x="31.5" y="8" width="1" height="48" opacity=".35"/><rect x="6" y="24" width="2" height="16" opacity=".35"/><rect x="56" y="24" width="2" height="16" opacity=".35"/><circle cx="18" cy="32" r="9"/><circle cx="18" cy="32" r="4" style="fill:var(--tile)"/><circle cx="46" cy="22" r="9" opacity=".45"/><circle cx="36" cy="39" r="5"/></g>`,
+  },
+  {
+    slug: 'blackjack',
+    title: 'Blackjack',
+    description:
+      "Beat the dealer's hand without going over 21, playing from a six-deck shoe with a bankroll that carries over between visits. The dealer stands on soft 17 and blackjack pays 3 to 2. Double on any first two cards, split pairs up to three hands, and take insurance when the dealer shows an ace.",
+    kind: 'inhouse',
+    src: '/games/blackjack/index.html',
+    tags: ['Solo', 'Cards'],
+    players: '1 player',
+    controls: 'Tap chips to bet, then Deal. H hit, S stand, D double, P split. 1 to 4 add chips, Enter deals.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor">
+      <rect x="12" y="14" width="24" height="34" transform="rotate(-10 24 31)" opacity=".45"/>
+      <rect x="28" y="16" width="24" height="34" transform="rotate(8 40 33)"/>
+      <path d="M40 24C44 29 48 31 48 35C48 38 46 40 43.5 40C42 40 41 39.3 40.5 38.4L41.5 43H38.5L39.5 38.4C39 39.3 38 40 36.5 40C34 40 32 38 32 35C32 31 36 29 40 24Z" transform="rotate(8 40 33)" style="fill:var(--tile)"/>
+    </g>`,
+  },
+  {
+    slug: 'block-puzzle',
+    title: 'Block Puzzle',
+    description:
+      'Drag pieces from a tray of three onto a 10 by 10 grid. A full row or column clears; clearing several at once scores more, and clearing again within three placements builds a streak multiplier. A new set of three comes once all are placed, and the run ends when none of the remaining pieces fit.',
+    kind: 'inhouse',
+    src: '/games/block-puzzle/index.html',
+    tags: ['Solo', 'Puzzle'],
+    players: '1 player',
+    controls: 'Drag a piece onto the grid. Keys: 1 to 3 pick a piece, arrows move it, Enter places.',
+    scores: true,
+    art: `<g fill="currentColor"><rect x="32" y="8" width="10" height="10"/><rect x="44" y="8" width="10" height="10"/><rect x="44" y="20" width="10" height="10"/><rect x="8" y="32" width="10" height="10" opacity=".55"/><rect x="20" y="32" width="10" height="10" opacity=".55"/><rect x="32" y="32" width="10" height="10" opacity=".18"/><rect x="44" y="32" width="10" height="10" opacity=".18"/><rect x="8" y="44" width="10" height="10" opacity=".55"/><rect x="20" y="44" width="10" height="10" opacity=".55"/><rect x="32" y="44" width="10" height="10" opacity=".55"/><rect x="44" y="44" width="10" height="10" opacity=".18"/></g>`,
+  },
+  {
+    slug: 'hearts',
+    title: 'Hearts',
+    description:
+      'Classic Hearts against three computer players. Pass three cards each hand, follow suit, and avoid taking hearts and the queen of spades, or take every point to shoot the moon. The game ends when someone reaches 100 and the lowest score wins.',
+    kind: 'inhouse',
+    src: '/games/hearts/index.html',
+    tags: ['Solo', 'Cards', 'Strategy'],
+    players: '1 player',
+    controls: 'Tap or click a card to play it. Arrow keys and Enter also work.',
+    art: `<g fill="currentColor"><rect x="12" y="16" width="24" height="34" transform="rotate(-12 24 33)" opacity=".45"/><rect x="28" y="12" width="24" height="34" transform="rotate(8 40 29)"/><path transform="rotate(8 40 29) translate(32.8 22.4) scale(.16)" d="M50 92C46 87 5 61 5 32 5 17 16 7 29 7 39 7 46 13 50 21 54 13 61 7 71 7 84 7 95 17 95 32 95 61 54 87 50 92Z" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'word-search',
+    title: 'Word Search',
+    description:
+      'Find every word from the themed list hidden in the letter grid. Small 8 by 8 puzzles run across and down only, Medium 11 by 11 adds diagonals, and Large 14 by 14 hides words in all eight directions, backwards included. One daily puzzle that is the same for everyone, plus random puzzles from 23 themes with a best time for each size.',
+    kind: 'inhouse',
+    src: '/games/word-search/index.html',
+    tags: ['Solo', 'Puzzle'],
+    players: '1 player',
+    controls: 'Drag across a word, or tap its first and last letters. Keys: arrows to move, Enter to mark each end.',
+    art: `<g fill="currentColor"><rect x="6" y="7" width="52" height="10"/><rect x="14.62" y="33" width="46.77" height="10" transform="rotate(45 38 38)" opacity=".6"/><rect x="9" y="9" width="6" height="6" style="fill:var(--tile)"/><rect x="22" y="9" width="6" height="6" style="fill:var(--tile)"/><rect x="35" y="9" width="6" height="6" style="fill:var(--tile)"/><rect x="48" y="9" width="6" height="6" style="fill:var(--tile)"/><rect x="9" y="22" width="6" height="6" opacity=".45"/><rect x="22" y="22" width="6" height="6" style="fill:var(--tile)"/><rect x="35" y="22" width="6" height="6" opacity=".45"/><rect x="48" y="22" width="6" height="6" opacity=".45"/><rect x="9" y="35" width="6" height="6" opacity=".45"/><rect x="22" y="35" width="6" height="6" opacity=".45"/><rect x="35" y="35" width="6" height="6" style="fill:var(--tile)"/><rect x="48" y="35" width="6" height="6" opacity=".45"/><rect x="9" y="48" width="6" height="6" opacity=".45"/><rect x="22" y="48" width="6" height="6" opacity=".45"/><rect x="35" y="48" width="6" height="6" opacity=".45"/><rect x="48" y="48" width="6" height="6" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'yatzy',
+    title: 'Yatzy',
+    description:
+      'Roll five dice up to three times a turn, holding the ones you want, then score the roll in one of 13 boxes. 63 or more in the upper section earns a 35 bonus, and every extra Yatzy is worth 100 with the joker rule. Play solo for a high score or against the computer, each on its own card.',
+    kind: 'inhouse',
+    src: '/games/yatzy/index.html',
+    tags: ['Solo', 'Strategy'],
+    players: '1 player',
+    controls: 'Tap dice to hold, tap Roll, tap a box to score. Keys: 1 to 5 hold, Space rolls, arrows and Enter score.',
+    scores: true,
+    bestLabel: 'Best solo score',
+    art: `<g fill="currentColor"><g transform="rotate(-12 22 23)" opacity=".45"><rect x="10" y="11" width="24" height="24"/></g><rect x="26" y="26" width="28" height="28"/><rect x="30" y="30" width="5" height="5" style="fill:var(--tile)"/><rect x="45" y="30" width="5" height="5" style="fill:var(--tile)"/><rect x="37.5" y="37.5" width="5" height="5" style="fill:var(--tile)"/><rect x="30" y="45" width="5" height="5" style="fill:var(--tile)"/><rect x="45" y="45" width="5" height="5" style="fill:var(--tile)"/></g>`,
+  },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {
     slug: 'basketball-stars',
@@ -921,7 +1004,7 @@ export const CATALOGUE = [
     art: `<path d="M32 9 C26 19 12 25 12 36 C12 43 18 47 24 45 C27 44 29 42 30 40 L28 54 H36 L34 40 C35 42 37 44 40 45 C46 47 52 43 52 36 C52 25 38 19 32 9 Z" fill="currentColor"/>`,
   },
   {
-    slug: 'hearts',
+    slug: 'gd-hearts',
     title: 'Hearts',
     via: 'GameDistribution',
     description:
@@ -933,7 +1016,7 @@ export const CATALOGUE = [
     art: `<path d="M32 52 C20 43 10 34 10 24 C10 17 15 12 21 12 C26 12 29 15 32 19 C35 15 38 12 43 12 C49 12 54 17 54 24 C54 34 44 43 32 52 Z" fill="currentColor"/>`,
   },
   {
-    slug: 'yatzy',
+    slug: 'gd-yatzy',
     title: 'Yatzy',
     via: 'GameDistribution',
     description:
