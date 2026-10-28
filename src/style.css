@@ -90,6 +90,31 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .search input::-webkit-search-cancel-button { display: none; }
 .search kbd { font: 600 11px var(--font); color: var(--text-3); border: 1px solid var(--line); padding: 0 6px; }
 
+.account { position: relative; flex-shrink: 0; margin-left: 16px; }
+.account-btn {
+  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0;
+  background: none; border: 0; cursor: pointer;
+  font: 600 14px var(--font); color: var(--text-3); transition: color 0.15s var(--ease);
+}
+.account-btn:hover { color: var(--text); }
+.account-btn:disabled { opacity: 0.5; cursor: default; }
+.account-btn svg { width: 16px; height: 16px; }
+.avatar {
+  display: grid; place-items: center; width: 28px; height: 28px;
+  background: var(--vela); color: #fff; font: 600 13px var(--font);
+}
+.account-menu {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 20; min-width: 200px;
+  display: flex; flex-direction: column; gap: 4px; padding: 12px;
+  background: var(--bg-2); border: 1px solid var(--line);
+}
+.account-menu .label { padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-item {
+  padding: 6px 0; background: none; border: 0; text-align: left; cursor: pointer;
+  font: 600 14px var(--font); color: var(--text-2); transition: color 0.15s var(--ease);
+}
+.account-item:hover { color: var(--vela-2); }
+
 /* ── buttons ────────────────────────────────────────────────── */
 .btn {
   display: inline-flex; align-items: center; height: 36px; padding: 0 18px;
@@ -284,7 +309,17 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 }
 @media (max-width: 640px) {
   .wrap, .nav-inner { padding-left: 16px; padding-right: 16px; }
-  .brand-sub, .search kbd { display: none; }
+  .brand-sub, .search kbd, #sign-in span { display: none; }
+  .account { margin-left: 12px; }
+  /* No room for a full search box: it is an icon that opens across the bar. */
+  .nav-inner { position: relative; }
+  .search { flex: 0 0 32px; padding: 0; justify-content: center; }
+  .search input { flex: 0 0 0; width: 0; }
+  .search:focus-within, .search:has(input:not(:placeholder-shown)) {
+    position: absolute; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); z-index: 30;
+    padding: 0 10px; justify-content: flex-start; background: var(--bg-2);
+  }
+  .search:focus-within input, .search:has(input:not(:placeholder-shown)) input { flex: 1 1 auto; width: auto; }
   .toolbar { padding-top: 24px; }
   .toolbar h1 { font-size: 34px; padding-bottom: 12px; }
   .online { padding: 24px 0 48px; }

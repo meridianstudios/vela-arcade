@@ -6,6 +6,16 @@
  */
 export const UPDATES = [
   {
+    version: '1.2',
+    date: '2026-10-28',
+    games: ['roulette', 'slots', 'video-poker', 'mines', 'basketball-manager', 'racing-manager', 'checkers'],
+    changes: [
+      'Chess: Game Review grades every move from Best to Blunder, with accuracy for both sides.',
+      'Optional sign in with Google to keep your bests across devices.',
+      'Casino and Manager filters.',
+    ],
+  },
+  {
     version: '1.1',
     date: '2026-10-27',
     games: ['yatzy', 'air-hockey', 'blackjack', 'word-search', 'block-puzzle', 'hearts'],

@@ -19,7 +19,7 @@
  * `tags` drive the filter tabs; keep them to the ones in TAGS below.
  */
 
-export const ALL_TAGS = ['Solo', 'Multiplayer', 'Puzzle', 'Action', 'Strategy', 'Cards', 'Sports', 'Racing']
+export const ALL_TAGS = ['Solo', 'Multiplayer', 'Puzzle', 'Action', 'Strategy', 'Cards', 'Casino', 'Manager', 'Sports', 'Racing']
 
 // GameDistribution only serves its games on domains registered to a publisher
 // account; anywhere else they show a "not available here" screen. Turn this on
@@ -284,7 +284,7 @@ export const CATALOGUE = [
       'Two modes: predict a 48-team World Cup with friends on one device, or manage a national team across many tournaments.',
     kind: 'embed',
     src: 'https://worldcup.novalabsos.com',
-    tags: ['Sports', 'Strategy', 'Multiplayer'],
+    tags: ['Sports', 'Manager', 'Strategy', 'Multiplayer'],
     players: '1 player or pass-and-play',
     controls: 'Mouse or touch.',
     art: `<g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round">
@@ -480,7 +480,7 @@ export const CATALOGUE = [
       "Beat the dealer's hand without going over 21, playing from a six-deck shoe with a bankroll that carries over between visits. The dealer stands on soft 17 and blackjack pays 3 to 2. Double on any first two cards, split pairs up to three hands, and take insurance when the dealer shows an ace.",
     kind: 'inhouse',
     src: '/games/blackjack/index.html',
-    tags: ['Solo', 'Cards'],
+    tags: ['Solo', 'Cards', 'Casino'],
     players: '1 player',
     controls: 'Tap chips to bet, then Deal. H hit, S stand, D double, P split. 1 to 4 add chips, Enter deals.',
     scores: true,
@@ -541,6 +541,109 @@ export const CATALOGUE = [
     scores: true,
     bestLabel: 'Best solo score',
     art: `<g fill="currentColor"><g transform="rotate(-12 22 23)" opacity=".45"><rect x="10" y="11" width="24" height="24"/></g><rect x="26" y="26" width="28" height="28"/><rect x="30" y="30" width="5" height="5" style="fill:var(--tile)"/><rect x="45" y="30" width="5" height="5" style="fill:var(--tile)"/><rect x="37.5" y="37.5" width="5" height="5" style="fill:var(--tile)"/><rect x="30" y="45" width="5" height="5" style="fill:var(--tile)"/><rect x="45" y="45" width="5" height="5" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'basketball-manager',
+    title: 'Basketball Manager',
+    description:
+      'Run a pro basketball team in a fictional 30-team league for as many seasons as you last. Set the starting five and minutes, trade with computer teams under salary cap rules, draft scouted prospects, re-sign your players and bid on free agents, then sim 82-game seasons and best-of-seven playoffs with a box score for every game. Win and keep the books healthy, or the owner fires you.',
+    kind: 'inhouse',
+    src: '/games/basketball-manager/index.html',
+    tags: ['Solo', 'Manager', 'Sports'],
+    players: '1 player',
+    controls: 'Tap tabs, rows and buttons to manage. Sim buttons play games. Space runs the main sim button.',
+    scores: true,
+    bestLabel: 'Most titles',
+    art: `<g fill="currentColor"><circle cx="27" cy="27" r="17"/><rect x="25.5" y="10" width="3" height="34" style="fill:var(--tile)"/><rect x="10" y="25.5" width="34" height="3" style="fill:var(--tile)"/><path d="M15 15 Q23 27 15 39 L18 39 Q26 27 18 15 Z" style="fill:var(--tile)"/><path d="M39 15 Q31 27 39 39 L36 39 Q28 27 36 15 Z" style="fill:var(--tile)"/><rect x="36" y="46" width="6" height="8" opacity=".45"/><rect x="45" y="40" width="6" height="14" opacity=".7"/><rect x="54" y="32" width="6" height="22"/></g>`,
+  },
+  {
+    slug: 'checkers',
+    title: 'Checkers',
+    description:
+      'American checkers on an 8 by 8 board. Captures are compulsory and multi-jumps must be finished; a man reaching the far row becomes a king and can move and capture both ways. A player with no legal move loses, and 40 moves each without a capture or a man moving, or the same position three times, is a draw. Play the computer on Easy, Normal or Hard, pass and play on one device, or play a friend online with a room code.',
+    kind: 'inhouse',
+    src: '/games/checkers/index.html',
+    tags: ['Strategy', 'Multiplayer', 'Solo'],
+    players: '1 or 2 players, online',
+    controls: 'Drag a piece, or click it and then click a square. U to undo, F to flip the board.',
+    scores: true,
+    bestLabel: 'Best Hard streak',
+    art: `<g fill="currentColor"><circle cx="32" cy="39" r="20" opacity=".45"/><circle cx="32" cy="31" r="20"/><circle cx="32" cy="31" r="13" style="fill:var(--tile)"/><circle cx="32" cy="31" r="10"/></g>`,
+  },
+  {
+    slug: 'mines',
+    title: 'Mines',
+    description:
+      'Pick how many mines hide in a 5 x 5 grid, place a bet, then turn tiles over one at a time. Every gem raises the multiplier and you can cash out whenever you like, but a mine loses the bet. Your bankroll carries over between visits.',
+    kind: 'inhouse',
+    src: '/games/mines/index.html',
+    tags: ['Casino', 'Solo'],
+    players: '1 player',
+    controls: 'Tap tiles to reveal. Space bets and cashes out, R picks a random tile.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><rect x="10" y="10" width="13" height="13" opacity=".35"/><rect x="25.5" y="10" width="13" height="13" opacity=".35"/><rect x="41" y="10" width="13" height="13"/><rect x="10" y="25.5" width="13" height="13"/><rect x="25.5" y="25.5" width="13" height="13" opacity=".35"/><rect x="41" y="25.5" width="13" height="13" opacity=".35"/><rect x="10" y="41" width="13" height="13" opacity=".35"/><rect x="25.5" y="41" width="13" height="13"/><rect x="41" y="41" width="13" height="13" opacity=".35"/><path d="M44.4 13.5H50.6L52 16.3L47.5 21.5L43 16.3Z" style="fill:var(--tile)"/><path d="M13.4 29H19.6L21 31.8L16.5 37L12 31.8Z" style="fill:var(--tile)"/><path d="M28.9 44.5H35.1L36.5 47.3L32 52.5L27.5 47.3Z" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'racing-manager',
+    title: 'Racing Manager',
+    description:
+      "Run one of ten single-seater teams across as many seasons as you like: develop aero, engine, chassis and reliability under a budget cap, upgrade staff and sign drivers who develop and age. Each of the 16 rounds has qualifying and a live lap-by-lap race where you choose tyres, pit stops and driver mode through safety cars and rain. Points decide the drivers' and constructors' titles, and the rules change between seasons.",
+    kind: 'inhouse',
+    src: '/games/racing-manager/index.html',
+    tags: ['Solo', 'Manager', 'Racing'],
+    players: '1 player',
+    controls: 'Tap or click to manage the team. In a race, set tyres, pit calls and driver mode; Space pauses.',
+    scores: true,
+    bestLabel: 'Most titles',
+    art: `<g fill="currentColor"><rect x="14" y="8" width="36" height="5"/><rect x="29" y="13" width="6" height="13"/><rect x="12" y="16" width="9" height="13"/><rect x="43" y="16" width="9" height="13"/><rect x="23" y="25" width="18" height="24"/><rect x="28.5" y="29" width="7" height="9" style="fill:var(--tile)"/><rect x="11" y="37" width="10" height="15"/><rect x="43" y="37" width="10" height="15"/><rect x="17" y="52" width="30" height="5" opacity=".55"/></g>`,
+  },
+  {
+    slug: 'roulette',
+    title: 'Roulette',
+    description:
+      'European single-zero roulette with a full betting table and a bankroll that carries over between visits. Bet straight, split, street, corner, six line, dozens, columns and the even-money spots at the standard payouts from 35 to 1 down to 1 to 1. Undo, clear, rebet and double, then watch the ball settle into its pocket.',
+    kind: 'inhouse',
+    src: '/games/roulette/index.html',
+    tags: ['Solo', 'Casino'],
+    players: '1 player',
+    controls: 'Pick a chip, tap the table to bet (lines and corners for splits, streets and corners), then Spin. Keys: 1 to 5 chips, Z undo, C clear, R rebet, D double, Space spins or skips.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><circle cx="32" cy="32" r="26"/><circle cx="32" cy="32" r="18" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(45 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(90 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(135 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(180 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(225 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(270 32 32)" style="fill:var(--tile)"/><rect x="31" y="6" width="2" height="8" transform="rotate(315 32 32)" style="fill:var(--tile)"/><circle cx="32" cy="32" r="11" opacity=".45"/><rect x="29" y="29" width="6" height="6"/><circle cx="43" cy="21" r="3"/></g>`,
+  },
+  {
+    slug: 'slots',
+    title: 'Slots',
+    description:
+      'A five-reel, three-row video slot with 20 fixed lines and a bankroll that carries over between visits. Three or more scatters anywhere start 10 free spins with every win tripled, and they can retrigger. Spin once or auto-spin 10, 25 or 50 times; the paytable shows every payout and line, for a 96.2% return.',
+    kind: 'inhouse',
+    src: '/games/slots/index.html',
+    tags: ['Solo', 'Casino'],
+    players: '1 player',
+    controls: 'Space or Spin to spin, again to stop the reels. Up and down change the bet. P shows the paytable.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor">
+      <rect x="8" y="14" width="48" height="36"/>
+      <rect x="12" y="19" width="12" height="26" style="fill:var(--tile)"/><rect x="26" y="19" width="12" height="26" style="fill:var(--tile)"/><rect x="40" y="19" width="12" height="26" style="fill:var(--tile)"/>
+      <path d="M14 26H22V29L18.5 38H15.5L19 29H14Z"/><path d="M28 26H36V29L32.5 38H29.5L33 29H28Z"/><path d="M42 26H50V29L46.5 38H43.5L47 29H42Z"/>
+      <rect x="8" y="53" width="48" height="3" opacity=".45"/>
+    </g>`,
+  },
+  {
+    slug: 'video-poker',
+    title: 'Video Poker',
+    description:
+      'Machine-style draw poker with two games: Jacks or Better on the full-pay 9/6 table and full-pay Deuces Wild. Bet 1 to 5 credits, hold the cards you want and draw once, with a royal flush paying 4000 at five credits. A hint marks the hold with the best expected return, and the bankroll carries over between visits.',
+    kind: 'inhouse',
+    src: '/games/video-poker/index.html',
+    tags: ['Solo', 'Cards', 'Casino'],
+    players: '1 player',
+    controls: 'Tap cards to hold, then Draw. Keys: 1 to 5 hold, Enter deals and draws, B bet one, M bet max, H hint, G switch game.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><rect x="5" y="8" width="43" height="8" opacity=".35"/><rect x="49" y="8" width="10" height="8"/><rect x="5" y="22" width="10" height="22"/><rect x="16" y="22" width="10" height="22"/><rect x="27" y="22" width="10" height="22" opacity=".45"/><rect x="38" y="22" width="10" height="22"/><rect x="49" y="22" width="10" height="22" opacity=".45"/><rect x="5" y="48" width="10" height="5"/><rect x="16" y="48" width="10" height="5"/><rect x="38" y="48" width="10" height="5"/></g>`,
   },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {

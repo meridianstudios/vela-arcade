@@ -60,6 +60,20 @@ service cloud.firestore {
       }
     }
 
+    // Saved bests for a signed-in (non-anonymous) player, src/account.js.
+    // Only the owner can see or change them; anonymous room accounts cannot.
+    match /players/{uid} {
+      function owner() {
+        return signedIn() && request.auth.uid == uid
+          && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
+      allow get: if owner();
+      allow create, update: if owner()
+        && request.resource.data.keys().hasOnly(['bests', 'updatedAt'])
+        && request.resource.data.bests is map
+        && request.resource.data.bests.size() <= 500;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

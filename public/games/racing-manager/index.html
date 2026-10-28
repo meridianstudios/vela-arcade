@@ -1,0 +1,1866 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Racing Manager</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --tint: rgba(234, 84, 38, 0.14);
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- frame ---------- */
+  .app { position: fixed; inset: 0; display: flex; flex-direction: column; visibility: hidden; }
+  .app.ready { visibility: visible; }
+  .head { display: grid; gap: 0.5em; align-items: stretch; padding: 12px 12px 0; }
+  .app.wide .head { grid-template-columns: 1fr auto auto auto auto; grid-template-areas: "brand s1 s2 s3 menu"; }
+  .app.narrow .head { grid-template-columns: 1fr 1fr 1.25fr auto; grid-template-areas: "brand brand brand brand" "s1 s2 s3 menu"; }
+  html.vela-embedded .app.narrow .head { grid-template-areas: "s1 s2 s3 menu"; }
+  html.vela-embedded .app.narrow .brand { display: none; }
+  .brand { grid-area: brand; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 { margin: 0; font: 600 1.05em/1 var(--font); letter-spacing: 0.24em; text-transform: uppercase; white-space: nowrap; }
+  .brand h1::before { content: ""; display: inline-block; width: 0.62em; height: 0.62em; margin-right: 0.62em; background: var(--brand); vertical-align: 0.02em; }
+  .app.narrow .brand { padding: 0.15em 0 0.25em; }
+  .s1 { grid-area: s1; } .s2 { grid-area: s2; } .s3 { grid-area: s3; } .b-menu { grid-area: menu; }
+  .stat { min-width: 6.4em; padding: 0.5em 0.85em 0.55em; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; transition: border-color 180ms var(--ease); }
+  .app.narrow .stat { min-width: 0; padding-left: 0.7em; padding-right: 0.6em; }
+  .stat.lit { border-color: var(--brand); }
+  .stat.lit .num { color: var(--brand-hover); }
+  .lab { display: block; font: 600 11px/1.2 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .num { display: block; font: 600 1.2em/1.15 var(--font-display); font-variant-numeric: tabular-nums; margin-top: 0.15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.6em;
+    min-height: 3.3em; padding: 0 1.25em; border-radius: 0;
+    border: 1px solid var(--outline); background: transparent;
+    font: 600 clamp(11px, 0.76rem, 13px) var(--font); letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible, .seg button:focus-visible, .tabs button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary, .btn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover, .btn.on:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn.block { display: flex; width: 100%; margin-top: 12px; }
+  .btn.sm { min-height: 2.7em; padding: 0 0.9em; }
+  .btn.warn { border-color: var(--brand); color: var(--brand-hover); }
+  .app.narrow .head .btn { padding: 0 0.9em; }
+
+  .tabs { display: flex; margin: 10px 12px 0; border-bottom: 1px solid var(--line); }
+  .tabs[hidden] { display: none; }
+  .tabs button {
+    flex: 1 1 0; min-width: 0; position: relative; cursor: pointer;
+    background: none; border: 0; padding: 11px 2px 10px;
+    font: 600 11px/1 var(--font); letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); white-space: nowrap; transition: color 180ms var(--ease);
+  }
+  .app.wide .tabs button { flex: 0 0 auto; padding: 11px 18px 10px; letter-spacing: 0.12em; }
+  .tabs button::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--brand); transform: scaleX(0); transition: transform 240ms var(--ease); }
+  .tabs button:hover { color: #fff; }
+  .tabs button.on { color: #fff; }
+  .tabs button.on::after { transform: scaleX(1); }
+
+  .view { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 20px; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
+  .view.racing { overflow: hidden; padding: 10px 12px 12px; display: flex; flex-direction: column; }
+  .fade { animation: fade 280ms var(--ease); }
+  @keyframes fade { from { opacity: 0; transform: translateY(10px); } }
+
+  /* ---------- panels ---------- */
+  .cols { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .app.wide .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (min-width: 1180px) { .app.wide .cols.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  .stack { display: grid; gap: 10px; min-width: 0; align-content: start; }
+  .pn { background: var(--surface); border: 1px solid var(--line); border-radius: 2px; padding: 12px 14px 14px; min-width: 0; }
+  .pn h3 { margin: 0 0 10px; display: flex; align-items: center; gap: 0.6em; font: 600 12px/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; }
+  .pn h3::before { content: ""; width: 8px; height: 8px; flex: none; background: var(--brand); }
+  .pn h3 .r { margin-left: auto; color: var(--muted); letter-spacing: 0.1em; }
+  .big { font: 300 2em/1.1 var(--font-display); }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 1px; padding: 1px; margin: 10px 0 0; }
+  .kv > div { outline: 1px solid var(--line); padding: 7px 9px 8px; min-width: 0; }
+  .kv .v { display: block; margin-top: 3px; font: 600 15px/1.25 var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kv .v.hot { color: var(--brand-hover); }
+  .kv > .x2 { grid-column: span 2; }
+  .kv .v.dim { color: var(--muted); }
+  .bars { margin-top: 12px; }
+  .br { display: grid; grid-template-columns: 7.2em minmax(0, 1fr); align-items: center; gap: 10px; margin: 8px 0; }
+  .meter { position: relative; height: 6px; background: var(--surface-3); }
+  .meter i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brand); transition: width 500ms var(--ease); }
+  .meter b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .row2 .btn { width: 100%; }
+  .gap { margin-top: 10px; }
+  .list { margin: 0; padding: 0; list-style: none; }
+  .list li { padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px; display: flex; gap: 10px; align-items: baseline; }
+  .list li:first-child { border-top: 0; }
+  .list li .lab { margin-left: auto; }
+
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0; min-width: 0; min-height: 34px; padding: 0 4px; margin-left: -1px; cursor: pointer;
+    border: 1px solid var(--outline); background: transparent; border-radius: 0;
+    font: 600 11px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease);
+  }
+  .seg button:first-child { margin-left: 0; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.08); }
+  .seg button.on { position: relative; z-index: 1; background: var(--brand); border-color: var(--brand); color: #fff; }
+  .seg button.forced { box-shadow: inset 0 -3px 0 #fff; }
+  .seg button:disabled { opacity: 0.35; cursor: default; }
+  .seg.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .seg.g2 button { margin: 0; }
+  .seg + .seg, .seg + .kv { margin-top: 8px; }
+
+  .tw { overflow-x: auto; margin: 0 -14px; padding: 0 14px; scrollbar-width: thin; }
+  .tbl { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .tbl th { padding: 0 8px 7px; text-align: left; font: 600 11px/1.2 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .tbl td { padding: 7px 8px; border-top: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+  .tbl th:first-child, .tbl td:first-child { padding-left: 4px; }
+  .tbl .n { text-align: right; }
+  .tbl .b { font-weight: 600; }
+  .tbl .nm { max-width: 11em; overflow: hidden; text-overflow: ellipsis; }
+  .tbl tr.me td { background: var(--tint); }
+  .tbl tr.me td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+  .tbl tr.dim td { color: var(--muted); }
+  .tbl tr.next td { box-shadow: inset 0 1px 0 var(--brand), inset 0 -1px 0 var(--brand); }
+  .tbl tr.click { cursor: pointer; }
+  .tbl tr.click:hover td { background: rgba(255, 255, 255, 0.05); }
+  .tbl tr.sel td { background: rgba(234, 84, 38, 0.24); }
+  .tbl tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+  .tbl .btn { min-height: 2.5em; padding: 0 0.8em; }
+  .app.narrow .w { display: none; }
+  .hot { color: var(--brand-hover); }
+  .muted { color: var(--muted); }
+
+  .cp {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; flex: none; border: 1.5px solid currentColor; border-radius: 1px;
+    font: 700 10px/1 var(--font); vertical-align: -3px;
+  }
+  .cp.S { color: var(--brand-hover); }
+  .cp.M { color: #fff; }
+  .cp.H { color: rgba(255, 255, 255, 0.5); }
+  .cp.I { background: #fff; border-color: #fff; color: #000; }
+  .cp.W { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+  .arow { display: grid; grid-template-columns: 6.6em 3.2em 2.4em minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .arow:first-of-type { border-top: 0; }
+  .arow .v { font: 300 1.35em/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .proj { display: grid; grid-template-columns: 6.6em 4.6em minmax(0, 1fr) 4.4em; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .proj .n { text-align: right; font-variant-numeric: tabular-nums; }
+  .proj.free { color: var(--muted); }
+  .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .srow:first-of-type { border-top: 0; }
+  .srow .t { font-size: 14px; font-weight: 600; }
+  .srow .lab { margin-top: 3px; }
+  .mrow { padding: 10px 0 12px; border-top: 1px solid var(--line); }
+  .mrow:first-of-type { border-top: 0; padding-top: 0; }
+  .mrow .t { font-size: 15px; font-weight: 600; }
+  .mrow .row2 { margin-top: 8px; }
+
+  /* ---------- race ---------- */
+  .race { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rbar { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+  .rbar .stat { flex: 1 1 0; min-width: 0; padding: 0.4em 0.7em 0.45em; }
+  .rbar .stat .num { font-size: 1.1em; }
+  .rbar .num small { font: 600 11px var(--font); letter-spacing: 0.06em; color: var(--brand-hover); margin-left: 6px; text-transform: uppercase; }
+  .rbar .spd { flex: 0 0 auto; }
+  .rbar .spd button { min-width: 3.6em; padding: 0 14px; }
+  .app.narrow .rbar .spd { flex: 1 1 100%; }
+  .app.narrow.racing .head { display: none; }
+  .rbar .rmenu { min-height: 0; padding: 0 0.9em; }
+  .app.wide .rbar .rmenu { display: none; }
+  .app.narrow .view.racing { padding-top: 12px; }
+  .app.narrow .rbar .spd button { min-width: 0; min-height: 32px; }
+  .rgrid { flex: 1; min-height: 0; display: grid; gap: 8px; }
+  .app.wide .rgrid { grid-template-columns: minmax(0, 1fr) minmax(330px, 420px); grid-template-rows: minmax(0, 1fr) auto; grid-template-areas: "trk tower" "ctl tower"; }
+  .app.narrow .rgrid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(96px, 27%) minmax(0, 1fr) auto; grid-template-areas: "trk" "tower" "ctl"; }
+  .trk { grid-area: trk; position: relative; min-height: 0; overflow: hidden; background: var(--bg-2); border: 1px solid var(--line); }
+  .trk canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .tick { position: absolute; left: 8px; bottom: 6px; right: 8px; pointer-events: none; font: 600 11px/1.55 var(--font); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .tick div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tick .m { color: var(--brand-hover); }
+  .app.narrow .tick div:nth-last-child(n+3) { display: none; }
+  .tick div:last-child { animation: fade 300ms var(--ease); }
+  .tower { grid-area: tower; min-height: 0; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); }
+  .app.wide .tower { --tcols: 22px 38px 36px minmax(0, 1fr) 56px 46px 18px; }
+  .app.narrow .tower { --tcols: 22px 38px minmax(0, 1fr) 54px 46px; }
+  .th, .tr { display: grid; grid-template-columns: var(--tcols); align-items: center; column-gap: 6px; padding: 0 8px; }
+  .th { height: 26px; flex: none; }
+  .th .lab { font-size: 11px; }
+  .tb { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--surface-3) transparent; }
+  .tr {
+    position: absolute; left: 0; right: 0; top: 0; height: 26px; border-top: 1px solid var(--line);
+    font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap;
+    transition: transform 420ms var(--ease), background 200ms var(--ease);
+  }
+  .tr > span { overflow: hidden; text-overflow: ellipsis; }
+  .tr .p { text-align: right; color: var(--muted); }
+  .tr .k { font-weight: 600; letter-spacing: 0.04em; }
+  .tr .tm { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
+  .tr .g, .tr .i, .tr .s { text-align: right; }
+  .tr .y { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+  .tr.me { background: var(--tint); box-shadow: inset 3px 0 0 var(--brand); }
+  .tr.out { color: var(--muted); }
+  .tr.out .k { font-weight: 400; }
+  .tr.up .p { color: var(--brand-hover); }
+  .pit { font: 700 10px/1 var(--font); letter-spacing: 0.08em; color: var(--brand-hover); }
+  .ctl { grid-area: ctl; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dc { min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--surface); border: 1px solid var(--line); transition: border-color 200ms var(--ease); }
+  .dc.boxing { border-color: var(--brand); }
+  .dc.gone { opacity: 0.45; }
+  .dtop { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .dpos { font: 300 1.5em/1 var(--font-display); font-variant-numeric: tabular-nums; min-width: 1.6em; }
+  .dname { font: 600 13px/1 var(--font); letter-spacing: 0.1em; }
+  .dtag { font: 600 11px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-hover); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dlast { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .drow { display: flex; align-items: center; gap: 7px; font-size: 13px; font-variant-numeric: tabular-nums; min-width: 0; }
+  .drow .lab { flex: none; }
+  .drow .sp { flex: 1; }
+  .wbar { flex: 1; min-width: 20px; height: 5px; position: relative; background: var(--surface-3); }
+  .wbar i { position: absolute; left: 0; top: 0; bottom: 0; background: #fff; transition: width 300ms var(--ease), background 200ms var(--ease); }
+  .wbar.hi i { background: var(--brand); }
+  .dv.neg { color: var(--brand-hover); }
+  .seg.sm button { min-height: 30px; padding: 0 1px; letter-spacing: 0.02em; }
+  .dtop .auto { margin-left: auto; flex: none; min-height: 24px; padding: 0 8px; border: 1px solid var(--outline); background: transparent; border-radius: 0; cursor: pointer; font: 600 11px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase; transition: background 160ms var(--ease), border-color 160ms var(--ease); }
+  .dtop .auto.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .dtop .auto:disabled { opacity: 0.35; cursor: default; }
+  .app.narrow .dlast { display: none; }
+  .dlast + .auto { margin-left: 8px; }
+  .app.narrow .dlast + .auto { margin-left: auto; }
+  .seg .bx { flex: 1.5 1 0; }
+  .seg .bx.on { background: var(--brand); }
+  .app.wide .dc { padding: 10px 12px; gap: 8px; }
+  .app.wide .seg.sm button { min-height: 34px; }
+
+  /* ---------- overlay ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 12px; overflow: auto; background: rgba(0, 0, 0, 0.72); opacity: 0; transition: opacity 220ms var(--ease); }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card { width: min(100%, 23em); padding: 1.4em 1.4em 1.3em; background: var(--surface); border: 1px solid var(--line); border-radius: 2px; transform: translateY(24px); transition: transform 300ms var(--ease); }
+  .card.wide { width: min(100%, 34em); }
+  .overlay.show .card { transform: none; }
+  .card h2 { margin: 0; font: 600 0.95em/1.1 var(--font); letter-spacing: 0.2em; text-transform: uppercase; }
+  .card h2::before { content: ""; display: inline-block; width: 0.62em; height: 0.62em; margin-right: 0.62em; background: var(--brand); vertical-align: 0.02em; }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 8em; }
+  .card .tbl { margin-top: 1em; }
+  .card .kv { margin-top: 1.1em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fade, .tick div:last-child { animation: none; }
+    .tr, .meter i, .wbar i, .overlay, .card, .tabs button::after { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="head">
+    <div class="brand"><h1>Racing Manager</h1></div>
+    <div class="stat s1"><span class="lab">Season</span><span class="num" id="hSeason">1</span></div>
+    <div class="stat s2"><span class="lab">Round</span><span class="num" id="hRound">1/16</span></div>
+    <div class="stat s3" id="hCashBox"><span class="lab">Cash</span><span class="num" id="hCash">$0.0M</span></div>
+    <button class="btn b-menu" id="menuBtn" type="button" data-act="menu">Menu</button>
+  </header>
+  <nav class="tabs" id="tabs" hidden>
+    <button type="button" data-act="tab" data-t="home">Home</button>
+    <button type="button" data-act="tab" data-t="car">Car</button>
+    <button type="button" data-act="tab" data-t="team">Team</button>
+    <button type="button" data-act="tab" data-t="standings">Standings</button>
+    <button type="button" data-act="tab" data-t="calendar">Calendar</button>
+  </nav>
+  <main class="view" id="view"></main>
+</div>
+<div class="overlay" id="overlay" hidden><div class="card" id="ovCard" role="dialog"></div></div>
+
+<script src="../_shared/bridge.js" data-game="racing-manager"></script>
+<script id="engine">
+(function (G) {
+'use strict';
+
+/* ---------- random ---------- */
+let rs = 1;
+function rng() {
+  rs = (rs + 0x6D2B79F5) >>> 0;
+  let t = rs;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const R = (a, b) => a + rng() * (b - a);
+const RI = (a, b) => Math.floor(a + rng() * (b - a + 1));
+function gauss() { let u = 0; while (!u) u = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng()); }
+const pick = (a) => a[Math.floor(rng() * a.length)];
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const r1 = (x) => Math.round(x * 10) / 10;
+const r2 = (x) => Math.round(x * 100) / 100;
+const r3 = (x) => Math.round(x * 1000) / 1000;
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+/* ---------- data ---------- */
+// name, short, prestige, aero, engine, chassis, reliability, design, pit crew, factory
+const TEAM_DEF = [
+  ['Ferrand', 'FER', 90, 85, 83, 84, 80, 8, 8, 8],
+  ['Halden', 'HAL', 85, 84, 85, 81, 84, 8, 7, 8],
+  ['Moreau', 'MOR', 78, 81, 79, 81, 78, 7, 7, 7],
+  ['Kessler', 'KES', 68, 76, 80, 76, 82, 6, 6, 6],
+  ['Vantor', 'VAN', 60, 75, 74, 77, 75, 6, 5, 6],
+  ['Lindqvist', 'LIN', 54, 72, 76, 72, 74, 5, 6, 5],
+  ['Castell', 'CAS', 47, 72, 70, 73, 70, 5, 5, 5],
+  ['Ridley', 'RID', 41, 70, 73, 69, 72, 4, 5, 4],
+  ['Arkwright', 'ARK', 35, 68, 71, 69, 68, 4, 4, 4],
+  ['Dunmore', 'DUN', 30, 66, 69, 66, 66, 3, 4, 3],
+];
+// name, km, base lap s, power 0-1, tyre wear, overtaking difficulty 0-1, rain chance, pit loss s
+const CIRCUITS = [
+  ['Port Ellery', 5.30, 87, 0.55, 1.00, 0.45, 0.15, 21],
+  ['Marivel', 6.17, 92, 0.70, 0.90, 0.40, 0.05, 22],
+  ['Sundara', 5.41, 95, 0.50, 0.95, 0.40, 0.05, 24],
+  ['Montessa', 4.66, 79, 0.40, 1.25, 0.55, 0.10, 22],
+  ['Lake Orrin', 4.31, 76, 0.45, 0.80, 0.50, 0.30, 19],
+  ['Calder Bay', 3.34, 74, 0.25, 0.70, 0.90, 0.10, 20],
+  ['Valtiera', 4.65, 81, 0.35, 1.20, 0.60, 0.10, 22],
+  ['Northbank', 5.81, 83, 0.80, 0.80, 0.35, 0.35, 20],
+  ['Ashgrove', 5.89, 90, 0.60, 1.10, 0.50, 0.45, 20],
+  ['Kerrow', 4.26, 71, 0.55, 1.00, 0.55, 0.40, 21],
+  ['Skarvik', 7.00, 107, 0.75, 1.05, 0.35, 0.40, 22],
+  ['Vastmark', 5.79, 84, 0.85, 0.85, 0.30, 0.20, 23],
+  ['Belmira', 5.06, 94, 0.50, 0.75, 0.65, 0.10, 25],
+  ['Tessaly', 4.38, 79, 0.30, 0.95, 0.80, 0.15, 21],
+  ['Corran Heights', 4.30, 72, 0.45, 1.30, 0.45, 0.35, 21],
+  ['Brenmoor', 3.98, 77, 0.30, 1.05, 0.75, 0.25, 21],
+  ['Redcliff', 5.51, 96, 0.65, 1.35, 0.40, 0.25, 20],
+  ['Sablon', 4.94, 89, 0.40, 1.15, 0.55, 0.20, 22],
+  ['Orsk', 5.85, 98, 0.70, 0.70, 0.45, 0.05, 21],
+  ['Lisaro', 5.28, 82, 0.60, 0.90, 0.35, 0.20, 23],
+].map((c) => ({ name: c[0], km: c[1], base: c[2], power: c[3], wear: c[4], ovt: c[5], rain: c[6], pit: c[7] }));
+
+const FIRST = ['Mateo', 'Elias', 'Jonas', 'Luca', 'Noah', 'Rafael', 'Theo', 'Kai', 'Oskar', 'Felix', 'Adrian', 'Dario', 'Hugo', 'Leon', 'Marco',
+  'Nils', 'Pavel', 'Ruben', 'Sami', 'Tomas', 'Viktor', 'Aiden', 'Callum', 'Emil', 'Isaac', 'Kenji', 'Milo', 'Owen', 'Stefan', 'Tiago', 'Ivo',
+  'Arlo', 'Bruno', 'Caio', 'Dmitri', 'Enzo', 'Finn', 'Gabriel', 'Henrik', 'Joel', 'Karim', 'Lorenzo', 'Mikael', 'Pietro', 'Quentin', 'Ravi',
+  'Soren', 'Tobias', 'Wen', 'Yannick', 'Zane', 'Anton', 'Bastien', 'Cyrus', 'Dante', 'Erik', 'Jakob', 'Matias', 'Omar', 'Rhys'];
+const LAST = ['Varga', 'Lindgren', 'Okafor', 'Duval', 'Reyes', 'Morandi', 'Kowalski', 'Hartmann', 'Sorensen', 'Ferreira', 'Quinn', 'Takeda',
+  'Delacroix', 'Petrakis', 'Ivanov', 'Castillo', 'Novak', 'Eriksen', 'Laurent', 'Aziz', 'Keller', 'Marchetti', 'Oyelaran', 'Whitfield',
+  'Tanaka', 'Pellegrini', 'Bauer', 'Svoboda', 'Lindahl', 'Brennan', 'Dasilva', 'Engel', 'Fontaine', 'Galloway', 'Iversen', 'Jovanovic',
+  'Kaur', 'Mendes', 'Ortega', 'Pires', 'Rinaldi', 'Ueda', 'Vidal', 'Wexler', 'Yilmaz', 'Zielinski', 'Achterberg', 'Beaumont', 'Carvalho',
+  'Dekker', 'Esposito', 'Falk', 'Grau', 'Ishikawa', 'Nyberg', 'Abara', 'Soto', 'Halloran', 'Mbeki', 'Strand', 'Varela', 'Ostrowski'];
+const FAILS = ['Engine', 'Gearbox', 'Hydraulics', 'Power unit', 'Brakes', 'Electrics', 'Suspension', 'Cooling'];
+
+const PTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const PRIZE = [72, 64, 57, 50, 44, 38, 33, 28, 24, 20];
+const TIERS = [
+  { name: 'Small', cost: 3, races: 2, gain: 2 },
+  { name: 'Medium', cost: 6.5, races: 3, gain: 4 },
+  { name: 'Major', cost: 12, races: 5, gain: 7 },
+];
+const AREAS = ['aero', 'engine', 'chassis', 'rel'];
+const DEPTS = ['design', 'pit', 'factory'];
+const DRY = { S: 0, M: 0.55, H: 1.0 };
+const WEAR = { S: 0.042, M: 0.029, H: 0.021, I: 0.03, W: 0.026 };
+const ROUNDS = 16;
+const slick = (k) => k === 'S' || k === 'M' || k === 'H';
+const lapsOf = (c) => Math.min(78, Math.ceil(305 / c.km));
+
+/* ---------- ratings and money ---------- */
+const ovr = (d) => d.pace * 0.45 + d.racecraft * 0.18 + d.tyre * 0.12 + d.cons * 0.17 + d.wet * 0.08;
+function demand(d) { return r1(0.6 + Math.pow(Math.max(0, ovr(d) - 62) / 30, 2.2) * 38 * (d.age > 33 ? 0.8 : 1)); }
+const required = (d) => Math.max(0, (ovr(d) - 66) * 3.2);
+const buyout = (d) => r1(d.salary * d.contract * 0.5 + 1);
+const staffRun = (t) => (t.staff.design + t.staff.pit + t.staff.factory) * 1.2;
+const slots = (t) => 1 + Math.floor(t.staff.factory / 4);
+const sponsorOf = (p) => Math.round(45 + p);
+const carOvr = (car) => (car.aero + car.engine + car.chassis) / 3;
+const carScore = (car, c) => car.engine * (0.2 + 0.3 * c.power) + car.aero * (0.2 + 0.3 * (1 - c.power)) + car.chassis * 0.3;
+const staffCost = (lvl) => (lvl + 1) * 2.5;
+function salaries(S, ti) { let s = 0; for (const d of S.drivers) if (d.team === ti) s += d.salary; return s; }
+function capLeft(S, ti) { const t = S.teams[ti]; return r1(S.rules.cap - t.cap - staffRun(t) * Math.max(0, ROUNDS - S.round) / ROUNDS); }
+function lineup(S, ti) { return S.drivers.filter((d) => d.team === ti); }
+function targetPos(S, ti) { return 1 + S.teams.filter((t, i) => i !== ti && t.prestige > S.teams[ti].prestige).length; }
+
+function teamOrder(S) {
+  const wins = S.teams.map(() => 0);
+  for (const r of S.results) { const w = r.rows[0]; if (w && w.st === 'fin') wins[w.tm]++; }
+  return S.teams.map((t, i) => i).sort((a, b) => S.teams[b].pts - S.teams[a].pts || wins[b] - wins[a] || a - b);
+}
+function driverOrder(S) {
+  return S.drivers.filter((d) => d.team >= 0 || d.pts > 0).sort((a, b) => b.pts - a.pts || b.sw - a.sw || b.sp - a.sp || a.id - b.id);
+}
+
+/* ---------- drivers ---------- */
+function codeFor(S, last, first) {
+  const L = last.toUpperCase(), F = first.toUpperCase();
+  const used = new Set(S.drivers.filter((d) => !d.retired).map((d) => d.code));
+  const tries = [L.slice(0, 3), L[0] + L[1] + L[L.length - 1], L[0] + L.slice(2, 4), F[0] + L.slice(0, 2), L.slice(0, 2) + F[0]];
+  for (const c of tries) if (c.length === 3 && !used.has(c)) return c;
+  return L.slice(0, 2) + String.fromCharCode(65 + (S.drivers.length % 26));
+}
+function mkDriver(S, lvl, age) {
+  let first, last, n = 0;
+  do { first = pick(FIRST); last = pick(LAST); n++; } while (S.drivers.some((d) => !d.retired && d.last === last) && n < 60);
+  const a = (v) => r1(clamp(lvl + v, 35, 99));
+  const d = {
+    id: S.drivers.length, first, last, code: codeFor(S, last, first), age,
+    pace: a(gauss() * 2.5), racecraft: a(gauss() * 5), tyre: a(gauss() * 6), cons: a(gauss() * 5), wet: a(gauss() * 7),
+    pot: 0, morale: 65, team: -1, contract: 0, salary: 0, exp: false, retired: false,
+    pts: 0, sw: 0, sp: 0, starts: 0, wins: 0, pods: 0, titles: 0,
+  };
+  d.pot = Math.round(clamp(ovr(d) + (age < 22 ? R(4, 20) : age < 26 ? R(1, 10) : R(0, 2)), 50, 99));
+  d.salary = demand(d);
+  S.drivers.push(d);
+  return d;
+}
+function sign(d, ti, yrs, sal) { d.team = ti; d.contract = yrs; d.salary = sal != null ? sal : demand(d); d.exp = false; }
+
+function develop(d) {
+  const room = d.pot - ovr(d);
+  let g;
+  if (d.age <= 24) g = room > 0 ? R(0.25, 0.6) * room : R(-0.5, 0.5);
+  else if (d.age <= 29) g = room > 0 ? R(0.1, 0.4) * room : R(-0.6, 0.6);
+  else if (d.age <= 32) g = R(-1.4, 0.4);
+  else g = R(-3.2, -0.5);
+  const f = (k, s) => { d[k] = r1(clamp(d[k] + g * s + gauss() * 0.7, 35, 99)); };
+  f('pace', 1); f('racecraft', 1.1); f('tyre', 0.9); f('cons', 1.1); f('wet', 1);
+  if (d.age < 31) { d.racecraft = r1(Math.min(99, d.racecraft + 0.4)); d.cons = r1(Math.min(99, d.cons + 0.4)); }
+}
+
+/* ---------- career ---------- */
+function pickCalendar(prev) {
+  const all = CIRCUITS.map((_, i) => i);
+  let set;
+  if (!prev) set = shuffle(all.slice()).slice(0, ROUNDS);
+  else {
+    set = prev.slice();
+    const out = all.filter((i) => !set.includes(i));
+    const n = RI(0, 2);
+    for (let k = 0; k < n && out.length; k++) set[RI(0, set.length - 1)] = out.splice(RI(0, out.length - 1), 1)[0];
+  }
+  return set.sort((a, b) => a - b);
+}
+
+function newCareer(pi, seed) {
+  rs = (seed >>> 0) || 1;
+  const S = {
+    v: 1, season: 1, round: 0, phase: 'hq', player: pi, teams: [], drivers: [],
+    rules: { cap: 135, fl: true, drs: true, tyre: 1 },
+    history: [], titles: { c: 0, d: 0 }, results: [], calendar: [], weekend: null, race: null, devLog: [], review: null, target: 0, rs: 0,
+  };
+  TEAM_DEF.forEach((t, i) => S.teams.push({
+    name: t[0], short: t[1], prestige: t[2],
+    car: { aero: t[3], engine: t[4], chassis: t[5], rel: t[6] },
+    staff: { design: t[7], pit: t[8], factory: t[9] },
+    projects: [], cash: r1(PRIZE[i] * 0.5 + 10), cap: 0, pts: 0, sponsor: sponsorOf(t[2]), lastPos: i + 1,
+  }));
+  S.teams.forEach((t, i) => {
+    const top = 70 + t.prestige * 0.2;
+    [top + R(0, 3), top - R(1, 5)].forEach((l) => sign(mkDriver(S, l, RI(21, 35)), i, RI(1, 3)));
+  });
+  for (let k = 0; k < 8; k++) mkDriver(S, R(63, 75), RI(22, 34));
+  for (let k = 0; k < 4; k++) mkDriver(S, R(60, 68), RI(18, 21));
+  S.calendar = pickCalendar(null);
+  S.target = targetPos(S, pi);
+  return S;
+}
+
+/* ---------- performance model ---------- */
+const effPace = (d, w) => d.pace * (1 - w) + (d.pace * 0.35 + d.wet * 0.65) * w + (d.morale - 60) / 25;
+const carDelta = (S, ti, c) => (100 - carScore(S.teams[ti].car, c)) * 0.07 * c.base / 90;
+function compPen(k, w) {
+  if (slick(k)) return DRY[k] + (w > 0.12 ? (w - 0.12) * 32 : 0);
+  if (k === 'I') return w < 0.3 ? 0.4 + (0.3 - w) * 12 : w <= 0.6 ? 0.4 : 0.4 + (w - 0.6) * 14;
+  return w < 0.7 ? 1.4 + (0.7 - w) * 9 : 1.4;
+}
+const deg = (x) => { x = Math.min(x, 1.05); return 2.2 * x + (x > 0.7 ? (x - 0.7) * (x - 0.7) * 60 : 0); };
+function wearRate(race, d, k, mode, w) {
+  let r = WEAR[k] * race.wearK * (1.15 - d.tyre * 0.003) * (mode === 'P' ? 1.35 : mode === 'S' ? 0.72 : 1);
+  if (slick(k) && w > 0.15) r *= 0.7;
+  if (k === 'I' && w < 0.2) r *= 3;
+  if (k === 'W' && w < 0.45) r *= 3;
+  return r;
+}
+const wetAt = (race, lap) => race.wet[clamp(lap, 0, race.wet.length - 1)];
+const wetComp = (w) => (w >= 0.67 ? 'W' : w >= 0.18 ? 'I' : null);
+
+function makeWx(c, L) {
+  const rain = new Array(L + 4).fill(0);
+  if (rng() < c.rain * 0.2) { const e = RI(4, L); const lv = R(0.3, 0.95); for (let l = 0; l <= e; l++) rain[l] = r2(lv); }
+  if (rng() < c.rain * 0.6) {
+    const st = RI(4, Math.max(5, L - 6)), du = RI(3, 18), lv = R(0.2, 1);
+    for (let l = st; l < Math.min(rain.length, st + du); l++) rain[l] = r2(Math.max(rain[l], lv));
+  }
+  const wet = [];
+  let x = rain[0];
+  for (let l = 0; l < rain.length; l++) {
+    const r = rain[l];
+    if (r > x) x = Math.min(r, x + 0.16);
+    else if (r > 0) x = Math.max(r, x - 0.03);
+    else x = Math.max(0, x - 0.06);
+    wet.push(r2(x));
+  }
+  const any = rain.some((v) => v > 0);
+  return { rain, wet, fe: RI(-2, 2), pct: Math.round((any ? R(0.5, 0.95) : R(0.02, 0.35)) * 100) };
+}
+
+/* ---------- qualifying ---------- */
+function runQuali(S) {
+  const ci = S.calendar[S.round], c = CIRCUITS[ci], L = lapsOf(c);
+  const wx = makeWx(c, L);
+  const qw = rng() < c.rain * 0.3 ? r2(R(0.25, 0.9)) : 0;
+  const form = {}, setup = S.teams.map(() => r3(gauss() * 0.15));
+  S.drivers.forEach((d) => { if (d.team >= 0) form[d.id] = r3(gauss() * 0.12); });
+  const lap = (d) => {
+    const pen = qw >= 0.18 ? compPen(wetComp(qw), qw) : 0;
+    return c.base - 2.5 + carDelta(S, d.team, c) + setup[d.team] + form[d.id] + (100 - effPace(d, qw)) * 0.03 * c.base / 90 + qw * 7 + pen
+      + gauss() * (0.06 + (100 - d.cons) * 0.004)
+      + (rng() < 0.035 * (1.6 - d.cons / 100) * (1 + qw * 2) ? R(0.6, 3) : 0);
+  };
+  const rows = S.drivers.filter((d) => d.team >= 0).map((d) => ({ d: d.id, tm: d.team, q: [0, 0, 0] }));
+  const sess = (list, k) => {
+    list.forEach((r) => { const d = S.drivers[r.d]; r.q[k] = r3(Math.min(lap(d), lap(d))); });
+    list.sort((a, b) => a.q[k] - b.q[k]);
+  };
+  const l1 = rows.slice(); sess(l1, 0);
+  const l2 = l1.slice(0, 15); sess(l2, 1);
+  const l3 = l2.slice(0, 10); sess(l3, 2);
+  const order = [...l3, ...l2.slice(10), ...l1.slice(15)];
+  S.weekend = { ci, wx, qw, form, setup, rows: order, grid: order.map((r) => r.d), start: {} };
+  const tmp = { laps: L, wearK: c.wear * S.rules.tyre, wet: wx.wet };
+  order.forEach((r, g) => { S.weekend.start[r.d] = aiStartComp(tmp, S.drivers[r.d], g + 1); });
+  S.phase = 'quali';
+}
+
+/* ---------- race ---------- */
+function aiStartComp(race, d, grid) {
+  const w = race.wet[0];
+  if (w >= 0.18) return wetComp(w);
+  const r = rng();
+  const hiWear = race.laps * wearRate(race, d, 'M', 'N', 0) > 1.55;
+  if (grid <= 10) return r < (hiWear ? 0.3 : 0.55) ? 'S' : 'M';
+  return r < 0.2 ? 'S' : r < 0.65 ? 'M' : 'H';
+}
+
+function log(race, lap, x, m) { race.log.push({ l: lap, x, m: m ? 1 : 0 }); if (race.log.length > 40) race.log.shift(); }
+
+function startRace(S) {
+  const W = S.weekend, c = CIRCUITS[W.ci], L = lapsOf(c);
+  const race = {
+    ci: W.ci, laps: L, base: c.base, pit: c.pit, ovt: c.ovt, wearK: c.wear * S.rules.tyre, drs: S.rules.drs,
+    wet: W.wx.wet, rain: W.wx.rain, fe: W.wx.fe,
+    t: 0, lead: 0, leadT: [0], flag: false, sc: null, nSC: 0, nVSC: 0, cars: [], ev: [], log: [], fl: null,
+    ovts: 0, att: 0, done: false, carD: S.teams.map((_, i) => r3(carDelta(S, i, c) + W.setup[i])), form: W.form, alert: 0, ver: 0,
+    debris: rng() < 0.12 ? RI(3, L - 6) : -1,
+  };
+  W.grid.forEach((id, g) => {
+    const d = S.drivers[id];
+    const me = d.team === S.player;
+    race.cars.push({
+      d: id, tm: d.team, grid: g + 1, lap: 0, t0: 0, t1: 0, last: r2(g * 0.16), pitT: 0, comp: 'M', wear: 0, age: 0, used: [],
+      fuel: L + 0.6, mode: 'N', lapMode: 'N', fsave: false, box: false, boxComp: 'M', pick: false, stops: 0, st: 'run', why: '',
+      best: 1e9, lastLap: 0, pen: 0, dmg: 0, auto: !me, me, thr: R(0.68, 0.84), finT: 0, outT: 0, doom: false,
+    });
+  });
+  race.cars.forEach((car) => {
+    const k = W.start[car.d] || aiStartComp(race, S.drivers[car.d], car.grid);
+    car.comp = k; car.used.push(k); car.boxComp = k;
+  });
+  race.cars.forEach((car) => beginLap(race, S, car, car.last));
+  S.race = race;
+  S.phase = 'race';
+  return race;
+}
+
+function findFront(race, c) {
+  let f = null;
+  for (const o of race.cars) {
+    if (o === c || o.st !== 'run' || o.lap !== c.lap || o.pitT > 0 || o.last > c.last) continue;
+    if (!f || o.last > f.last) f = o;
+  }
+  return f;
+}
+
+function chooseDry(race, d, c, rem) {
+  const used = new Set(c.used.filter(slick));
+  const need = used.size < 2 && !c.used.some((k) => !slick(k));
+  const rate = (k) => wearRate(race, d, k, 'N', 0);
+  const opts = ['S', 'M', 'H'];
+  const ok = opts.filter((k) => rem * rate(k) <= 0.78 && (!need || !used.has(k)));
+  if (ok.length) return ok.length > 1 && rng() < 0.2 ? ok[1] : ok[0];
+  const half = opts.filter((k) => (rem / 2) * rate(k) <= 0.8);
+  return half.filter((k) => !need || !used.has(k))[0] || half[0] || 'H';
+}
+
+function suggest(race, S, c) {
+  const rem = race.laps - c.lap;
+  const w = Math.max(wetAt(race, race.lead), wetAt(race, race.lead + 1));
+  return wetComp(w) || chooseDry(race, S.drivers[c.d], c, rem);
+}
+
+function aiDecide(race, S, c, rem, w, T) {
+  const d = S.drivers[c.d];
+  const wn = wetAt(race, race.lead + 1);
+  let box = false, k = c.comp;
+  if (c.lap > 0 && rem >= 2) {
+    const want = wetComp(wn);
+    if (want || !slick(c.comp)) {
+      const tgt = want || chooseDry(race, d, c, rem);
+      if (tgt !== c.comp && !(slick(tgt) && slick(c.comp))) {
+        const loss = compPen(c.comp, wn) - compPen(tgt, wn);
+        if (loss > 4 || (loss > 1.0 && rng() < 0.55)) { box = true; k = tgt; }
+      }
+    }
+    if (!box && slick(c.comp) && wn < 0.18) {
+      const rate = wearRate(race, d, c.comp, 'N', w);
+      const ok2 = new Set(c.used.filter(slick)).size >= 2 || c.used.some((x) => !slick(x));
+      const reach = (0.9 - c.wear) / rate >= rem;
+      if (c.dmg > 0 && rem > 3) box = true;
+      else if (c.wear > c.thr && !(ok2 && reach)) box = true;
+      else if (!ok2 && rem <= 6) box = true;
+      else if (race.sc && race.sc.k === 'SC' && c.wear > 0.3 && rem > 8 && c.age > 5 && rng() < 0.85) box = true;
+      else if (race.sc && race.sc.k === 'VSC' && c.wear > 0.45 && rem > 8 && rng() < 0.6) box = true;
+      if (box) k = chooseDry(race, d, c, rem);
+    }
+  }
+  c.box = box; c.boxComp = k;
+  const margin = c.fuel - rem;
+  const f = findFront(race, c);
+  const gap = f ? T - f.last : 99;
+  if (margin < 0.15) c.mode = 'S';
+  else if ((rem <= 8 && margin > 0.45 && c.wear < 0.6) || (gap < 1.2 && margin > 0.7 && c.wear < 0.5)) c.mode = 'P';
+  else c.mode = 'N';
+}
+
+function doom(race, c, t, why, crash) {
+  if (c.doom) return;
+  c.doom = true;
+  race.ev.push({ t, c: race.cars.indexOf(c), why, crash });
+}
+
+function deploy(race, k, S) {
+  race.sc = { k, end: race.lead + (k === 'SC' ? RI(3, 5) : RI(1, 2)) };
+  if (k === 'SC') race.nSC++; else race.nVSC++;
+  log(race, race.lead + 1, k === 'SC' ? 'Safety car' : 'Virtual safety car', true);
+  race.alert++;
+}
+
+function retire(race, S, e) {
+  const c = race.cars[e.c];
+  if (c.st !== 'run') return;
+  c.st = 'out'; c.why = e.why; c.outT = e.t;
+  log(race, c.lap + 1, S.drivers[c.d].code + ' out: ' + e.why, c.me);
+  if (!race.flag && race.lead < race.laps - 1 && !race.sc) {
+    const r = rng();
+    const k = e.crash ? (r < 0.45 ? 'SC' : r < 0.7 ? 'VSC' : null) : (r < 0.12 ? 'SC' : r < 0.4 ? 'VSC' : null);
+    if (k) deploy(race, k, S);
+  }
+}
+
+function beginLap(race, S, c, T) {
+  const d = S.drivers[c.d], team = S.teams[c.tm];
+  const rem = race.laps - c.lap;
+  const w = wetAt(race, race.lead);
+  if (c.auto) aiDecide(race, S, c, rem, w, T);
+  else if (!c.pick) c.boxComp = suggest(race, S, c);
+  let mode = c.mode;
+  c.fsave = false;
+  if (c.fuel < rem + 0.02) { mode = 'S'; c.fsave = c.mode !== 'S'; }
+  let pitT = 0;
+  if (c.box && c.lap > 0) {
+    const k = c.boxComp || c.comp;
+    const st = Math.max(1.8, 3.3 - team.staff.pit * 0.12 + gauss() * 0.22) + (rng() < 0.1 - team.staff.pit * 0.007 ? R(1.5, 7) : 0);
+    const loss = race.pit * (race.sc ? (race.sc.k === 'SC' ? 0.5 : 0.62) : 1);
+    pitT = st + loss;
+    c.stops++; c.comp = k; c.wear = 0; c.age = 0; c.dmg = 0; c.thr = R(0.68, 0.84); c.pick = false;
+    if (!c.used.includes(k)) c.used.push(k);
+    log(race, c.lap + 1, d.code + ' pit ' + k + ' ' + st.toFixed(1) + 's', c.me);
+  }
+  c.box = false;
+
+  let lt = race.base + race.carD[c.tm] + (race.form[c.d] || 0) + (100 - effPace(d, w)) * 0.03 * race.base / 90 + w * 7;
+  lt += compPen(c.comp, w) + deg(c.wear) + 3.0 * c.fuel / race.laps + c.dmg;
+  lt += mode === 'P' ? -0.3 : mode === 'S' ? 0.55 : 0;
+  lt += gauss() * (0.1 + (100 - d.cons) * 0.006);
+  if (c.lap === 0) lt += 2.5 + gauss() * 0.5 * (1.4 - d.racecraft / 100);
+  if (pitT) lt += 1.0;
+  if (c.wear >= 1 && !c.doom && rng() < 0.3) {
+    lt += R(15, 25); c.box = true; c.boxComp = c.pick ? c.boxComp : suggest(race, S, c);
+    log(race, c.lap + 1, d.code + ' puncture', true);
+  }
+
+  const sc = race.sc;
+  let pm = 0.0035 * (1.5 - d.cons / 100) * (mode === 'P' ? 1.7 : mode === 'S' ? 0.7 : 1) * (1 + w * (2.6 - d.wet / 50));
+  if (slick(c.comp) && w > 0.15) pm += (w - 0.15) * 0.08;
+  if (sc) pm *= 0.3;
+  if (!c.doom && rng() < pm) {
+    const r = rng();
+    if (r < 0.12) doom(race, c, T + pitT + lt * R(0.1, 0.9), 'Accident', true);
+    else if (r < 0.32) { lt += R(5, 12); if (rng() < 0.4) c.dmg = 1.2; log(race, c.lap + 1, d.code + ' spins', c.me); }
+    else lt += R(0.8, 3);
+  }
+  const pf = 0.0028 * Math.pow((100 - team.car.rel) / 35, 2) * (mode === 'P' ? 1.3 : 1) * (sc ? 0.5 : 1);
+  if (!c.doom && rng() < pf) doom(race, c, T + pitT + lt * R(0.05, 0.95), pick(FAILS), false);
+
+  let end = T + pitT + lt;
+  let wm = 1;
+  const front = findFront(race, c);
+  if (sc && sc.k === 'SC') {
+    end = front ? Math.max(T + pitT + race.base * 1.12 + w * 7, front.t1 + 0.5 + rng() * 0.35) : T + pitT + race.base * 1.38 + w * 7;
+  } else if (sc) {
+    end = T + pitT + Math.max(lt, race.base * 1.36 + w * 7);
+    if (front && pitT === 0 && end < front.t1 + 0.3) end = front.t1 + 0.3 + rng() * 0.3;
+  } else if (front && pitT === 0) {
+    const gap0 = T - front.last;
+    const drsOn = race.drs && c.lap >= 2 && gap0 < 1.0 && w < 0.2;
+    if (drsOn) end -= 0.35;
+    if (gap0 < 1.5) wm = 1.06;
+    const m = front.t1 - end;
+    if (m > -0.3) {
+      const df = S.drivers[front.d];
+      race.att++;
+      const pc = 0.007 * (1.35 - d.racecraft / 100) * (c.lap === 0 ? 2.5 : 1) * (1 + w) * (m > 1 ? 0.3 : 1);
+      if (rng() < pc) {
+        const r = rng();
+        const who = d.code + ' and ' + df.code + ' collide';
+        if (r < 0.45) { c.dmg = 1.3; end = Math.max(end, front.t1 + R(2, 5)); log(race, c.lap + 1, who, c.me || front.me); }
+        else if (r < 0.7) { doom(race, c, T + (end - T) * R(0.05, 0.3), 'Collision', true); end = Math.max(end, front.t1 + 0.5); }
+        else if (r < 0.9) { front.dmg = 1.3; front.t1 += R(2, 4); log(race, c.lap + 1, who, c.me || front.me); }
+        else { doom(race, front, T + (front.t1 - T) * R(0.05, 0.3), 'Collision', true); }
+      } else {
+        let p = m > 1.0 ? 0.97 : 0.02 + (m + 0.3) * 0.4 * (1 - race.ovt) + (d.racecraft - df.racecraft) / 250
+          + (drsOn ? 0.1 : 0) + (c.lap === 0 ? 0.08 : 0) + (mode === 'P' ? 0.04 : 0);
+        p = clamp(p, 0.02, 0.97);
+        if (rng() < p) {
+          end = Math.min(end, front.t1 - 0.05 - rng() * 0.25);
+          front.t1 += m > 1 ? 0.05 : 0.1 + rng() * 0.25;
+          race.ovts++;
+          if (c.me || front.me) log(race, c.lap + 1, d.code + ' passes ' + df.code, true);
+        } else {
+          end = Math.max(end, front.t1 + 0.25 + rng() * 0.4);
+          wm *= 1.03;
+        }
+      }
+    }
+  }
+  c.t0 = T; c.t1 = Math.max(end, T + 1); c.pitT = pitT; c.lapMode = mode;
+  c.wear += wearRate(race, d, c.comp, mode, w) * wm * (1 + 0.15 * c.fuel / race.laps) * (sc ? (sc.k === 'SC' ? 0.45 : 0.55) : 1);
+  c.fuel -= (mode === 'P' ? 1.05 : mode === 'S' ? 0.88 : 1) * (sc ? 0.6 : 1);
+  c.age++;
+}
+
+function crossing(race, S, c, T) {
+  if (c.doom) {
+    const i = race.ev.findIndex((e) => race.cars[e.c] === c);
+    if (i >= 0) { const e = race.ev.splice(i, 1)[0]; e.t = T; retire(race, S, e); return; }
+  }
+  c.lap++;
+  const lt = T - c.t0;
+  c.lastLap = lt;
+  if (c.lap > 1 && c.pitT === 0 && !race.sc) {
+    if (lt < c.best) c.best = lt;
+    if (!race.fl || lt < race.fl.t) race.fl = { d: c.d, t: lt, lap: c.lap };
+  }
+  c.last = T;
+  let leader = false;
+  if (race.leadT[c.lap] === undefined) { race.leadT[c.lap] = T; race.lead = c.lap; leader = true; }
+  if (race.flag || c.lap >= race.laps) { c.st = 'fin'; c.finT = T; race.flag = true; return; }
+  if (leader) {
+    if (race.sc && c.lap >= race.sc.end) { log(race, c.lap + 1, race.sc.k === 'SC' ? 'Safety car in' : 'VSC ends', true); race.sc = null; }
+    if (!race.sc && c.lap === race.debris) deploy(race, rng() < 0.6 ? 'SC' : 'VSC', S);
+    const r = race.rain;
+    if (r[c.lap] > 0 && !(r[c.lap - 1] > 0)) { log(race, c.lap + 1, 'Rain', true); race.alert++; }
+    if (!(r[c.lap] > 0) && r[c.lap - 1] > 0) log(race, c.lap + 1, 'Rain stops', true);
+  }
+  beginLap(race, S, c, T);
+}
+
+function advance(race, S, T) {
+  let guard = 0;
+  while (!race.done && guard++ < 200000) {
+    let nc = null, nt = T;
+    for (const c of race.cars) if (c.st === 'run' && c.t1 <= nt) { nt = c.t1; nc = c; }
+    let ne = -1;
+    for (let i = 0; i < race.ev.length; i++) if (race.ev[i].t <= nt) { nt = race.ev[i].t; ne = i; }
+    if (ne >= 0) { const e = race.ev.splice(ne, 1)[0]; race.t = Math.max(race.t, e.t); retire(race, S, e); race.ver++; }
+    else if (nc) { race.t = Math.max(race.t, nc.t1); crossing(race, S, nc, nc.t1); race.ver++; }
+    else break;
+    if (!race.cars.some((c) => c.st === 'run')) { race.done = true; race.ver++; }
+  }
+  if (!race.done && isFinite(T)) race.t = Math.max(race.t, T);
+}
+
+function lapsDown(race, c) {
+  let k = c.lap + 1;
+  while (race.leadT[k] !== undefined && race.leadT[k] <= c.last) k++;
+  return k - c.lap - 1;
+}
+function order(race) {
+  return race.cars.slice().sort((a, b) => {
+    const ao = a.st === 'out' ? 1 : 0, bo = b.st === 'out' ? 1 : 0;
+    if (ao !== bo) return ao - bo;
+    if (ao) return b.lap - a.lap || b.outT - a.outT;
+    return b.lap - a.lap || a.last - b.last;
+  });
+}
+
+function finishRace(S) {
+  const race = S.race;
+  race.cars.forEach((x) => { if (x.st === 'fin' && !x.used.some((k) => !slick(k)) && new Set(x.used).size < 2) x.pen += 30; });
+  const fin = race.cars.filter((x) => x.st === 'fin').sort((a, b) => b.lap - a.lap || (a.finT + a.pen) - (b.finT + b.pen));
+  const out = race.cars.filter((x) => x.st !== 'fin').sort((a, b) => b.lap - a.lap || b.outT - a.outT);
+  const all = fin.concat(out);
+  const wT = fin.length ? fin[0].finT + fin[0].pen : 0;
+  const wL = fin.length ? fin[0].lap : 0;
+  const rows = all.map((x, i) => ({
+    d: x.d, tm: x.tm, pos: i + 1, st: x.st, lap: x.lap, grid: x.grid, pits: x.stops, why: x.why, pen: x.pen,
+    best: x.best < 1e8 ? r3(x.best) : 0,
+    gap: x.st !== 'fin' ? 0 : x.lap < wL ? -(wL - x.lap) : r3(x.finT + x.pen - wT),
+    pts: x.st === 'fin' && i < 10 ? PTS[i] : 0, fl: false,
+  }));
+  if (S.rules.fl && race.fl) { const r = rows.find((x) => x.d === race.fl.d); if (r && r.pts > 0) { r.pts++; r.fl = true; } }
+  const carRank = S.teams.map((t, i) => i).sort((a, b) => race.carD[a] - race.carD[b]);
+  rows.forEach((r) => {
+    const d = S.drivers[r.d], t = S.teams[r.tm];
+    d.pts += r.pts; t.pts += r.pts; d.starts++;
+    if (r.pos === 1 && r.st === 'fin') { d.wins++; d.sw++; }
+    if (r.pos <= 3 && r.st === 'fin') { d.pods++; d.sp++; }
+    const exp = carRank.indexOf(r.tm) * 2 + 1.5;
+    const mate = rows.find((o) => o.tm === r.tm && o.d !== r.d);
+    let m = r.st === 'fin' ? clamp((exp - r.pos) * 0.8, -5, 5) : -3;
+    if (mate) m += r.pos < mate.pos ? 1 : -1;
+    d.morale = Math.round(clamp(d.morale + m + (65 - d.morale) * 0.05, 10, 100));
+  });
+  S.results.push({ r: S.round, ci: race.ci, rows, fl: race.fl ? { d: race.fl.d, t: r3(race.fl.t), lap: race.fl.lap } : null, sc: race.nSC, vsc: race.nVSC, laps: race.laps, wT: r2(wT) });
+  perRace(S);
+  S.teams.forEach((_, i) => { if (i !== S.player) aiDevelop(S, i); });
+  S.round++;
+  S.race = null;
+  S.phase = 'post';
+}
+
+function perRace(S) {
+  S.teams.forEach((t, i) => {
+    const run = staffRun(t);
+    t.cash = r1(t.cash + t.sponsor / ROUNDS - salaries(S, i) / ROUNDS - run / ROUNDS);
+    t.cap = r1(t.cap + run / ROUNDS);
+    t.projects.forEach((p) => { p.left--; });
+    t.projects.filter((p) => p.left <= 0).forEach((p) => {
+      const v = t.car[p.area];
+      const g = r1(p.gain * clamp((105 - v) / 40, 0.15, 1.2));
+      t.car[p.area] = r1(Math.min(99, v + g));
+      if (i === S.player) { S.devLog.unshift({ s: S.season, r: S.round + 1, a: p.area, tier: p.tier, g }); S.devLog.length = Math.min(S.devLog.length, 12); }
+    });
+    t.projects = t.projects.filter((p) => p.left > 0);
+  });
+}
+
+/* ---------- development ---------- */
+function projectBlock(S, ti, area, tier) {
+  const t = S.teams[ti], T = TIERS[tier];
+  if (t.projects.some((p) => p.area === area)) return 'In progress';
+  if (t.projects.length >= slots(t)) return 'No free slot';
+  if (capLeft(S, ti) < T.cost) return 'Over budget cap';
+  if (t.cash < T.cost) return 'Not enough cash';
+  return null;
+}
+function projectRaces(t, tier) { return Math.max(1, TIERS[tier].races - (t.staff.factory >= 6 ? 1 : 0)); }
+function startProject(S, ti, area, tier) {
+  const err = projectBlock(S, ti, area, tier);
+  if (err) return err;
+  const t = S.teams[ti], T = TIERS[tier];
+  const n = projectRaces(t, tier);
+  t.cash = r1(t.cash - T.cost); t.cap = r1(t.cap + T.cost);
+  t.projects.push({ area, tier, left: n, total: n, gain: r2(T.gain * R(0.6, 1.4) * (0.7 + t.staff.design * 0.06)) });
+  return null;
+}
+function staffBlock(S, ti, k) {
+  const t = S.teams[ti], lv = t.staff[k];
+  if (lv >= 10) return 'Max level';
+  const cost = staffCost(lv) + 1.2 * Math.max(0, ROUNDS - S.round) / ROUNDS;
+  if (capLeft(S, ti) < cost) return 'Over budget cap';
+  if (t.cash < staffCost(lv)) return 'Not enough cash';
+  return null;
+}
+function upgradeStaff(S, ti, k) {
+  const err = staffBlock(S, ti, k);
+  if (err) return err;
+  const t = S.teams[ti], c = staffCost(t.staff[k]);
+  t.cash = r1(t.cash - c); t.cap = r1(t.cap + c); t.staff[k]++;
+  return null;
+}
+function aiDevelop(S, ti) {
+  const t = S.teams[ti];
+  const racesLeft = Math.max(1, ROUNDS - S.round - 1);
+  let guard = 0;
+  while (t.projects.length < slots(t) && guard++ < 6) {
+    const spend = Math.min(t.cash - 4, capLeft(S, ti));
+    if (spend < TIERS[0].cost) return;
+    const free = AREAS.filter((a) => !t.projects.some((p) => p.area === a));
+    if (!free.length) return;
+    const wt = free.map((a) => (a === 'rel' ? (t.car.rel < 75 ? 1.2 : 0.45) : a === 'chassis' ? 0.85 : 1) * Math.max(0.2, (100 - t.car[a]) / 20));
+    let r = rng() * wt.reduce((x, y) => x + y, 0), area = free[0];
+    for (let i = 0; i < free.length; i++) { r -= wt[i]; if (r <= 0) { area = free[i]; break; } }
+    const per = spend / Math.max(1, slots(t) * racesLeft / 3.2);
+    let tier = per > 10 ? 2 : per > 5 ? 1 : 0;
+    while (tier > 0 && TIERS[tier].cost > spend) tier--;
+    if (startProject(S, ti, area, tier)) return;
+  }
+}
+
+/* ---------- season end ---------- */
+function ruleChanges(S) {
+  const out = [];
+  const comp = (a, mid, f) => S.teams.forEach((t) => { t.car[a] = r1(mid + (t.car[a] - mid) * f); });
+  if (S.season % 4 === 3) {
+    const a = pick(['aero', 'engine', 'chassis']);
+    comp(a, 64, 0.5);
+    if (a === 'engine') S.teams.forEach((t) => { t.car.rel = r1(Math.max(45, t.car.rel - 6)); });
+    out.push('New ' + (a === 'aero' ? 'aero' : a) + ' regulations');
+  }
+  if (rng() < 0.55) {
+    const o = [];
+    if (S.rules.cap > 115) o.push('capDown');
+    if (S.rules.cap < 155) o.push('capUp');
+    o.push('fl', 'drs');
+    if (S.rules.tyre < 1.25) o.push('tyreUp');
+    if (S.rules.tyre > 0.8) o.push('tyreDown');
+    const k = pick(o);
+    if (k === 'capDown') { S.rules.cap -= 10; out.push('Budget cap $' + S.rules.cap + 'M'); }
+    if (k === 'capUp') { S.rules.cap += 10; out.push('Budget cap $' + S.rules.cap + 'M'); }
+    if (k === 'fl') { S.rules.fl = !S.rules.fl; out.push('Fastest lap point ' + (S.rules.fl ? 'on' : 'off')); }
+    if (k === 'drs') { S.rules.drs = !S.rules.drs; out.push('DRS ' + (S.rules.drs ? 'on' : 'off')); }
+    if (k === 'tyreUp') { S.rules.tyre = r2(S.rules.tyre + 0.15); out.push('Tyre wear ' + Math.round(S.rules.tyre * 100) + '%'); }
+    if (k === 'tyreDown') { S.rules.tyre = r2(S.rules.tyre - 0.15); out.push('Tyre wear ' + Math.round(S.rules.tyre * 100) + '%'); }
+  }
+  return out;
+}
+
+function endSeason(S) {
+  const ts = teamOrder(S), ds = driverOrder(S);
+  const champD = ds[0], champT = ts[0];
+  champD.titles++;
+  const pPos = ts.indexOf(S.player) + 1;
+  if (champT === S.player) S.titles.c++;
+  if (champD.team === S.player) S.titles.d++;
+  const rev = {
+    season: S.season, champD: champD.id, champDt: champD.team, champT, pPos, target: S.target, pts: S.teams[S.player].pts,
+    prize: PRIZE[pPos - 1], tStand: ts.map((i) => ({ tm: i, pts: S.teams[i].pts })),
+    dStand: ds.slice(0, 10).map((d) => ({ d: d.id, tm: d.team, pts: d.pts })), rules: [], retired: [],
+  };
+  S.history.push({ s: S.season, d: champD.id, dt: champD.team, t: champT, p: pPos, pts: S.teams[S.player].pts, tgt: S.target });
+  ts.forEach((ti, k) => {
+    const t = S.teams[ti];
+    t.cash = r1(t.cash + PRIZE[k]);
+    t.prestige = Math.round(t.prestige * 0.7 + (100 - k * 9) * 0.3);
+    t.lastPos = k + 1;
+  });
+  S.teams.forEach((t) => AREAS.forEach((a) => { t.car[a] = r1(clamp(55 + (t.car[a] - 55) * 0.82 + t.staff.design * 0.35 + R(-1, 1), 40, 99)); }));
+  rev.rules = ruleChanges(S);
+  S.drivers.forEach((d) => { if (d.retired) return; d.age++; develop(d); d.pts = 0; d.sw = 0; d.sp = 0; });
+  S.drivers.forEach((d) => {
+    if (d.retired) return;
+    const o = ovr(d);
+    if ((d.age >= 34 && rng() < (d.age - 33) * 0.16) || (d.team < 0 && d.age >= 30 && o < 68 && rng() < 0.5) || d.age >= 41) {
+      d.retired = true; d.team = -1; d.exp = false; d.contract = 0; rev.retired.push(d.id);
+    }
+  });
+  S.drivers.forEach((d) => {
+    if (d.retired || d.team < 0) return;
+    d.contract--;
+    if (d.contract <= 0) { d.contract = 0; d.exp = true; }
+  });
+  S.drivers.forEach((d) => {
+    if (!d.exp || d.team === S.player) return;
+    const t = S.teams[d.team];
+    const keep = ovr(d) >= 68 + (t.prestige - 50) * 0.25 && d.morale >= 30 && d.age < 36 && rng() < 0.8 && t.prestige >= required(d) - 10;
+    if (keep) { d.contract = RI(1, 3); d.salary = demand(d); d.exp = false; }
+    else { d.team = -1; d.exp = false; d.contract = 0; }
+  });
+  for (let k = 0; k < 5; k++) mkDriver(S, R(58, 70), RI(18, 21));
+  const free = S.drivers.filter((d) => !d.retired && d.team < 0).sort((a, b) => ovr(b) - ovr(a));
+  free.slice(18).forEach((d) => { d.retired = true; });
+  S.drivers.forEach((d) => { if (!d.retired) d.morale = Math.round(d.morale * 0.5 + 32); });
+  S.teams.forEach((t) => { t.pts = 0; t.cap = 0; t.sponsor = sponsorOf(t.prestige); });
+  S.results = [];
+  S.season++;
+  S.round = 0;
+  S.calendar = pickCalendar(S.calendar);
+  S.phase = 'review';
+  S.review = rev;
+  return rev;
+}
+
+/* ---------- market ---------- */
+function signBlock(S, d) {
+  const t = S.teams[S.player];
+  if (d.retired) return 'Retired';
+  if (d.team === S.player) return 'Signed';
+  if (lineup(S, S.player).filter((x) => !x.exp).length >= 2) return 'Seats full';
+  if (t.prestige < required(d)) return 'Not interested';
+  if (d.team >= 0 && t.cash < buyout(d)) return 'Not enough cash';
+  return null;
+}
+function signDriver(S, id, yrs) {
+  const d = S.drivers[id], err = signBlock(S, d);
+  if (err) return err;
+  const t = S.teams[S.player];
+  if (d.team >= 0) { const fee = buyout(d); t.cash = r1(t.cash - fee); S.teams[d.team].cash = r1(S.teams[d.team].cash + fee); }
+  sign(d, S.player, yrs);
+  d.morale = Math.max(d.morale, 70);
+  return null;
+}
+function renewBlock(S, d) {
+  if (!d.exp || d.team !== S.player) return 'Under contract';
+  if (lineup(S, S.player).filter((x) => !x.exp).length >= 2) return 'Seats full';
+  if (d.morale < 35) return 'Refuses';
+  if (S.teams[S.player].prestige < required(d) - 8) return 'Not interested';
+  return null;
+}
+function renew(S, id, yrs) {
+  const d = S.drivers[id], err = renewBlock(S, d);
+  if (err) return err;
+  d.contract = yrs; d.salary = demand(d); d.exp = false;
+  return null;
+}
+const releaseCost = (d) => (d.exp ? 0 : r1(d.salary * d.contract * 0.5));
+function release(S, id) {
+  const d = S.drivers[id];
+  if (d.team !== S.player) return 'Not in team';
+  const t = S.teams[S.player];
+  t.cash = r1(t.cash - releaseCost(d));
+  d.team = -1; d.exp = false; d.contract = 0;
+  return null;
+}
+function aiFill(S) {
+  const ord = S.teams.map((t, i) => i).filter((i) => i !== S.player).sort((a, b) => S.teams[b].prestige - S.teams[a].prestige);
+  for (const ti of ord) {
+    const t = S.teams[ti];
+    let guard = 0;
+    while (lineup(S, ti).length < 2 && guard++ < 4) {
+      const pool = S.drivers.filter((d) => !d.retired && d.team < 0 && t.prestige >= required(d))
+        .sort((a, b) => (ovr(b) + (b.age < 23 ? (b.pot - ovr(b)) * 0.3 : 0)) - (ovr(a) + (a.age < 23 ? (a.pot - ovr(a)) * 0.3 : 0)));
+      const d = pool.length ? pool[Math.min(pool.length - 1, Math.floor(rng() * rng() * 3))] : mkDriver(S, R(60, 66), RI(18, 21));
+      sign(d, ti, RI(1, 3));
+    }
+  }
+}
+function aiStaff(S) {
+  S.teams.forEach((t, i) => {
+    if (i === S.player || t.cash < 45 || rng() < 0.4) return;
+    const k = DEPTS.slice().sort((a, b) => t.staff[a] - t.staff[b])[0];
+    if (t.staff[k] < 9) upgradeStaff(S, i, k);
+  });
+}
+function startSeason(S) {
+  if (lineup(S, S.player).filter((d) => !d.exp).length < 2) return 'Two drivers needed';
+  S.drivers.forEach((d) => { if (d.exp) { d.team = -1; d.exp = false; } });
+  aiFill(S);
+  aiStaff(S);
+  S.target = targetPos(S, S.player);
+  S.phase = 'hq';
+  S.review = null;
+  S.weekend = null;
+  return null;
+}
+
+G.RM = {
+  CIRCUITS, TEAM_DEF, TIERS, AREAS, DEPTS, PTS, PRIZE, ROUNDS,
+  lapsOf, ovr, demand, required, buyout, slots, staffRun, staffCost, salaries, capLeft, carOvr, carScore, lineup, targetPos,
+  teamOrder, driverOrder, compPen, wetAt, wetComp, slick, suggest, lapsDown, order,
+  newCareer, runQuali, startRace, advance, finishRace, endSeason, startSeason,
+  projectBlock, projectRaces, startProject, staffBlock, upgradeStaff,
+  signBlock, signDriver, renewBlock, renew, release, releaseCost,
+  getRs: () => rs, setRs: (v) => { rs = (v >>> 0) || 1; },
+};
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+(function () {
+  'use strict';
+  const V = window.Vela, RM = window.RM;
+  const KEY = 'vela:racing-manager:save';
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), view = $('view'), tabsEl = $('tabs'), overlay = $('overlay'), ovCard = $('ovCard');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const AN = { aero: 'Aero', engine: 'Engine', chassis: 'Chassis', rel: 'Reliability' };
+  const DN = { design: 'Design', pit: 'Pit crew', factory: 'Factory' };
+  const CN = { S: 'Soft', M: 'Medium', H: 'Hard', I: 'Intermediate', W: 'Wet' };
+
+  let S = null;
+  let tab = 'home', stView = 'd', mkView = 'free', mkYears = 2, confirmKey = '';
+  const dev = { area: 'aero', tier: 1 };
+  let pickT = -1, qStep = 3, qTimer = 0;
+  let extPaused = false, ovOpen = false;
+
+  /* ---------- storage ---------- */
+  function save() {
+    if (!S) return;
+    try { S.rs = RM.getRs(); localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {}
+  }
+  function loadSave() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && s.v === 1 && Array.isArray(s.teams) && s.teams.length === 10 && Array.isArray(s.drivers)) return s;
+    } catch (_) {}
+    return null;
+  }
+
+  /* ---------- format ---------- */
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const money = (v) => (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(1) + 'M';
+  const r0 = (v) => Math.round(v);
+  function fmtLap(t) {
+    if (!(t > 0) || t > 1e8) return '-';
+    const m = Math.floor(t / 60), s = t - m * 60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(3);
+  }
+  function fmtTime(t) {
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
+  }
+  const lapsTxt = (n) => '+' + n + (n === 1 ? ' lap' : ' laps');
+  const drv = (id) => S.drivers[id];
+  const nm = (d) => esc(d.first + ' ' + d.last);
+  const shortNm = (d) => esc(d.first[0] + '. ' + d.last);
+  const chip = (k) => '<span class="cp ' + k + '" title="' + CN[k] + '">' + k + '</span>';
+  const ordn = (n) => 'P' + n;
+
+  /* ---------- small builders ---------- */
+  const pn = (title, body, right) => '<section class="pn"><h3>' + title + (right ? '<span class="r">' + right + '</span>' : '') + '</h3>' + body + '</section>';
+  const kv = (items) => '<div class="kv">' + items.map((x) => '<div' + (x[3] ? ' class="x2"' : '') + '><span class="lab">' + x[0] + '</span><span class="v ' + (x[2] || '') + '">' + x[1] + '</span></div>').join('') + '</div>';
+  function meter(label, frac, mark) {
+    const f = Math.max(0, Math.min(1, frac));
+    return '<div class="br"><span class="lab">' + label + '</span><div class="meter"><i style="width:' + (f * 100).toFixed(1) + '%"></i>' +
+      (mark != null ? '<b style="left:' + (Math.max(0, Math.min(1, mark)) * 100).toFixed(1) + '%"></b>' : '') + '</div></div>';
+  }
+  function seg(act, opts, cur, extra, cls) {
+    return '<div class="seg ' + (cls || '') + '">' + opts.map((o) => '<button type="button" data-act="' + act + '" data-v="' + o[0] + '"' + (extra || '') +
+      (o[2] ? ' disabled' : '') + ' class="' + (String(o[0]) === String(cur) ? 'on' : '') + '">' + o[1] + '</button>').join('') + '</div>';
+  }
+  function table(head, rows) {
+    return '<div class="tw"><table class="tbl"><thead><tr>' + head.map((h) => '<th class="' + (h[1] || '') + '">' + h[0] + '</th>').join('') +
+      '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+  }
+  const td = (v, cls) => '<td class="' + (cls || '') + '">' + v + '</td>';
+
+  function head() {
+    $('hSeason').textContent = S ? S.season : '-';
+    $('hRound').textContent = S ? (S.phase === 'review' || S.phase === 'market' ? '-' : Math.min(S.round + (S.phase === 'post' ? 0 : 1), S.calendar.length) + '/' + S.calendar.length) : '-';
+    const cash = S ? S.teams[S.player].cash : 0;
+    $('hCash').textContent = S ? money(cash) : '-';
+    $('hCashBox').classList.toggle('lit', !!S && cash < 0);
+  }
+
+  /* ---------- home ---------- */
+  function homeHTML() {
+    const t = S.teams[S.player];
+    const c = RM.CIRCUITS[S.calendar[S.round]];
+    const ts = RM.teamOrder(S), pos = ts.indexOf(S.player) + 1;
+    const carRank = S.teams.map((x, i) => i).sort((a, b) => RM.carOvr(S.teams[b].car) - RM.carOvr(S.teams[a].car)).indexOf(S.player) + 1;
+    const dord = RM.driverOrder(S);
+    const next = pn('Next race', '<div class="big">' + esc(c.name) + '</div><span class="lab gap">Round ' + (S.round + 1) + ' of ' + S.calendar.length + '</span>' +
+      kv([['Laps', RM.lapsOf(c)], ['Length', c.km.toFixed(2) + ' km'], ['Pit loss', c.pit + 's'], ['Rain', r0(c.rain * 100) + '%']]) +
+      '<div class="bars">' + meter('Power', c.power) + meter('Downforce', 1 - c.power) + meter('Tyre wear', (c.wear - 0.6) / 0.8) + meter('Overtaking', 1 - c.ovt) + '</div>' +
+      '<button class="btn primary block" type="button" data-act="weekend">Race weekend</button>');
+    const rows = RM.lineup(S, S.player).map((d) => '<tr class="me">' + td(nm(d), 'nm b') + td(ordn(dord.indexOf(d) + 1), 'n') + td(d.sw, 'n') + td(d.pts, 'n') + '</tr>');
+    const team = pn(esc(t.name), kv([['Constructors', ordn(pos), pos <= S.target ? 'hot' : ''], ['Points', t.pts], ['Target', ordn(S.target)], ['Car', ordn(carRank)]]) +
+      '<div class="gap">' + table([['Driver'], ['Pos', 'n'], ['Wins', 'n'], ['Pts', 'n']], rows) + '</div>');
+    const sal = RM.salaries(S, S.player), run = RM.staffRun(t);
+    const fin = pn('Finance', kv([
+      ['Cash', money(t.cash), t.cash < 0 ? 'hot' : ''], ['Sponsors', money(t.sponsor)], ['Salaries', money(sal)], ['Staff', money(run)],
+      ['Budget cap', money(S.rules.cap)], ['Cap spent', money(t.cap)], ['Cap left', money(RM.capLeft(S, S.player))],
+    ]), 'Season');
+    let last = '';
+    if (S.results.length) {
+      const res = S.results[S.results.length - 1], w = res.rows[0];
+      const mine = res.rows.filter((r) => r.tm === S.player);
+      last = pn('Last race', kv([['Circuit', esc(RM.CIRCUITS[res.ci].name)], ['Winner', drv(w.d).code]].concat(mine.map((r) => [drv(r.d).code, r.st === 'fin' ? ordn(r.pos) : 'DNF', r.st === 'fin' && r.pos <= 10 ? 'hot' : '']))));
+    }
+    return '<div class="cols"><div class="stack">' + next + '</div><div class="stack">' + team + fin + last + '</div></div>';
+  }
+
+  /* ---------- car ---------- */
+  function carHTML() {
+    const t = S.teams[S.player];
+    const rows = RM.AREAS.map((a) => {
+      const vals = S.teams.map((x) => x.car[a]);
+      const best = Math.max.apply(null, vals);
+      const rank = vals.filter((v) => v > t.car[a]).length + 1;
+      return '<div class="arow"><span class="lab">' + AN[a] + '</span><span class="v">' + t.car[a].toFixed(1) + '</span><span class="lab">' + ordn(rank) + '</span>' +
+        '<div class="meter"><i style="width:' + ((t.car[a] - 40) / 60 * 100).toFixed(1) + '%"></i><b style="left:' + ((best - 40) / 60 * 100).toFixed(1) + '%"></b></div></div>';
+    }).join('');
+    const sl = RM.slots(t);
+    let projs = t.projects.map((p) => '<div class="proj"><span class="b">' + AN[p.area] + '</span><span class="lab">' + RM.TIERS[p.tier].name + '</span>' +
+      '<div class="meter"><i style="width:' + ((1 - p.left / p.total) * 100).toFixed(0) + '%"></i></div><span class="n">' + p.left + (p.left === 1 ? ' race' : ' races') + '</span></div>').join('');
+    for (let k = t.projects.length; k < sl; k++) projs += '<div class="proj free"><span class="lab">Free slot</span></div>';
+    const T = RM.TIERS[dev.tier];
+    const block = RM.projectBlock(S, S.player, dev.area, dev.tier);
+    const devp = pn('Development', projs +
+      '<div class="gap">' + seg('dArea', RM.AREAS.map((a) => [a, AN[a]]), dev.area, '', 'g2') + '</div><div class="gap">' +
+      seg('dTier', RM.TIERS.map((x, i) => [i, x.name]), dev.tier) + '</div>' +
+      kv([['Cost', money(T.cost)], ['Time', RM.projectRaces(t, dev.tier) + ' races'], ['Cap left', money(RM.capLeft(S, S.player))], ['Cash', money(t.cash)]]) +
+      '<button class="btn primary block" type="button" data-act="dStart"' + (block ? ' disabled' : '') + '>' + (block || 'Start project') + '</button>', t.projects.length + '/' + sl + ' slots');
+    const log = S.devLog.length ? pn('Completed', '<ul class="list">' + S.devLog.slice(0, 6).map((e) =>
+      '<li><span class="b">' + AN[e.a] + ' +' + e.g.toFixed(1) + '</span><span class="muted">' + RM.TIERS[e.tier].name + '</span><span class="lab">S' + e.s + ' R' + e.r + '</span></li>').join('') + '</ul>') : '';
+    const ord = S.teams.map((x, i) => i).sort((a, b) => RM.carOvr(S.teams[b].car) - RM.carOvr(S.teams[a].car));
+    const field = pn('Field', table([['Team'], ['Aero', 'n'], ['Eng', 'n'], ['Chas', 'n'], ['Rel', 'n'], ['Ovr', 'n']], ord.map((i) => {
+      const c = S.teams[i].car;
+      return '<tr class="' + (i === S.player ? 'me' : '') + '">' + td(esc(S.teams[i].name), 'b') + td(r0(c.aero), 'n') + td(r0(c.engine), 'n') + td(r0(c.chassis), 'n') + td(r0(c.rel), 'n') + td(RM.carOvr(c).toFixed(1), 'n b') + '</tr>';
+    })));
+    return '<div class="cols"><div class="stack">' + pn('Car', rows, 'Rank') + devp + '</div><div class="stack">' + field + log + '</div></div>';
+  }
+
+  /* ---------- team ---------- */
+  function driverPanel(d) {
+    const pot = d.age < 26 ? '~' + Math.round(d.pot / 5) * 5 : '-';
+    return pn(nm(d), kv([
+      ['Overall', RM.ovr(d).toFixed(1), 'hot'], ['Age', d.age], ['Pace', d.pace.toFixed(1)], ['Racecraft', d.racecraft.toFixed(1)],
+      ['Tyres', d.tyre.toFixed(1)], ['Consistency', d.cons.toFixed(1)], ['Wet', d.wet.toFixed(1)], ['Morale', d.morale, d.morale < 40 ? 'hot' : ''],
+      ['Potential', pot], ['Contract', d.contract + (d.contract === 1 ? ' yr' : ' yrs')], ['Salary', money(d.salary)], ['Points', d.pts],
+      ['Wins', d.wins], ['Podiums', d.pods], ['Starts', d.starts], ['Titles', d.titles],
+    ]), d.code);
+  }
+  function teamHTML() {
+    const t = S.teams[S.player];
+    const ds = RM.lineup(S, S.player).map(driverPanel).join('');
+    const eff = { design: 'Gain x' + (0.7 + t.staff.design * 0.06).toFixed(2), pit: 'Stop ' + (3.3 - t.staff.pit * 0.12).toFixed(1) + 's', factory: RM.slots(t) + ' slots' + (t.staff.factory >= 6 ? ', -1 race' : '') };
+    const staff = pn('Staff', RM.DEPTS.map((k) => {
+      const err = RM.staffBlock(S, S.player, k);
+      return '<div class="srow"><div><span class="t">' + DN[k] + ' ' + t.staff[k] + '/10</span><span class="lab">' + eff[k] + '</span></div>' +
+        '<button class="btn sm" type="button" data-act="staff" data-k="' + k + '"' + (err ? ' disabled' : '') + '>' + (err === 'Max level' ? 'Max' : 'Upgrade ' + money(RM.staffCost(t.staff[k]))) + '</button></div>';
+    }).join('') + kv([['Running cost', money(RM.staffRun(t))], ['Cap left', money(RM.capLeft(S, S.player))]]), 'Level');
+    const all = S.drivers.filter((d) => d.team >= 0).sort((a, b) => RM.ovr(b) - RM.ovr(a));
+    const tbl = pn('Drivers', table([['Driver'], ['Team', 'w'], ['Age', 'n'], ['Ovr', 'n'], ['Pace', 'n w'], ['Wet', 'n w'], ['Contract', 'n']], all.map((d) =>
+      '<tr class="' + (d.team === S.player ? 'me' : '') + '">' + td(shortNm(d), 'nm b') + td(esc(S.teams[d.team].name), 'w') + td(d.age, 'n') + td(RM.ovr(d).toFixed(1), 'n') +
+      td(d.pace.toFixed(1), 'n w') + td(d.wet.toFixed(1), 'n w') + td(d.contract + 'y', 'n') + '</tr>')));
+    return '<div class="cols"><div class="stack">' + ds + staff + '</div><div class="stack">' + tbl + '</div></div>';
+  }
+
+  /* ---------- standings ---------- */
+  function standingsHTML() {
+    const wins = S.teams.map(() => 0);
+    S.results.forEach((r) => { if (r.rows[0] && r.rows[0].st === 'fin') wins[r.rows[0].tm]++; });
+    let body;
+    if (stView === 'd') {
+      body = table([['Pos', 'n'], ['Driver'], ['Team', 'w'], ['Wins', 'n'], ['Pod', 'n w'], ['Pts', 'n']], RM.driverOrder(S).map((d, i) =>
+        '<tr class="' + (d.team === S.player ? 'me' : '') + '">' + td(i + 1, 'n muted') + td(shortNm(d), 'nm b') + td(d.team >= 0 ? esc(S.teams[d.team].name) : '-', 'w') +
+        td(d.sw, 'n') + td(d.sp, 'n w') + td(d.pts, 'n b') + '</tr>'));
+    } else {
+      body = table([['Pos', 'n'], ['Team'], ['Wins', 'n'], ['Car', 'n w'], ['Pts', 'n']], RM.teamOrder(S).map((i, k) =>
+        '<tr class="' + (i === S.player ? 'me' : '') + '">' + td(k + 1, 'n muted') + td(esc(S.teams[i].name), 'b') + td(wins[i], 'n') + td(RM.carOvr(S.teams[i].car).toFixed(1), 'n w') + td(S.teams[i].pts, 'n b') + '</tr>'));
+    }
+    return '<div class="cols"><div class="stack">' + pn('Standings', seg('st', [['d', 'Drivers'], ['t', 'Constructors']], stView) + '<div class="gap">' + body + '</div>', 'Season ' + S.season) + '</div></div>';
+  }
+
+  /* ---------- calendar ---------- */
+  function calendarHTML() {
+    const rows = S.calendar.map((ci, r) => {
+      const c = RM.CIRCUITS[ci];
+      const res = S.results.find((x) => x.r === r);
+      let win = '', you = '';
+      if (res) {
+        win = drv(res.rows[0].d).code;
+        const best = res.rows.filter((x) => x.tm === S.player && x.st === 'fin').sort((a, b) => a.pos - b.pos)[0];
+        you = best ? ordn(best.pos) : 'DNF';
+      }
+      return '<tr class="' + (r === S.round ? 'next' : res ? '' : 'dim') + '">' + td(r + 1, 'n muted') + td(esc(c.name), 'b') + td(RM.lapsOf(c), 'n w') +
+        td(r0(c.rain * 100) + '%', 'n w') + td(win) + td(you, 'n' + (res && you !== 'DNF' && parseInt(you.slice(1), 10) <= 10 ? ' hot' : '')) + '</tr>';
+    });
+    const cal = pn('Calendar', table([['Rd', 'n'], ['Circuit'], ['Laps', 'n w'], ['Rain', 'n w'], ['Winner'], ['You', 'n']], rows), 'Season ' + S.season);
+    const rules = pn('Rules', kv([['Budget cap', money(S.rules.cap)], ['DRS', S.rules.drs ? 'On' : 'Off'], ['Fastest lap', S.rules.fl ? '1 pt' : 'Off'], ['Tyre wear', r0(S.rules.tyre * 100) + '%']]));
+    const titles = pn('Titles', kv([['Constructors', S.titles.c, S.titles.c ? 'hot' : ''], ['Drivers', S.titles.d], ['Seasons', S.season - 1]]));
+    const hist = S.history.length ? pn('History', table([['Season', 'n'], ['Champion'], ['Team', 'w'], ['Constructors'], ['You', 'n']], S.history.slice().reverse().map((h) =>
+      '<tr class="' + (h.t === S.player ? 'me' : '') + '">' + td(h.s, 'n muted') + td(shortNm(drv(h.d)), 'nm') + td(esc(S.teams[h.dt] ? S.teams[h.dt].name : '-'), 'w') +
+      td(esc(S.teams[h.t].name), 'b') + td(ordn(h.p), 'n') + '</tr>'))) : '';
+    return '<div class="cols"><div class="stack">' + cal + '</div><div class="stack">' + rules + titles + hist + '</div></div>';
+  }
+
+  const TABS = { home: homeHTML, car: carHTML, team: teamHTML, standings: standingsHTML, calendar: calendarHTML };
+
+  /* ---------- qualifying ---------- */
+  function qualiHTML() {
+    const W = S.weekend, c = RM.CIRCUITS[W.ci];
+    let rows = W.rows.slice();
+    if (qStep === 1) rows.sort((a, b) => a.q[0] - b.q[0]);
+    else if (qStep === 2) rows = W.rows.slice(0, 15).sort((a, b) => a.q[1] - b.q[1]).concat(W.rows.slice(15));
+    const cut = qStep === 1 ? 15 : qStep === 2 ? 10 : 99;
+    const tbl = table([['Pos', 'n'], ['Driver'], ['Team', 'w'], ['Q1', 'n'], ['Q2', 'n'], ['Q3', 'n']], rows.map((r, i) => {
+      const d = drv(r.d);
+      const q2 = qStep >= 2 && i < 15 ? fmtLap(r.q[1]) : '';
+      const q3 = qStep >= 3 && i < 10 ? fmtLap(r.q[2]) : '';
+      return '<tr class="' + (r.tm === S.player ? 'me' : i >= cut ? 'dim' : '') + '">' + td(i + 1, 'n muted') + td(d.code, 'b') + td(esc(S.teams[r.tm].name), 'w') +
+        td(fmtLap(r.q[0]), 'n') + td(q2, 'n') + td(q3, 'n' + (qStep >= 3 && i === 0 ? ' hot' : '')) + '</tr>';
+    }));
+    const wet = W.qw >= 0.18;
+    const info = pn('Qualifying', '<div class="big">' + esc(c.name) + '</div>' + kv([
+      ['Session', qStep >= 3 ? 'Grid' : 'Q' + qStep], ['Track', wet ? 'Wet' : 'Dry'], ['Race rain', W.wx.pct + '%'], ['Laps', RM.lapsOf(c)],
+    ]));
+    let setup = '';
+    if (qStep >= 3) {
+      const mine = W.grid.map((id, g) => ({ d: drv(id), g: g + 1 })).filter((x) => x.d.team === S.player);
+      setup = pn('Start tyres', mine.map((x) =>
+        '<div class="srow"><div><span class="t">' + nm(x.d) + '</span><span class="lab">Grid ' + ordn(x.g) + '</span></div></div>' +
+        seg('scomp', ['S', 'M', 'H', 'I', 'W'].map((k) => [k, k]), W.start[x.d.id], ' data-d="' + x.d.id + '"')).join('') +
+        '<button class="btn primary block" type="button" data-act="start">Start race</button>');
+    }
+    return '<div class="cols"><div class="stack">' + info + setup + '</div><div class="stack">' + pn('Times', tbl) + '</div></div>';
+  }
+  function revealQuali() {
+    clearTimeout(qTimer);
+    if (qStep >= 3) return;
+    qTimer = setTimeout(() => {
+      if (!S || S.phase !== 'quali') return;
+      if (ovOpen || extPaused) { revealQuali(); return; }
+      qStep++;
+      render();
+      revealQuali();
+    }, reduce ? 250 : 950);
+  }
+
+  /* ---------- result ---------- */
+  function postHTML() {
+    const res = S.results[S.results.length - 1], c = RM.CIRCUITS[res.ci];
+    const rows = res.rows.map((r) => {
+      const d = drv(r.d);
+      let g;
+      if (r.st !== 'fin') g = 'DNF';
+      else if (r.pos === 1) g = fmtTime(res.wT);
+      else if (r.gap < 0) g = lapsTxt(-r.gap);
+      else g = '+' + r.gap.toFixed(3);
+      return '<tr class="' + (r.tm === S.player ? 'me' : r.st !== 'fin' ? 'dim' : '') + '">' + td(r.st === 'fin' ? r.pos : '-', 'n muted') + td(shortNm(d), 'nm b') +
+        td(esc(S.teams[r.tm].name), 'w') + td(r.grid, 'n w') + td(g + (r.pen ? ' <span class="hot">+' + r.pen + 's</span>' : ''), 'n') +
+        td(r.st === 'fin' ? '' : esc(r.why), 'w muted') + td(r.pits, 'n w') + td(r.pts ? r.pts : '', 'n b' + (r.fl ? ' hot' : '')) + '</tr>';
+    });
+    const mine = res.rows.filter((r) => r.tm === S.player);
+    const fl = res.fl ? drv(res.fl.d).code + ' ' + fmtLap(res.fl.t) : '-';
+    const ts = RM.teamOrder(S);
+    const last = S.round >= S.calendar.length;
+    const sum = pn('Race', '<div class="big">' + esc(c.name) + '</div>' + kv([
+      ['Winner', drv(res.rows[0].d).code], ['Fastest lap', fl, '', 1], ['Safety car', res.sc], ['VSC', res.vsc],
+    ].concat(mine.map((r) => [drv(r.d).code, r.st === 'fin' ? ordn(r.pos) : 'DNF', r.pts ? 'hot' : '']))
+      .concat([['Points', mine.reduce((a, r) => a + r.pts, 0)], ['Constructors', ordn(ts.indexOf(S.player) + 1)]])) +
+      '<button class="btn primary block" type="button" data-act="cont">' + (last ? 'Season review' : 'Continue') + '</button>');
+    return '<div class="cols"><div class="stack">' + sum + '</div><div class="stack">' + pn('Result',
+      table([['Pos', 'n'], ['Driver'], ['Team', 'w'], ['Grid', 'n w'], ['Time', 'n'], ['', 'w'], ['Pits', 'n w'], ['Pts', 'n']], rows), 'Round ' + (res.r + 1)) + '</div></div>';
+  }
+
+  /* ---------- season review ---------- */
+  function reviewHTML() {
+    const R = S.review;
+    const cd = drv(R.champD);
+    const champ = pn('Champions', kv([
+      ['Drivers', shortNm(cd), R.champDt === S.player ? 'hot' : ''], ['Team', R.champDt >= 0 ? esc(S.teams[R.champDt].name) : '-'],
+      ['Constructors', esc(S.teams[R.champT].name), R.champT === S.player ? 'hot' : ''],
+    ]), 'Season ' + R.season);
+    const you = pn(esc(S.teams[S.player].name), kv([
+      ['Position', ordn(R.pPos), R.pPos <= R.target ? 'hot' : ''], ['Target', ordn(R.target)], ['Points', R.pts], ['Prize money', money(R.prize)],
+      ['Titles', S.titles.c, S.titles.c ? 'hot' : ''], ['Cash', money(S.teams[S.player].cash)],
+    ]));
+    const rules = pn('Rule changes', R.rules.length ? '<ul class="list">' + R.rules.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '<span class="lab">None</span>');
+    const ret = R.retired.length ? pn('Retired', '<ul class="list">' + R.retired.map((id) => { const d = drv(id); return '<li>' + nm(d) + '<span class="lab">Age ' + d.age + '</span></li>'; }).join('') + '</ul>') : '';
+    const tt = pn('Constructors', table([['Pos', 'n'], ['Team'], ['Pts', 'n']], R.tStand.map((x, i) => '<tr class="' + (x.tm === S.player ? 'me' : '') + '">' + td(i + 1, 'n muted') + td(esc(S.teams[x.tm].name), 'b') + td(x.pts, 'n b') + '</tr>')));
+    const dt = pn('Drivers', table([['Pos', 'n'], ['Driver'], ['Team', 'w'], ['Pts', 'n']], R.dStand.map((x, i) => '<tr class="' + (x.tm === S.player ? 'me' : '') + '">' + td(i + 1, 'n muted') + td(shortNm(drv(x.d)), 'nm b') + td(x.tm >= 0 ? esc(S.teams[x.tm].name) : '-', 'w') + td(x.pts, 'n b') + '</tr>')));
+    return '<div class="cols"><div class="stack">' + champ + you + rules + ret +
+      '<button class="btn primary block" type="button" data-act="market">Driver market</button></div><div class="stack">' + tt + dt + '</div></div>';
+  }
+
+  /* ---------- driver market ---------- */
+  function marketHTML() {
+    const t = S.teams[S.player];
+    const mine = RM.lineup(S, S.player);
+    const ready = mine.filter((d) => !d.exp).length;
+    const minePn = pn('Your drivers', (mine.length ? mine.map((d) => {
+      const rb = d.exp ? RM.renewBlock(S, d) : null;
+      const k = 'rel' + d.id, cost = RM.releaseCost(d);
+      return '<div class="mrow"><span class="t">' + nm(d) + '</span>' + kv([['Age', d.age], ['Overall', RM.ovr(d).toFixed(1)], ['Contract', d.exp ? 'Expiring' : d.contract + (d.contract === 1 ? ' yr' : ' yrs'), d.exp ? 'hot' : ''], [d.exp ? 'Asks' : 'Salary', money(d.exp ? RM.demand(d) : d.salary)]]) + '<div class="row2">' +
+        (d.exp ? '<button class="btn sm primary" type="button" data-act="renew" data-d="' + d.id + '"' + (rb ? ' disabled' : '') + '>' + (rb || 'Renew') + '</button>' : '<span></span>') +
+        '<button class="btn sm' + (confirmKey === k ? ' warn' : '') + '" type="button" data-act="release" data-d="' + d.id + '">' + (confirmKey === k ? 'Confirm' : 'Release' + (cost ? ' ' + money(cost) : '')) + '</button></div></div>';
+    }).join('') : '<span class="lab">None</span>') +
+      '<div class="gap">' + seg('yrs', [[1, '1 year'], [2, '2 years'], [3, '3 years']], mkYears) + '</div>' +
+      kv([['Seats', ready + '/2', ready < 2 ? 'hot' : ''], ['Cash', money(t.cash), t.cash < 0 ? 'hot' : ''], ['Salaries', money(mine.filter((d) => !d.exp).reduce((a, d) => a + d.salary, 0))], ['Sponsors', money(t.sponsor)]]) +
+      '<button class="btn primary block" type="button" data-act="season"' + (ready < 2 ? ' disabled' : '') + '>Start season ' + S.season + '</button>');
+    const free = mkView === 'free';
+    const list = S.drivers.filter((d) => !d.retired && d.team !== S.player && (free ? d.team < 0 : d.team >= 0)).sort((a, b) => RM.ovr(b) - RM.ovr(a));
+    const rows = list.map((d) => {
+      const err = RM.signBlock(S, d);
+      const fee = d.team >= 0 ? RM.buyout(d) : 0;
+      return '<tr>' + td(shortNm(d), 'nm b') + td(d.age, 'n') + td(RM.ovr(d).toFixed(1), 'n') + td(d.age < 26 ? '~' + Math.round(d.pot / 5) * 5 : '-', 'n w') +
+        (free ? '' : td(esc(S.teams[d.team].name), 'w') + td(money(fee), 'n')) + td(money(RM.demand(d)), 'n') +
+        td('<button class="btn sm' + (err ? '' : ' primary') + '" type="button" data-act="sign" data-d="' + d.id + '"' + (err ? ' disabled' : '') + '>' + (err || 'Sign') + '</button>', 'n') + '</tr>';
+    });
+    const head = [['Driver'], ['Age', 'n'], ['Ovr', 'n'], ['Pot', 'n w']].concat(free ? [] : [['Team', 'w'], ['Fee', 'n']]).concat([['Salary', 'n'], ['', 'n']]);
+    const listPn = pn('Drivers', seg('mkv', [['free', 'Free agents'], ['ctr', 'Under contract']], mkView) + '<div class="gap">' + table(head, rows) + '</div>');
+    return '<div class="cols"><div class="stack">' + minePn + '</div><div class="stack">' + listPn + '</div></div>';
+  }
+
+  /* ---------- race view ---------- */
+  let raf = 0, lastTs = 0, speed = 1, lastSpeed = 1, geo = null, fit = null, rowEls = [], prevPos = [], lastVer = -1, lastUi = 0, endTimer = 0, savedLap = -1;
+  const ROWH = 26;
+  function trackGeom(ci) {
+    let s = (Math.imul(ci + 7, 2654435761) >>> 0) || 1;
+    const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const h = [[2, 0.12 + rnd() * 0.14], [3, 0.05 + rnd() * 0.1], [4, rnd() * 0.07], [5, rnd() * 0.05]].map((x) => [x[0], x[1], rnd() * 6.2832]);
+    const sx = 1.2 + rnd() * 0.5, rot = rnd() * 6.2832, N = 420;
+    const xs = [], ys = [], cum = [0];
+    for (let i = 0; i < N; i++) {
+      const th = (i / N) * 6.283185;
+      let r = 1;
+      for (const k of h) r += k[1] * Math.sin(k[0] * th + k[2]);
+      const x = Math.cos(th) * r * sx, y = Math.sin(th) * r;
+      xs.push(x * Math.cos(rot) - y * Math.sin(rot));
+      ys.push(x * Math.sin(rot) + y * Math.cos(rot));
+    }
+    for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + Math.hypot(xs[i % N] - xs[i - 1], ys[i % N] - ys[i - 1]));
+    return { xs, ys, cum, N, len: cum[N] };
+  }
+  function makeFit(w, h) {
+    const g = geo, pad = 18;
+    const bx = [Math.min.apply(null, g.xs), Math.max.apply(null, g.xs)], by = [Math.min.apply(null, g.ys), Math.max.apply(null, g.ys)];
+    const bw = bx[1] - bx[0], bh = by[1] - by[0];
+    const s0 = Math.min((w - 2 * pad) / bw, (h - 2 * pad) / bh), s1 = Math.min((w - 2 * pad) / bh, (h - 2 * pad) / bw);
+    const rot = s1 > s0 * 1.08, s = Math.max(1, rot ? s1 : s0);
+    const mx = (bx[0] + bx[1]) / 2, my = (by[0] + by[1]) / 2;
+    const px = [], py = [];
+    for (let i = 0; i < g.N; i++) {
+      const x = g.xs[i] - mx, y = g.ys[i] - my;
+      px.push(w / 2 + (rot ? -y : x) * s);
+      py.push(h / 2 + (rot ? x : y) * s);
+    }
+    return { px, py, w, h };
+  }
+  function ptAt(f) {
+    const g = geo;
+    f = ((f % 1) + 1) % 1;
+    const target = f * g.len;
+    let lo = 0, hi = g.N;
+    while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (g.cum[mid] <= target) lo = mid; else hi = mid; }
+    const a = lo % g.N, b = (lo + 1) % g.N;
+    const u = (target - g.cum[lo]) / Math.max(1e-9, g.cum[lo + 1] - g.cum[lo]);
+    return [fit.px[a] + (fit.px[b] - fit.px[a]) * u, fit.py[a] + (fit.py[b] - fit.py[a]) * u];
+  }
+  function carFrac(c, t) {
+    if (t < c.t0 + c.pitT) return { f: 0, pit: c.pitT > 0 };
+    return { f: (t - c.t0 - c.pitT) / Math.max(1, c.t1 - c.t0 - c.pitT), pit: false };
+  }
+  function draw(race) {
+    const cv = $('cv');
+    if (!cv) return;
+    const wrap = cv.parentNode, w = wrap.clientWidth, h = wrap.clientHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!fit || fit.w !== w || fit.h !== h) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); fit = makeFit(w, h); }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < geo.N; i++) { if (i) ctx.lineTo(fit.px[i], fit.py[i]); else ctx.moveTo(fit.px[i], fit.py[i]); }
+    ctx.closePath();
+    ctx.strokeStyle = '#2a2e35'; ctx.lineWidth = 9; ctx.stroke();
+    // start line
+    const p0 = [fit.px[0], fit.py[0]], p1 = [fit.px[1], fit.py[1]];
+    let nx = -(p1[1] - p0[1]), ny = p1[0] - p0[0];
+    const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(p0[0] - nx * 8, p0[1] - ny * 8); ctx.lineTo(p0[0] + nx * 8, p0[1] + ny * 8); ctx.stroke();
+    const cx = w / 2, cy = h / 2;
+    const inX = cx - p0[0], inY = cy - p0[1], il = Math.hypot(inX, inY) || 1;
+    const t = race.t;
+    const font = getComputedStyle(document.documentElement).getPropertyValue('--font') || 'sans-serif';
+    const mine = [];
+    let lead = null;
+    for (const c of race.cars) {
+      if (c.st !== 'run') continue;
+      const q = carFrac(c, t);
+      const pos = q.pit ? [p0[0] + inX / il * 16, p0[1] + inY / il * 16] : ptAt(q.f);
+      if (c.me) { mine.push([c, pos]); continue; }
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillRect(pos[0] - 3, pos[1] - 3, 6, 6);
+      if (!lead || c.lap + q.f > lead[0]) lead = [c.lap + q.f, q.f];
+    }
+    for (const m of mine) { const q = carFrac(m[0], t); if (!lead || m[0].lap + q.f > lead[0]) lead = [m[0].lap + q.f, q.f]; }
+    if (race.sc && race.sc.k === 'SC' && lead) {
+      const p = ptAt(lead[1] + 0.02);
+      ctx.strokeStyle = '#ea5426'; ctx.lineWidth = 2; ctx.strokeRect(p[0] - 5, p[1] - 5, 10, 10);
+    }
+    ctx.font = '600 11px ' + font;
+    ctx.textAlign = 'center';
+    mine.forEach((m, k) => {
+      const p = m[1];
+      ctx.fillStyle = '#000'; ctx.fillRect(p[0] - 6, p[1] - 6, 12, 12);
+      ctx.fillStyle = '#ea5426'; ctx.fillRect(p[0] - 5, p[1] - 5, 10, 10);
+      const near = k > 0 && Math.hypot(p[0] - mine[0][1][0], p[1] - mine[0][1][1]) < 26;
+      ctx.fillStyle = '#ffffff'; ctx.fillText(drv(m[0].d).code, p[0], near ? p[1] + 19 : p[1] - 10);
+    });
+  }
+
+  function raceDOM(race) {
+    const mine = race.cars.filter((c) => c.me);
+    const card = (c, i) => {
+      const d = drv(c.d);
+      return '<div class="dc" id="dc' + i + '">' +
+        '<div class="dtop"><span class="dpos" id="dp' + i + '">-</span><span class="dname">' + d.code + '</span><span class="dtag" id="dx' + i + '"></span><span class="dlast" id="dl' + i + '"></span>' +
+        '<button type="button" class="auto" data-act="auto" data-i="' + i + '" id="da' + i + '">Auto</button></div>' +
+        '<div class="drow"><span id="dt' + i + '"></span><div class="wbar" id="dwb' + i + '"><i id="dw' + i + '"></i></div><span id="dwp' + i + '"></span></div>' +
+        '<div class="drow"><span class="lab">Fuel</span><span class="dv" id="df' + i + '"></span><span class="sp"></span><span class="lab">Int</span><span class="dv" id="dg' + i + '"></span></div>' +
+        '<div class="seg sm" id="dm' + i + '">' + [['P', 'Push'], ['N', 'Normal'], ['S', 'Save']].map((m) => '<button type="button" data-act="mode" data-i="' + i + '" data-v="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>' +
+        '<div class="seg sm" id="dk' + i + '">' + ['S', 'M', 'H', 'I', 'W'].map((k) => '<button type="button" data-act="comp" data-i="' + i + '" data-v="' + k + '" title="' + CN[k] + '">' + k + '</button>').join('') +
+        '<button type="button" class="bx" data-act="box" data-i="' + i + '" id="db' + i + '">Box</button></div>' +
+        '</div>';
+    };
+    return '<div class="race fade">' +
+      '<div class="rbar">' +
+      '<div class="stat"><span class="lab">Lap</span><span class="num" id="rLap">-</span></div>' +
+      '<div class="stat" id="rFlagBox"><span class="lab">Track</span><span class="num" id="rFlag">-</span></div>' +
+      '<div class="stat"><span class="lab">Weather</span><span class="num" id="rWx">-</span></div>' +
+      '<button class="btn rmenu" type="button" data-act="menu">Menu</button>' +
+      '<div class="seg spd" id="spd">' + [['0', 'Pause'], ['1', '1x'], ['4', '4x'], ['16', '16x'], ['fin', 'Finish']].map((x) => '<button type="button" data-act="spd" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
+      '</div>' +
+      '<div class="rgrid">' +
+      '<div class="trk"><canvas id="cv"></canvas><div class="tick" id="tick"></div></div>' +
+      '<div class="tower"><div class="th"><span class="lab" style="text-align:right">P</span><span class="lab">Drv</span><span class="lab w">Team</span><span class="lab" style="text-align:right">Gap</span><span class="lab" style="text-align:right">Int</span><span class="lab" style="text-align:right">Tyre</span><span class="lab w" style="text-align:right">S</span></div><div class="tb" id="tb"></div></div>' +
+      '<div class="ctl">' + mine.map(card).join('') + '</div>' +
+      '</div></div>';
+  }
+
+  function mountRace(fresh) {
+    const race = S.race;
+    view.className = 'view racing';
+    view.innerHTML = raceDOM(race);
+    geo = trackGeom(race.ci);
+    fit = null;
+    const tb = $('tb');
+    rowEls = race.cars.map((c) => {
+      const el = document.createElement('div');
+      el.className = 'tr' + (c.me ? ' me' : '');
+      el.innerHTML = '<span class="p"></span><span class="k">' + drv(c.d).code + '</span><span class="tm w">' + S.teams[c.tm].short + '</span><span class="g"></span><span class="i"></span><span class="y"></span><span class="s w"></span>';
+      tb.appendChild(el);
+      return { el, p: el.children[0], g: el.children[3], i: el.children[4], y: el.children[5], s: el.children[6], cls: '' };
+    });
+    const sizer = document.createElement('div');
+    sizer.style.height = race.cars.length * ROWH + 'px';
+    tb.appendChild(sizer);
+    prevPos = [];
+    savedLap = race.lead;
+    if (!fresh) speed = 0;
+    uiRace();
+    if (!raf) { lastTs = performance.now(); raf = requestAnimationFrame(frame); }
+    if (race.done) scheduleEnd();
+  }
+  function unmountRace() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    clearTimeout(endTimer); endTimer = 0;
+  }
+  function frame(ts) {
+    raf = requestAnimationFrame(frame);
+    const race = S && S.race;
+    if (!race || S.phase !== 'race') return;
+    const dt = Math.min(0.1, Math.max(0, (ts - lastTs) / 1000));
+    lastTs = ts;
+    if (!race.done && speed > 0 && !extPaused && !ovOpen) {
+      const a = race.alert;
+      RM.advance(race, S, race.t + dt * speed * race.base / 6);
+      if (race.alert !== a) { lastSpeed = speed; speed = 0; }
+      if (race.lead !== savedLap) { savedLap = race.lead; save(); }
+      if (race.done) { save(); scheduleEnd(); }
+    }
+    draw(race);
+    if (race.ver !== lastVer || ts - lastUi > 250) uiRace();
+  }
+  function scheduleEnd() {
+    if (endTimer) return;
+    endTimer = setTimeout(() => {
+      endTimer = 0;
+      if (!S || !S.race || !S.race.done) return;
+      RM.finishRace(S);
+      save();
+      render(true);
+    }, 1300);
+  }
+  function setSpeed(v) {
+    const race = S.race;
+    if (!race || race.done) return;
+    if (v === 'fin') {
+      race.cars.forEach((c) => { if (c.me) c.auto = true; });
+      RM.advance(race, S, Infinity);
+      save();
+      uiRace();
+      draw(race);
+      scheduleEnd();
+      return;
+    }
+    speed = +v;
+    if (speed > 0) lastSpeed = speed;
+    uiRace();
+  }
+  function intervals(race, ord) {
+    const gap = (c) => c.last - (race.leadT[c.lap] || 0);
+    return ord.map((c, i) => {
+      if (c.st === 'out') return ['DNF', ''];
+      if (i === 0) return [race.flag && c.st === 'fin' ? 'Winner' : 'Leader', ''];
+      const dn = RM.lapsDown(race, c);
+      const g = dn > 0 ? lapsTxt(dn) : '+' + gap(c).toFixed(1);
+      const p = ord[i - 1];
+      let iv = '';
+      if (p.st !== 'out') {
+        const pd = RM.lapsDown(race, p);
+        iv = dn > pd ? lapsTxt(dn - pd) : '+' + Math.max(0, gap(c) - gap(p)).toFixed(1);
+      }
+      return [g, iv];
+    });
+  }
+  function wxText(race) {
+    const w = RM.wetAt(race, race.lead);
+    const lbl = w < 0.05 ? 'Dry' : w < 0.18 ? 'Damp' : w < 0.67 ? 'Wet' : 'Heavy';
+    const L = race.lead, r = race.rain;
+    let fc = '';
+    if (!race.flag) {
+      if (!(r[L] > 0)) { for (let l = L + 1; l <= Math.min(race.laps - 1, L + 12); l++) if (r[l] > 0) { fc = 'Rain L' + Math.max(L + 2, l + 1 + race.fe); break; } }
+      else { for (let l = L + 1; l <= Math.min(race.laps - 1, L + 12); l++) if (!(r[l] > 0)) { fc = 'Dry L' + Math.max(L + 2, l + 1 + race.fe); break; } }
+    }
+    return lbl + (fc ? '<small>' + fc + '</small>' : '');
+  }
+  function uiRace() {
+    const race = S.race;
+    if (!race || !$('tb')) return;
+    lastVer = race.ver; lastUi = performance.now();
+    const ord = RM.order(race);
+    const iv = intervals(race, ord);
+    $('rLap').textContent = Math.min(race.flag ? race.laps : race.lead + 1, race.laps) + '/' + race.laps;
+    $('rFlag').textContent = race.flag ? 'Finish' : race.sc ? race.sc.k : 'Green';
+    $('rFlagBox').classList.toggle('lit', !!race.sc && !race.flag);
+    const wx = wxText(race);
+    if ($('rWx').innerHTML !== wx) $('rWx').innerHTML = wx;
+    $('spd').querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('on', !race.done && b.dataset.v !== 'fin' && +b.dataset.v === speed);
+      b.disabled = race.done;
+    });
+    const t = race.t;
+    ord.forEach((c, i) => {
+      const k = race.cars.indexOf(c), r = rowEls[k];
+      if (!r) return;
+      const tf = 'translateY(' + i * ROWH + 'px)';
+      if (r.el.style.transform !== tf) r.el.style.transform = tf;
+      r.p.textContent = i + 1;
+      r.g.textContent = iv[i][0];
+      r.i.textContent = iv[i][1];
+      const inPit = c.st === 'run' && t < c.t0 + c.pitT;
+      const y = c.st === 'out' ? '' : inPit ? '<span class="pit">PIT</span>' : chip(c.comp) + (c.age > 0 ? c.age : '');
+      if (r.y.innerHTML !== y) r.y.innerHTML = y;
+      r.s.textContent = c.stops;
+      const cls = 'tr' + (c.me ? ' me' : '') + (c.st === 'out' ? ' out' : '') + (prevPos[k] != null && i < prevPos[k] ? ' up' : '');
+      if (r.cls !== cls) { r.el.className = cls; r.cls = cls; }
+      prevPos[k] = i;
+    });
+    race.cars.filter((c) => c.me).forEach((c, i) => {
+      const card = $('dc' + i);
+      if (!card) return;
+      const pos = ord.indexOf(c);
+      const run = c.st === 'run' && !race.done;
+      $('dp' + i).textContent = c.st === 'out' ? 'DNF' : ordn(pos + 1);
+      const inPit = c.st === 'run' && t < c.t0 + c.pitT;
+      $('dx' + i).textContent = c.st === 'out' ? c.why : inPit ? 'Pit' : c.dmg > 0 ? 'Damage' : c.fsave ? 'Fuel save' : c.st === 'fin' ? 'Finished' : '';
+      $('dl' + i).textContent = c.lap > 1 ? fmtLap(c.lastLap) : '';
+      const ty = chip(c.comp) + ' <span>' + c.age + 'L</span>';
+      if ($('dt' + i).innerHTML !== ty) $('dt' + i).innerHTML = ty;
+      $('dw' + i).style.width = Math.min(100, c.wear * 100).toFixed(0) + '%';
+      $('dwb' + i).classList.toggle('hi', c.wear > 0.7);
+      $('dwp' + i).textContent = Math.round(c.wear * 100) + '%';
+      const fm = c.fuel - Math.max(0, race.laps - c.lap - 1);
+      const fe = $('df' + i);
+      fe.textContent = (fm >= 0 ? '+' : '') + fm.toFixed(1);
+      fe.classList.toggle('neg', fm < 0.1 || c.fsave);
+      $('dg' + i).textContent = pos > 0 && c.st !== 'out' ? iv[pos][1] || '-' : '-';
+      $('dm' + i).querySelectorAll('[data-act=mode]').forEach((b) => {
+        b.classList.toggle('on', c.mode === b.dataset.v);
+        b.classList.toggle('forced', c.fsave && b.dataset.v === 'S');
+        b.disabled = !run;
+      });
+      const da = $('da' + i); da.classList.toggle('on', c.auto); da.disabled = !run;
+      $('dk' + i).querySelectorAll('[data-act=comp]').forEach((b) => { b.classList.toggle('on', c.boxComp === b.dataset.v); b.disabled = !run; });
+      const db = $('db' + i); db.classList.toggle('on', c.box); db.textContent = c.box ? 'Boxing' : 'Box'; db.disabled = !run || race.flag;
+      card.classList.toggle('boxing', c.box);
+      card.classList.toggle('gone', c.st === 'out');
+    });
+    const tick = race.log.slice(-3).map((e) => '<div class="' + (e.m ? 'm' : '') + '">L' + e.l + ' ' + esc(e.x) + '</div>').join('');
+    const tk = $('tick');
+    if (tk.innerHTML !== tick) tk.innerHTML = tick;
+  }
+  const myCar = (i) => (S && S.race ? S.race.cars.filter((c) => c.me)[i] : null);
+
+  /* ---------- screens ---------- */
+  function render(fresh) {
+    head();
+    if (!S) { tabsEl.hidden = true; view.className = 'view'; view.innerHTML = ''; return; }
+    const ph = S.phase;
+    tabsEl.hidden = ph !== 'hq';
+    app.classList.toggle('racing', ph === 'race');
+    if (ph === 'race') { if (fresh || !$('tb')) mountRace(fresh); return; }
+    unmountRace();
+    if (ph === 'hq') tabsEl.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.t === tab));
+    const html = ph === 'hq' ? TABS[tab]() : ph === 'quali' ? qualiHTML() : ph === 'post' ? postHTML() : ph === 'review' ? reviewHTML() : ph === 'market' ? marketHTML() : '';
+    const keep = view.scrollTop;
+    view.className = 'view';
+    view.innerHTML = '<div class="' + (fresh ? 'fade' : '') + '">' + html + '</div>';
+    view.scrollTop = fresh ? 0 : keep;
+  }
+
+  function act(a, ds) {
+    if (a !== 'release') confirmKey = '';
+    const c = ds.i != null ? myCar(+ds.i) : null;
+    switch (a) {
+      case 'tab': tab = ds.t; render(true); break;
+      case 'weekend': RM.runQuali(S); save(); qStep = 1; render(true); revealQuali(); break;
+      case 'scomp': S.weekend.start[+ds.d] = ds.v; save(); render(); break;
+      case 'start': clearTimeout(qTimer); RM.startRace(S); speed = 1; lastSpeed = 1; save(); render(true); break;
+      case 'spd': setSpeed(ds.v); break;
+      case 'mode': if (c && c.st === 'run') { c.mode = ds.v; c.auto = false; uiRace(); } break;
+      case 'comp': if (c && c.st === 'run') { c.boxComp = ds.v; c.pick = true; c.auto = false; uiRace(); } break;
+      case 'box': if (c && c.st === 'run') { c.box = !c.box; if (c.box && !c.pick) c.boxComp = RM.suggest(S.race, S, c); c.auto = false; uiRace(); } break;
+      case 'auto': if (c && c.st === 'run') { c.auto = !c.auto; uiRace(); } break;
+      case 'cont':
+        if (S.round >= S.calendar.length) { RM.endSeason(S); V.gameOver(S.titles.c); }
+        else { S.phase = 'hq'; tab = 'home'; }
+        save(); render(true); break;
+      case 'market': S.phase = 'market'; mkView = 'free'; save(); render(true); break;
+      case 'season': if (!RM.startSeason(S)) { tab = 'home'; save(); render(true); } break;
+      case 'dArea': dev.area = ds.v; render(); break;
+      case 'dTier': dev.tier = +ds.v; render(); break;
+      case 'dStart': if (!RM.startProject(S, S.player, dev.area, dev.tier)) { save(); render(); } break;
+      case 'staff': if (!RM.upgradeStaff(S, S.player, ds.k)) { save(); render(); } break;
+      case 'st': stView = ds.v; render(); break;
+      case 'mkv': mkView = ds.v; render(); break;
+      case 'yrs': mkYears = +ds.v; render(); break;
+      case 'sign': if (!RM.signDriver(S, +ds.d, mkYears)) { save(); render(); } break;
+      case 'renew': if (!RM.renew(S, +ds.d, mkYears)) { save(); render(); } break;
+      case 'release':
+        if (confirmKey !== 'rel' + ds.d) { confirmKey = 'rel' + ds.d; render(); }
+        else { confirmKey = ''; RM.release(S, +ds.d); save(); render(); }
+        break;
+      case 'menu': if (ovOpen) closeOverlay(); else openMenu(); break;
+      case 'close': closeOverlay(); break;
+      case 'new': pickT = -1; openPicker(); break;
+      case 'back': openMenu(); break;
+      case 'pick': pickT = +ds.t; openPicker(); break;
+      case 'go':
+        if (pickT < 0) break;
+        S = RM.newCareer(pickT, ((Date.now() ^ Math.floor(Math.random() * 4294967296)) >>> 0) || 7);
+        tab = 'home'; stView = 'd'; dev.area = 'aero'; dev.tier = 1;
+        unmountRace();
+        save(); closeOverlay(); render(true);
+        break;
+    }
+  }
+
+  /* ---------- overlay ---------- */
+  function showOverlay(html, wide) {
+    ovCard.className = 'card' + (wide ? ' wide' : '');
+    ovCard.innerHTML = html;
+    if (!ovOpen) {
+      ovOpen = true;
+      overlay.hidden = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+      setTimeout(() => overlay.classList.add('show'), 60);
+    }
+    setTimeout(() => { const b = ovCard.querySelector('.btn.primary:not([disabled])'); if (b) try { b.focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function closeOverlay() {
+    if (!S) return;
+    ovOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    lastTs = performance.now();
+  }
+  function openMenu() {
+    if (S && S.race) save();
+    const stats = S ? kv([['Season', S.season], ['Team', esc(S.teams[S.player].name)], ['Titles', S.titles.c], ['Most titles', V.best()]]) : '';
+    showOverlay('<h2>Racing Manager</h2><p class="line">Tap or click to manage the team. Space pauses a race, 1 to 3 set the speed.</p>' + stats +
+      '<div class="btns">' + (S ? '<button class="btn primary" type="button" data-act="close">Continue</button>' : '') +
+      '<button class="btn' + (S ? '' : ' primary') + '" type="button" data-act="new">New career</button></div>');
+  }
+  function openPicker() {
+    const rows = RM.TEAM_DEF.map((t, i) => {
+      const car = (t[3] + t[4] + t[5]) / 3;
+      return '<tr class="click' + (i === pickT ? ' sel' : '') + '" data-act="pick" data-t="' + i + '">' + td(esc(t[0]), 'b') + td(car.toFixed(1), 'n') +
+        td(money(45 + t[2] + RM.PRIZE[i]), 'n') + td(ordn(i + 1), 'n') + '</tr>';
+    });
+    showOverlay('<h2>New career</h2>' + table([['Team'], ['Car', 'n'], ['Budget', 'n'], ['Target', 'n']], rows) +
+      '<div class="btns"><button class="btn" type="button" data-act="back">Back</button>' +
+      '<button class="btn primary" type="button" data-act="go"' + (pickT < 0 ? ' disabled' : '') + '>Start' + (pickT >= 0 ? ' ' + esc(RM.TEAM_DEF[pickT][0]) : '') + '</button></div>', true);
+  }
+
+  /* ---------- input ---------- */
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    if (ovOpen && !overlay.contains(b) && b.dataset.act !== 'menu') return;
+    act(b.dataset.act, b.dataset);
+  });
+  overlay.addEventListener('pointerdown', (e) => { if (e.target === overlay && S) closeOverlay(); });
+  document.addEventListener('pointerdown', () => { try { window.focus(); } catch (_) {} }, { passive: true });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); if (ovOpen) closeOverlay(); else openMenu(); return; }
+    if (ovOpen || !S || S.phase !== 'race' || !S.race || S.race.done) return;
+    if (e.key === ' ') { e.preventDefault(); setSpeed(speed > 0 ? '0' : String(lastSpeed || 1)); }
+    else if (e.key === '1') setSpeed('1');
+    else if (e.key === '2') setSpeed('4');
+    else if (e.key === '3') setSpeed('16');
+  });
+  V.onPause((p) => { extPaused = !!p; if (p) save(); lastTs = performance.now(); });
+  window.addEventListener('pagehide', save);
+
+  function layout() {
+    const wide = window.innerWidth >= 760;
+    app.classList.toggle('wide', wide);
+    app.classList.toggle('narrow', !wide);
+    fit = null;
+  }
+  let rz = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(rz);
+    rz = requestAnimationFrame(() => { layout(); if (S && S.phase === 'race' && S.race) { uiRace(); draw(S.race); } });
+  });
+
+  /* ---------- boot ---------- */
+  layout();
+  const sv = loadSave();
+  if (sv) { S = sv; RM.setRs(S.rs); qStep = 3; }
+  render(true);
+  app.classList.add('ready');
+  openMenu();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S && S.race) draw(S.race); }).catch(() => {});
+  V.ready();
+})();
+</script>
+</body>
+</html>

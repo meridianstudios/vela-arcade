@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Roulette</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --blk: #e4e6ea;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --gap: 10px;
+    --pad: 12px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    margin: 0 auto;
+    max-width: 1400px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "head" "bar" "stage" "ctrl";
+    gap: var(--gap);
+    padding: var(--pad);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.side {
+    grid-template-columns: minmax(0, 1fr) 11em;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "head head" "bar ctrl" "stage ctrl";
+  }
+
+  .head { grid-area: head; display: flex; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .brand { flex: 1 1 auto; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .head.nobrand .brand { display: none; }
+  .head.nobrand .stat { flex: 1 1 0; min-width: 0; }
+
+  .stat {
+    position: relative;
+    min-width: 7.2em;
+    padding: 0.45em 0.8em 0.5em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .num {
+    display: block;
+    font: 600 1.35em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.12em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: clip;
+    transition: color 300ms var(--ease);
+  }
+  .num.gain { color: var(--brand-hover); transition: none; }
+  .num.hot { color: var(--brand-hover); }
+
+  /* results strip and bet readout */
+  .bar {
+    grid-area: bar;
+    display: flex; align-items: center; gap: 0.75em;
+    height: 1.9em;
+    min-width: 0;
+  }
+  .hist { flex: 1 1 auto; min-width: 0; height: 100%; display: flex; gap: 3px; overflow: hidden; }
+  .hist i {
+    flex: none;
+    width: 1.9em; height: 100%;
+    display: grid; place-items: center;
+    font: 600 0.8em/1 var(--font);
+    font-style: normal;
+    font-variant-numeric: tabular-nums;
+    border-radius: 2px;
+    background: var(--surface-3);
+    color: #fff;
+  }
+  .hist i.r { background: var(--brand); }
+  .hist i.z { background: var(--blk); color: #000; }
+  .hist i:first-child { box-shadow: inset 0 0 0 2px #fff; }
+  .hist i.z:first-child { box-shadow: inset 0 0 0 2px var(--brand); }
+  .hist i.in { animation: hin 320ms var(--ease) both; }
+  @keyframes hin { from { opacity: 0; transform: translateX(-60%); } }
+  .read {
+    flex: none;
+    display: flex; align-items: baseline; gap: 0.6em;
+    max-width: 60%;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .read .lab { color: #fff; overflow: hidden; text-overflow: ellipsis; }
+  .read b { font: 600 0.95em/1 var(--font); color: var(--brand-hover); font-variant-numeric: tabular-nums; }
+  .read em { font: 600 clamp(11px, 0.66em, 12px)/1 var(--font); font-style: normal; color: var(--muted); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+  .read em:empty { display: none; }
+
+  .stage {
+    grid-area: stage;
+    position: relative;
+    min-height: 0; min-width: 0;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .stage canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  .tag {
+    position: absolute; left: 50%; top: 50%;
+    padding: 0.5em 0.7em;
+    background: var(--brand);
+    color: #fff;
+    font: 600 12px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .tag[hidden] { display: none; }
+  .tag.pop { animation: tpop 320ms var(--ease) both; }
+  @keyframes tpop { from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); } }
+
+  .fx { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 5; }
+
+  /* ---------- controls ---------- */
+  .ctrl {
+    grid-area: ctrl;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    gap: 0.5em;
+    width: 100%;
+    max-width: 56em;
+    justify-self: center;
+    height: 3.4em;
+  }
+  .chips, .acts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.4em; min-width: 0; }
+  .app.narrow .ctrl { grid-template-columns: minmax(0, 1fr); grid-template-rows: 3em 2.8em; height: auto; }
+  .app.side .ctrl { grid-template-columns: 1fr 1fr; height: auto; max-width: none; align-self: stretch; }
+  .app.side .chips, .app.side .acts { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 0;
+    padding: 0 0.4em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.78rem, 13px) var(--font);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease), opacity 160ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn:disabled, .btn:disabled:hover { opacity: 0.3; cursor: default; background: transparent; border-color: var(--outline); transform: none; }
+  .btn.primary:disabled { background: var(--brand); border-color: var(--brand); }
+
+  .chip {
+    position: relative;
+    min-width: 0;
+    border: 0;
+    border-radius: 2px;
+    font: 600 1.05em/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: opacity 160ms var(--ease), transform 150ms var(--ease), filter 160ms var(--ease), outline-color 160ms var(--ease);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  .chip::before {
+    content: "";
+    position: absolute; inset: 4px;
+    border: 1px dashed rgba(255, 255, 255, 0.45);
+    pointer-events: none;
+  }
+  .chip:hover { filter: brightness(1.12); }
+  .chip:active { transform: scale(0.95); }
+  .chip.sel { outline-color: #fff; }
+  .chip:focus-visible { outline-color: var(--brand-hover); }
+  .chip:disabled { opacity: 0.25; cursor: default; filter: none; transform: none; outline-color: transparent; }
+  .k1 { background: var(--blk); color: #000; }
+  .k1::before { border-color: rgba(0, 0, 0, 0.35); }
+  .k5 { background: #6b717b; color: #fff; }
+  .k25 { background: var(--brand-dark); color: #fff; }
+  .k100 { background: var(--brand); color: #fff; }
+  .k500 { background: #000; color: #fff; box-shadow: inset 0 0 0 2px var(--brand); }
+  .k500::before { border-color: rgba(234, 84, 38, 0.7); inset: 5px; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.72);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div + div { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; }
+  .card .btns .btn { flex: 1 1 8em; min-height: 3.3em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .card, .btn, .chip { transition: none; }
+    .hist i.in, .tag.pop { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Roulette</h1></div>
+    <div class="stat"><span class="lab">Bankroll</span><span class="num" id="cashNum">1,000</span></div>
+    <div class="stat"><span class="lab">Bet</span><span class="num" id="betNum">0</span></div>
+    <div class="stat"><span class="lab">Win</span><span class="num" id="winNum">0</span></div>
+  </header>
+  <div class="bar" id="bar">
+    <div class="hist" id="hist"></div>
+    <div class="read" id="read"><span class="lab" id="readName"></span><b id="readOdds"></b><em id="readAmt"></em></div>
+  </div>
+  <main class="stage" id="stage">
+    <canvas id="cv"></canvas>
+    <div class="tag" id="bestTag" hidden>New best</div>
+  </main>
+  <footer class="ctrl" id="ctrl">
+    <div class="chips" id="chips">
+      <button class="chip k1" type="button" data-i="0">1</button>
+      <button class="chip k5" type="button" data-i="1">5</button>
+      <button class="chip k25" type="button" data-i="2">25</button>
+      <button class="chip k100" type="button" data-i="3">100</button>
+      <button class="chip k500" type="button" data-i="4">500</button>
+    </div>
+    <div class="acts">
+      <button class="btn" id="undoBtn" type="button">Undo</button>
+      <button class="btn" id="clearBtn" type="button">Clear</button>
+      <button class="btn" id="rebetBtn" type="button">Rebet</button>
+      <button class="btn" id="doubleBtn" type="button">Double</button>
+      <button class="btn primary" id="spinBtn" type="button">Spin</button>
+    </div>
+  </footer>
+</div>
+<canvas class="fx" id="fx"></canvas>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="startCard" role="dialog" aria-labelledby="startTitle" hidden>
+    <h2 id="startTitle">Roulette</h2>
+    <p class="line">Pick a chip, tap the table to bet, then Spin.</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="stCash">1,000</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="stBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="playBtn" type="button">Play</button></div>
+  </div>
+  <div class="card" id="overCard" role="dialog" aria-labelledby="overTitle" aria-live="polite" hidden>
+    <h2 id="overTitle">Game over</h2>
+    <p class="line">Out of chips</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="ovCash">0</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="ovBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="againBtn" type="button">New bankroll</button></div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="roulette"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {} };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const ROU = (function () {
+    const START = 1000;
+    const CHIPS = [1, 5, 25, 100, 500];
+    // European single-zero wheel, clockwise from zero.
+    const ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+    const REDS = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    const isRed = (n) => REDS.indexOf(n) >= 0;
+    const colorOf = (n) => (n === 0 ? 'z' : isRed(n) ? 'r' : 'b');
+
+    // Table coordinates, horizontal layout: x runs along the 12 number columns (0..12),
+    // zero sits at x -1..0, the 2:1 column bets at x 12..13. y runs across the three rows
+    // (row 0 holds 3, 6 .. 36), then the dozens strip and the even-money strip below.
+    const DH = 0.9, EH = 0.9;
+    const TB = { x0: -1, x1: 13, y0: 0, y1: 3 + DH + EH };
+    const colOf = (n) => Math.floor((n - 1) / 3);
+    const rowOf = (n) => 2 - ((n - 1) % 3);
+    const numAt = (col, row) => 3 * col + 3 - row;
+    const keyOf = (nums) => nums.slice().sort((a, b) => a - b).join('-');
+
+    const BETS = {};
+    const LIST = [];
+    function def(kind, nums, x, y, extra) {
+      nums = nums.slice().sort((a, b) => a - b);
+      const key = (extra && extra.key) || nums.join('-');
+      const b = Object.assign({ key, kind, nums, x, y, rect: null, label: '' }, extra || {});
+      BETS[key] = b;
+      LIST.push(b);
+    }
+    def('straight', [0], -0.5, 1.5, { rect: [-1, 0, 0, 3] });
+    for (let n = 1; n <= 36; n++) {
+      const c = colOf(n), r = rowOf(n);
+      def('straight', [n], c + 0.5, r + 0.5, { rect: [c, r, c + 1, r + 1] });
+    }
+    for (let n = 1; n <= 33; n++) def('split', [n, n + 3], colOf(n) + 1, rowOf(n) + 0.5);
+    for (let n = 1; n <= 36; n++) if (n % 3) def('split', [n, n + 1], colOf(n) + 0.5, rowOf(n));
+    for (let n = 1; n <= 3; n++) def('split', [0, n], 0, rowOf(n) + 0.5);
+    for (let c = 0; c < 12; c++) def('street', [3 * c + 1, 3 * c + 2, 3 * c + 3], c + 0.5, 3);
+    def('trio', [0, 1, 2], 0, 2);
+    def('trio', [0, 2, 3], 0, 1);
+    for (let c = 0; c < 11; c++) {
+      for (let hy = 1; hy <= 2; hy++) def('corner', [numAt(c, hy - 1), numAt(c, hy), numAt(c + 1, hy - 1), numAt(c + 1, hy)], c + 1, hy);
+    }
+    def('four', [0, 1, 2, 3], 0, 3);
+    for (let c = 0; c < 11; c++) def('line', [1, 2, 3, 4, 5, 6].map((k) => 3 * c + k), c + 1, 3);
+
+    const range = (a, b) => { const r = []; for (let i = a; i <= b; i++) r.push(i); return r; };
+    const ALL = range(1, 36);
+    for (let row = 0; row < 3; row++) {
+      const k = 3 - row;
+      def('column', ALL.filter((n) => (n - k) % 3 === 0), 12.5, row + 0.5, { key: 'col' + k, rect: [12, row, 13, row + 1], label: '2:1', name: 'Column ' + k });
+    }
+    ['1st 12', '2nd 12', '3rd 12'].forEach((label, i) => {
+      def('dozen', range(12 * i + 1, 12 * i + 12), 4 * i + 2, 3 + DH / 2, { key: 'doz' + (i + 1), rect: [4 * i, 3, 4 * i + 4, 3 + DH], label, name: label });
+    });
+    [
+      ['low', '1 to 18', (n) => n <= 18],
+      ['even', 'Even', (n) => n % 2 === 0],
+      ['red', 'Red', isRed],
+      ['black', 'Black', (n) => !isRed(n)],
+      ['odd', 'Odd', (n) => n % 2 === 1],
+      ['high', '19 to 36', (n) => n >= 19],
+    ].forEach(([key, label, f], i) => {
+      def('even', ALL.filter(f), 2 * i + 1, 3 + DH + EH / 2, { key, rect: [2 * i, 3 + DH, 2 * i + 2, 3 + DH + EH], label, name: label });
+    });
+
+    // Winnings per unit staked. 36/n - 1 gives every standard payout: 35, 17, 11, 8, 5, 2, 1.
+    const payout = (key) => 36 / BETS[key].nums.length - 1;
+
+    const KIND_NAME = { straight: 'Straight', split: 'Split', street: 'Street', trio: 'Trio', corner: 'Corner', four: 'First four', line: 'Six line' };
+    function nameOf(key) {
+      const b = BETS[key];
+      if (!b) return '';
+      if (b.name) return b.name;
+      if (b.kind === 'line') return 'Six line ' + b.nums[0] + ' to ' + b.nums[5];
+      if (b.kind === 'four') return 'First four';
+      return KIND_NAME[b.kind] + ' ' + b.nums.join(' ');
+    }
+
+    // bx, by: half-width of the line bands in table units (x and y).
+    function hitTest(x, y, bx, by) {
+      if (x >= -1 && x <= 12 && y >= 0 && y <= 3) {
+        const vx = Math.round(x), hy = Math.round(y);
+        const nearX = vx >= 0 && vx <= 11 && Math.abs(x - vx) < bx;
+        const nearY = hy >= 1 && hy <= 3 && Math.abs(y - hy) < by && (x >= 0 || nearX);
+        const row = Math.max(0, Math.min(2, Math.floor(y)));
+        let k;
+        if (nearX && nearY) {
+          if (vx === 0) k = hy === 3 ? '0-1-2-3' : hy === 2 ? '0-1-2' : '0-2-3';
+          else if (hy === 3) k = keyOf(range(3 * (vx - 1) + 1, 3 * (vx - 1) + 6));
+          else k = keyOf([numAt(vx - 1, hy - 1), numAt(vx - 1, hy), numAt(vx, hy - 1), numAt(vx, hy)]);
+        } else if (nearX) {
+          k = vx === 0 ? keyOf([0, numAt(0, row)]) : keyOf([numAt(vx - 1, row), numAt(vx, row)]);
+        } else if (x < 0) {
+          k = '0';
+        } else {
+          const col = Math.max(0, Math.min(11, Math.floor(x)));
+          if (nearY) k = hy === 3 ? keyOf([3 * col + 1, 3 * col + 2, 3 * col + 3]) : keyOf([numAt(col, hy - 1), numAt(col, hy)]);
+          else k = String(numAt(col, row));
+        }
+        return BETS[k] ? k : null;
+      }
+      for (const b of LIST) {
+        if (b.kind === 'straight' || !b.rect) continue;
+        const r = b.rect;
+        if (x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3]) return b.key;
+      }
+      return null;
+    }
+
+    const total = (bets) => { let t = 0; for (const k in bets) t += bets[k]; return t; };
+
+    function settle(bets, n) {
+      let ret = 0;
+      const wins = [], lose = [];
+      for (const key in bets) {
+        const amt = bets[key];
+        if (BETS[key].nums.indexOf(n) >= 0) {
+          const pay = amt * payout(key);
+          ret += amt + pay;
+          wins.push({ key, amt, pay });
+        } else lose.push({ key, amt });
+      }
+      return { n, ret, wins, lose, staked: total(bets) };
+    }
+
+    function newState() {
+      return { v: 1, cash: START, peak: START, bets: {}, last: null, hist: [], sel: 2 };
+    }
+
+    // deltas: [[key, amount]], positive adds chips from the bankroll, negative returns them.
+    function apply(S, deltas) {
+      if (!Array.isArray(deltas) || !deltas.length) return false;
+      const next = Object.assign({}, S.bets);
+      let cost = 0;
+      for (const [k, d] of deltas) {
+        if (!BETS[k] || !Number.isInteger(d) || d === 0) return false;
+        const v = (next[k] || 0) + d;
+        if (v < 0) return false;
+        if (v === 0) delete next[k]; else next[k] = v;
+        cost += d;
+      }
+      if (cost > S.cash) return false;
+      S.bets = next;
+      S.cash -= cost;
+      return true;
+    }
+    const entries = (bets, sign) => Object.keys(bets).map((k) => [k, sign * bets[k]]);
+    const canRebet = (S) => total(S.bets) === 0 && !!S.last && total(S.last) > 0 && total(S.last) <= S.cash;
+    const canDouble = (S) => total(S.bets) > 0 && total(S.bets) <= S.cash;
+
+    function spin(S, n) {
+      if (!total(S.bets) || !Number.isInteger(n) || n < 0 || n > 36) return null;
+      const bets = S.bets;
+      const r = settle(bets, n);
+      S.cash += r.ret;
+      S.last = bets;
+      S.bets = {};
+      S.hist.unshift(n);
+      if (S.hist.length > 60) S.hist.length = 60;
+      if (S.cash > S.peak) S.peak = S.cash;
+      r.bets = bets;
+      return r;
+    }
+
+    const isBroke = (S) => S.cash < CHIPS[0] && total(S.bets) === 0;
+    function fresh(S) {
+      if (!isBroke(S)) return false;
+      S.cash = START;
+      if (S.last && total(S.last) > START) S.last = null;
+      return true;
+    }
+
+    // Uniform 0..36 by rejection sampling.
+    function randomNumber(rnd) {
+      if (rnd) return Math.floor(rnd() * 37);
+      const c = (typeof crypto !== 'undefined' && crypto.getRandomValues) ? crypto : null;
+      if (!c) return Math.floor(Math.random() * 37);
+      const buf = new Uint32Array(1), lim = Math.floor(4294967296 / 37) * 37;
+      for (;;) { c.getRandomValues(buf); if (buf[0] < lim) return buf[0] % 37; }
+    }
+
+    function validBets(b) {
+      if (!b || typeof b !== 'object') return false;
+      for (const k in b) if (!BETS[k] || !Number.isInteger(b[k]) || b[k] <= 0) return false;
+      return true;
+    }
+    function valid(S) {
+      if (!S || S.v !== 1) return false;
+      if (!Number.isInteger(S.cash) || S.cash < 0 || !Number.isFinite(S.peak)) return false;
+      if (!validBets(S.bets) || (S.last !== null && !validBets(S.last))) return false;
+      if (!Array.isArray(S.hist) || S.hist.some((n) => !Number.isInteger(n) || n < 0 || n > 36)) return false;
+      if (!Number.isInteger(S.sel) || S.sel < 0 || S.sel >= CHIPS.length) return false;
+      return true;
+    }
+
+    return {
+      START, CHIPS, ORDER, REDS, isRed, colorOf, TB, DH, EH, BETS, LIST, payout, nameOf, hitTest,
+      total, settle, newState, apply, entries, canRebet, canDouble, spin, isBroke, fresh, randomNumber, valid,
+    };
+  })();
+  /* ===== LOGIC END ===== */
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:roulette:state';
+  function load() {
+    try {
+      const S = JSON.parse(localStorage.getItem(KEY));
+      return ROU.valid(S) ? S : null;
+    } catch (_) { return null; }
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const app = $('app'), head = $('head'), stage = $('stage'), cv = $('cv'), fx = $('fx');
+  const ctx = cv.getContext('2d'), fctx = fx.getContext('2d');
+  const histEl = $('hist'), bestTag = $('bestTag');
+  const overlay = $('overlay'), startCard = $('startCard'), overCard = $('overCard');
+  const chipBtns = Array.from(document.querySelectorAll('.chip'));
+  const btn = { undo: $('undoBtn'), clear: $('clearBtn'), rebet: $('rebetBtn'), double: $('doubleBtn'), spin: $('spinBtn') };
+  const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const fmt = (n) => Math.round(n).toLocaleString('en-US');
+  const TAU = Math.PI * 2, STEP = TAU / 37;
+  const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+  const easeOut4 = (p) => 1 - Math.pow(1 - p, 4);
+  const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+
+  const COL = {
+    bg2: '#0b0c0f', surface: '#16181c', surface2: '#1f2227', surface3: '#2a2e35',
+    line: 'rgba(255,255,255,0.16)', text: '#ffffff', muted: 'rgba(255,255,255,0.6)',
+    brand: '#ea5426', brandHi: '#ff7a4d', brandDark: '#b83f19', blk: '#e4e6ea',
+  };
+  // Chip faces by denomination: fill, text, dash colour, ring.
+  const CHIP_STYLE = {
+    1: ['#e4e6ea', '#000', 'rgba(0,0,0,0.35)', null],
+    5: ['#6b717b', '#fff', 'rgba(255,255,255,0.45)', null],
+    25: ['#b83f19', '#fff', 'rgba(255,255,255,0.45)', null],
+    100: ['#ea5426', '#fff', 'rgba(255,255,255,0.45)', null],
+    500: ['#000000', '#fff', 'rgba(234,84,38,0.7)', '#ea5426'],
+  };
+
+  let FONT = 'sans-serif', FONT_D = 'sans-serif';
+  function readFonts() {
+    const cs = getComputedStyle(document.documentElement);
+    FONT = cs.getPropertyValue('--font').trim() || 'sans-serif';
+    FONT_D = cs.getPropertyValue('--font-display').trim() || FONT;
+  }
+
+  /* ---------- state ---------- */
+  let st = load() || ROU.newState();
+  let undoStack = [];
+  let phase = 'bet';             // bet, spin, settle
+  let round = null;              // the settled result being shown
+  let disp = null;               // chips on the table while a round is shown: { bets, pay }
+  const inflight = {};           // key -> chips still flying to that spot
+  const bump = {};               // key -> time the stack last landed
+  let hoverKey = null, press = null;
+  let mark = st.hist.length ? st.hist[0] : null, markAt = -1e9;
+  let hubNum = mark, hubAt = -1e9;
+  let histHold = false;
+  const wheelSt = { angle: 0, ballRel: mark === null ? null : ROU.ORDER.indexOf(mark) * STEP };
+  let spinA = null;
+  let wheelFade = { from: 0, to: 0, t0: 0, dur: 1 };
+  let flights = [];
+  let queue = [];
+  let overlayOpen = false;
+
+  /* ---------- clock (stops while the arcade pauses the game) ---------- */
+  let paused = false, pausedAt = 0, pauseShift = 0;
+  const now = () => (paused ? pausedAt : performance.now()) - pauseShift;
+  const at = (delay, fn) => { queue.push({ t: now() + delay, fn }); queue.sort((a, b) => a.t - b.t); kick(); };
+  const D = (ms) => (reduceMotion ? Math.min(ms, 60) : ms);
+
+  /* ---------- geometry ---------- */
+  let G = null, dpr = 1, stageRect = null;
+  const TB = ROU.TB, TW = TB.x1 - TB.x0, TH = TB.y1 - TB.y0;
+
+  function fitTable(w, h, orient) {
+    let ux, uy;
+    if (orient === 'h') {
+      ux = Math.min(w / TW, 74);
+      uy = Math.min(h / TH, ux * 1.55);
+      ux = Math.min(ux, uy / 0.95);
+      return { orient, ux, uy, tw: ux * TW, th: uy * TH, score: Math.min(ux, uy) };
+    }
+    ux = Math.min(w / TH, 112);
+    uy = Math.min(h / TW, 66);
+    ux = Math.min(ux, uy * 2.6);
+    uy = Math.min(uy, ux);
+    return { orient, ux, uy, tw: ux * TH, th: uy * TW, score: Math.min(ux, uy) };
+  }
+
+  function computeGeom(W, H, fs) {
+    const p = Math.round(clamp(6, Math.min(W, H) * 0.025, 16));
+    const fH = fitTable(W - 2 * p, H - 2 * p, 'h'), fV = fitTable(W - 2 * p, H - 2 * p, 'v');
+    const tC = fH.score >= fV.score ? fH : fV;
+    const g = { W, H, p, mode: 'C', t: tC, wheel: null, pay: null };
+
+    const DA = Math.min(H - 2 * p, (W - 3 * p) * 0.36, 460);
+    const tA = DA >= 200 ? fitTable(W - 3 * p - DA, H - 2 * p, 'h') : null;
+    const DB = Math.min(W - 2 * p, (H - 3 * p) * 0.4, 420);
+    let tB = null;
+    if (DB >= 200) {
+      const a = fitTable(W - 2 * p, H - 3 * p - DB, 'h'), b = fitTable(W - 2 * p, H - 3 * p - DB, 'v');
+      tB = a.score >= b.score ? a : b;
+    }
+
+    if (tA && tA.score >= 36) {
+      g.mode = 'A';
+      g.t = tA;
+      let Dw = DA;
+      const rowH = Math.round(clamp(18, fs * 1.6, 24));
+      const PH = rowH * 8;
+      const colH = H - 2 * p;
+      let withPay = false;
+      if (colH - Dw >= PH + p) withPay = true;
+      else if (colH - PH - p >= Dw * 0.82 && colH - PH - p >= 220) { Dw = colH - PH - p; withPay = true; }
+      const t = fitTable(W - 3 * p - Dw, H - 2 * p, 'h');
+      g.t = t;
+      const totalW = Dw + p + t.tw;
+      const x0 = Math.round((W - totalW) / 2);
+      const blockH = Dw + (withPay ? p + PH : 0);
+      const y0 = Math.round((H - blockH) / 2);
+      g.wheel = { cx: x0 + Dw / 2, cy: y0 + Dw / 2, R: Dw / 2 - 2 };
+      if (withPay) g.pay = { x: x0 + Dw * 0.08, y: y0 + Dw + p, w: Dw * 0.84, rowH };
+      g.ox = x0 + Dw + p;
+      g.oy = Math.round((H - t.th) / 2);
+    } else if (tB && tB.score >= 34) {
+      g.mode = 'B';
+      g.t = tB;
+      const Dw = Math.max(DB, Math.min(W - 2 * p, H - 3 * p - tB.th, 460));
+      const blockH = Dw + p + tB.th;
+      const y0 = Math.round((H - blockH) / 2);
+      g.wheel = { cx: W / 2, cy: y0 + Dw / 2, R: Dw / 2 - 2 };
+      g.ox = Math.round((W - tB.tw) / 2);
+      g.oy = y0 + DB + p;
+    } else {
+      g.ox = Math.round((W - tC.tw) / 2);
+      g.oy = Math.round((H - tC.th) / 2);
+      const Dc = Math.min(W - 2 * p, H - 2 * p, 460);
+      g.wheel = { cx: W / 2, cy: H / 2, R: Dc / 2 - 2 };
+    }
+    g.orient = g.t.orient;
+    g.ux = g.t.ux; g.uy = g.t.uy;
+    g.chip = Math.round(clamp(14, Math.min(g.ux, g.uy) * 0.62, 30));
+    g.dealer = g.mode === 'C' ? { x: W / 2, y: -g.chip } : { x: g.wheel.cx, y: g.wheel.cy };
+    return g;
+  }
+
+  // table units -> stage pixels
+  function toS(x, y) {
+    if (G.orient === 'h') return [G.ox + (x - TB.x0) * G.ux, G.oy + (y - TB.y0) * G.uy];
+    return [G.ox + (TB.y1 - y) * G.ux, G.oy + (x - TB.x0) * G.uy];
+  }
+  function fromS(sx, sy) {
+    if (G.orient === 'h') return [TB.x0 + (sx - G.ox) / G.ux, TB.y0 + (sy - G.oy) / G.uy];
+    return [TB.x0 + (sy - G.oy) / G.uy, TB.y1 - (sx - G.ox) / G.ux];
+  }
+  const pxX = () => (G.orient === 'h' ? G.ux : G.uy);
+  const pxY = () => (G.orient === 'h' ? G.uy : G.ux);
+  function rectS(r) {
+    const a = toS(r[0], r[1]), b = toS(r[2], r[3]);
+    const x = Math.round(Math.min(a[0], b[0])), y = Math.round(Math.min(a[1], b[1]));
+    return { x, y, w: Math.round(Math.max(a[0], b[0])) - x, h: Math.round(Math.max(a[1], b[1])) - y };
+  }
+  const spotS = (key) => { const b = ROU.BETS[key]; return toS(b.x, b.y); };
+  function toClient(p) {
+    const r = stageRect || cv.getBoundingClientRect();
+    return [r.left + p[0], r.top + p[1]];
+  }
+  function centerOf(el) {
+    const r = el.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  }
+
+  function hitAt(e) {
+    if (!G) return null;
+    const r = cv.getBoundingClientRect();
+    const [x, y] = fromS(e.clientX - r.left, e.clientY - r.top);
+    const bandPx = (u) => clamp(5, u * 0.24, 14) / u;
+    return ROU.hitTest(x, y, bandPx(pxX()), bandPx(pxY()));
+  }
+
+  /* ---------- drawing: chips ---------- */
+  function denomFor(amount) {
+    let d = ROU.CHIPS[0];
+    for (const c of ROU.CHIPS) if (c <= amount) d = c;
+    return d;
+  }
+  function chipCount(amount) {
+    let n = 0, a = amount;
+    for (let i = ROU.CHIPS.length - 1; i >= 0; i--) { n += Math.floor(a / ROU.CHIPS[i]); a %= ROU.CHIPS[i]; }
+    return n;
+  }
+  function shortAmt(n) {
+    if (n < 10000) return String(n);
+    if (n < 1e6) return (Math.floor(n / 100) / 10).toString().replace(/\.0$/, '') + 'K';
+    return (Math.floor(n / 1e5) / 10).toString().replace(/\.0$/, '') + 'M';
+  }
+  function drawChip(c, x, y, s, amount, alpha, scale) {
+    const sty = CHIP_STYLE[denomFor(amount)];
+    const sz = s * (scale || 1);
+    const layers = Math.min(3, chipCount(amount) - 1);
+    c.save();
+    c.globalAlpha = alpha === undefined ? 1 : alpha;
+    const off = Math.max(2, sz * 0.09);
+    for (let i = layers; i >= 1; i--) {
+      const lx = x - sz / 2 + off * i * 0.5, ly = y - sz / 2 + off * i;
+      c.fillStyle = '#000';
+      c.fillRect(lx - 1, ly - 1, sz + 2, sz + 2);
+      c.fillStyle = sty[0];
+      c.fillRect(lx, ly, sz, sz);
+      c.fillStyle = 'rgba(0,0,0,0.35)';
+      c.fillRect(lx, ly, sz, sz);
+    }
+    const x0 = x - sz / 2, y0 = y - sz / 2;
+    c.fillStyle = '#000';
+    c.fillRect(x0 - 1, y0 - 1, sz + 2, sz + 2);
+    c.fillStyle = sty[0];
+    c.fillRect(x0, y0, sz, sz);
+    if (sty[3]) { c.strokeStyle = sty[3]; c.lineWidth = Math.max(1.5, sz * 0.07); const lw = c.lineWidth; c.strokeRect(x0 + lw / 2, y0 + lw / 2, sz - lw, sz - lw); }
+    const ins = Math.max(2.5, sz * 0.14);
+    c.strokeStyle = sty[2];
+    c.lineWidth = 1;
+    c.setLineDash([Math.max(2, sz * 0.09), Math.max(1.5, sz * 0.06)]);
+    c.strokeRect(Math.round(x0 + ins) + 0.5, Math.round(y0 + ins) + 0.5, Math.round(sz - 2 * ins) - 1, Math.round(sz - 2 * ins) - 1);
+    c.setLineDash([]);
+    const txt = shortAmt(amount);
+    let fsz = sz * 0.44;
+    c.font = '600 ' + fsz.toFixed(1) + 'px ' + FONT_D;
+    const w = c.measureText(txt).width, maxW = sz * 0.82;
+    if (w > maxW) { fsz *= maxW / w; c.font = '600 ' + fsz.toFixed(1) + 'px ' + FONT_D; }
+    c.fillStyle = sty[1];
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(txt, x, y + fsz * 0.04);
+    c.restore();
+  }
+
+  /* ---------- drawing: table ---------- */
+  function fillRect(r, color) { ctx.fillStyle = color; ctx.fillRect(r.x, r.y, r.w, r.h); }
+  function strokeRect(r, color, lw) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw || 1;
+    const o = (lw || 1) / 2;
+    ctx.strokeRect(r.x + o, r.y + o, r.w - 2 * o, r.h - 2 * o);
+  }
+  function text(str, x, y, size, weight, color, maxW) {
+    ctx.font = weight + ' ' + size.toFixed(1) + 'px ' + FONT;
+    if (maxW) {
+      const w = ctx.measureText(str).width;
+      if (w > maxW) { size *= maxW / w; ctx.font = weight + ' ' + size.toFixed(1) + 'px ' + FONT; }
+    }
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(str, x, y + size * 0.05);
+  }
+  function spaced(str, x, y, size, color, maxW) {
+    // Labels: uppercase with letter-spacing, drawn by hand so it works everywhere.
+    str = str.toUpperCase();
+    const width = (s) => {
+      ctx.font = '600 ' + s.toFixed(1) + 'px ' + FONT;
+      return ctx.measureText(str).width + s * 0.1 * (str.length - 1);
+    };
+    let w = width(size);
+    if (maxW && w > maxW) { size *= maxW / w; w = width(size); }
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    let cx = x - w / 2;
+    const ls = size * 0.1;
+    for (const ch of str) { ctx.fillText(ch, cx, y + size * 0.05); cx += ctx.measureText(ch).width + ls; }
+  }
+
+  function drawTable(t) {
+    const cellW = G.ux, cellH = G.uy;
+    const showHover = phase === 'bet' && hoverKey && ROU.BETS[hoverKey];
+    const cover = showHover ? ROU.BETS[hoverKey].nums : null;
+    const win = phase === 'spin' ? null : mark;
+    const numSize = Math.min(cellW * 0.42, cellH * 0.5, 26);
+
+    // numbers and zero
+    for (let n = 0; n <= 36; n++) {
+      const b = ROU.BETS[String(n)];
+      const r = rectS(b.rect);
+      const c = ROU.colorOf(n);
+      let fill = n === 0 ? COL.surface3 : COL.surface;
+      let ink = c === 'r' ? COL.brandHi : c === 'b' ? COL.blk : '#fff';
+      if (cover && cover.indexOf(n) >= 0) fill = n === 0 ? '#3a3f47' : '#2c3037';
+      if (win === n) { fill = COL.blk; ink = c === 'r' ? COL.brandDark : '#000'; }
+      fillRect(r, fill);
+      strokeRect(r, COL.line);
+      text(String(n), r.x + r.w / 2, r.y + r.h / 2, n === 0 ? numSize * 1.1 : numSize, n === 0 ? 600 : 400, ink);
+      if (win === n) {
+        const age = t - markAt;
+        if (age >= 0 && age < 700 && !reduceMotion) {
+          const q = age / 700, g = 3 + q * 10;
+          ctx.save();
+          ctx.globalAlpha = 1 - q;
+          strokeRect({ x: r.x - g, y: r.y - g, w: r.w + 2 * g, h: r.h + 2 * g }, '#fff', 2);
+          ctx.restore();
+        }
+      }
+    }
+
+    // outside bets
+    const labSize = clamp(10, Math.min(cellW, cellH) * 0.3, 13);
+    for (const b of ROU.LIST) {
+      if (b.kind === 'straight' || !b.rect) continue;
+      const r = rectS(b.rect);
+      let fill = COL.bg2;
+      if (showHover && hoverKey === b.key) fill = '#2c3037';
+      else if (win !== null && win !== 0 && b.nums.indexOf(win) >= 0) fill = COL.surface2;
+      fillRect(r, fill);
+      strokeRect(r, COL.line);
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+      if (b.key === 'red' || b.key === 'black') {
+        const dz = Math.min(r.w, r.h) * 0.3;
+        ctx.fillStyle = b.key === 'red' ? COL.brand : COL.blk;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - dz); ctx.lineTo(cx + dz * 1.4, cy); ctx.lineTo(cx, cy + dz); ctx.lineTo(cx - dz * 1.4, cy);
+        ctx.closePath(); ctx.fill();
+      } else if (b.kind === 'column') {
+        text('2:1', cx, cy, Math.min(r.w * 0.3, r.h * 0.38, 18), 600, '#fff');
+      } else {
+        spaced(b.label, cx, cy, labSize, '#fff', r.w * 0.86);
+      }
+    }
+  }
+
+  function drawBets(t) {
+    const list = [];
+    const src = disp ? disp.bets : st.bets;
+    for (const k in src) {
+      const a = src[k] - (disp ? 0 : (inflight[k] || 0));
+      if (a > 0) list.push([k, a, false]);
+    }
+    if (disp) for (const k in disp.pay) if (disp.pay[k] > 0) list.push([k, disp.pay[k], true]);
+    list.sort((p, q) => {
+      const a = spotS(p[0]), b = spotS(q[0]);
+      return (p[2] - q[2]) || (a[1] - b[1]) || (a[0] - b[0]);
+    });
+    const s = G.chip;
+    for (const [k, a, isPay] of list) {
+      let [x, y] = spotS(k);
+      if (isPay) { x += s * 0.5; y -= s * 0.5; }
+      let sc = 1;
+      const bt = bump[k];
+      if (bt !== undefined && !isPay) {
+        const age = t - bt;
+        if (age >= 0 && age < 240) sc = 1 + 0.16 * Math.sin((age / 240) * Math.PI);
+      }
+      drawChip(ctx, x, y, s, a, 1, sc);
+    }
+    // the chip that a tap here would place
+    if (phase === 'bet' && hoverKey && ROU.BETS[hoverKey] && !press) {
+      const v = ROU.CHIPS[st.sel];
+      if (v <= st.cash) {
+        const [x, y] = spotS(hoverKey);
+        const have = (st.bets[hoverKey] || 0) - (inflight[hoverKey] || 0);
+        if (!have) drawChip(ctx, x, y, s, v, 0.45, 1);
+      }
+    } else if (phase === 'bet' && press && hoverKey && ROU.BETS[hoverKey]) {
+      const [x, y] = spotS(hoverKey);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      const h = s * 0.7;
+      ctx.strokeRect(Math.round(x - h) + 1, Math.round(y - h) + 1, Math.round(2 * h) - 2, Math.round(2 * h) - 2);
+    }
+  }
+
+  /* ---------- drawing: wheel ---------- */
+  function ballAt(t) {
+    if (spinA) {
+      const s = spinState(t);
+      return { a: s.ball, r: s.r, w: s.w };
+    }
+    if (wheelSt.ballRel === null) return { a: 0, r: 0, w: wheelSt.angle, none: true };
+    return { a: wheelSt.angle + wheelSt.ballRel, r: 0.6, w: wheelSt.angle };
+  }
+
+  function drawWheel(t, alpha) {
+    const { cx, cy, R } = G.wheel;
+    const b = ballAt(t);
+    const w = b.w;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(cx, cy);
+
+    const disc = (r, color) => { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fillStyle = color; ctx.fill(); };
+    const ring = (r, color, lw) => { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.strokeStyle = color; ctx.lineWidth = lw || 1; ctx.stroke(); };
+
+    disc(R, COL.surface);
+    ring(R - 0.5, COL.line);
+    disc(R * 0.94, '#060708');
+    ring(R * 0.94, COL.line);
+
+    // number ring
+    const r1 = R * 0.8, r2 = R * 0.665, r3 = R * 0.53;
+    for (let i = 0; i < 37; i++) {
+      const n = ROU.ORDER[i], c = ROU.colorOf(n);
+      const a0 = w + (i - 0.5) * STEP - Math.PI / 2, a1 = a0 + STEP;
+      ctx.beginPath();
+      ctx.arc(0, 0, r1, a0, a1);
+      ctx.arc(0, 0, r2, a1, a0, true);
+      ctx.closePath();
+      ctx.fillStyle = c === 'r' ? COL.brand : c === 'b' ? '#1d2025' : COL.blk;
+      ctx.fill();
+    }
+    // pocket ring
+    ctx.beginPath(); ctx.arc(0, 0, r2, 0, TAU); ctx.arc(0, 0, r3, 0, TAU, true); ctx.fillStyle = '#0d0e11'; ctx.fill();
+    // frets
+    ctx.lineWidth = Math.max(1, R * 0.006);
+    for (let i = 0; i < 37; i++) {
+      const a = w + (i - 0.5) * STEP - Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath(); ctx.moveTo(ca * r2, sa * r2); ctx.lineTo(ca * r1, sa * r1); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath(); ctx.moveTo(ca * r3, sa * r3); ctx.lineTo(ca * r2, sa * r2); ctx.stroke();
+    }
+    ring(r1, 'rgba(255,255,255,0.22)');
+    ring(r2, 'rgba(255,255,255,0.22)');
+    ring(r3, 'rgba(255,255,255,0.22)');
+    // numbers
+    const nfs = R * 0.085;
+    ctx.font = '600 ' + nfs.toFixed(1) + 'px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 37; i++) {
+      const n = ROU.ORDER[i];
+      ctx.save();
+      ctx.rotate(w + i * STEP);
+      ctx.fillStyle = n === 0 ? '#000' : '#fff';
+      ctx.fillText(String(n), 0, -(r1 + r2) / 2 + nfs * 0.05);
+      ctx.restore();
+    }
+    // cone and turret
+    disc(r3, COL.surface);
+    ctx.save();
+    ctx.rotate(w);
+    ctx.fillStyle = COL.surface3;
+    const arm = R * 0.045;
+    for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-arm / 2, -R * 0.44, arm, R * 0.44); }
+    ctx.restore();
+    // deflectors on the ball track
+    ctx.fillStyle = COL.surface3;
+    for (let k = 0; k < 8; k++) {
+      const a = k * TAU / 8 + TAU / 16;
+      ctx.save();
+      ctx.rotate(a);
+      ctx.translate(0, -R * 0.82);
+      ctx.rotate(Math.PI / 4);
+      const d = R * 0.025;
+      ctx.fillRect(-d / 2, -d / 2, d, d);
+      ctx.restore();
+    }
+    // hub
+    const hr = R * 0.2;
+    disc(hr, COL.bg2);
+    ring(hr, COL.line);
+    const showHub = phase !== 'spin' && hubNum !== null;
+    if (showHub) {
+      const c = ROU.colorOf(hubNum);
+      let sc = 1;
+      const age = t - hubAt;
+      if (age >= 0 && age < 320 && !reduceMotion) sc = 1 + 0.35 * (1 - easeOut(age / 320));
+      ctx.save();
+      ctx.scale(sc, sc);
+      ctx.font = '300 ' + (hr * 1.05).toFixed(1) + 'px ' + FONT_D;
+      ctx.fillStyle = c === 'r' ? COL.brandHi : '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(hubNum), 0, hr * 0.06);
+      ctx.restore();
+    }
+    // ball
+    if (!b.none) {
+      const br = R * 0.034;
+      const a = b.a - Math.PI / 2, rr = b.r * R;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, br + 1, 0, TAU);
+      ctx.fillStyle = '#000';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * rr, Math.sin(a) * rr, br, 0, TAU);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPaytable() {
+    const P = G.pay;
+    const rows = [['Straight', '35:1'], ['Split', '17:1'], ['Street', '11:1'], ['Corner', '8:1'], ['Six line', '5:1'], ['Column', '2:1'], ['Dozen', '2:1'], ['Even money', '1:1']];
+    const fsz = clamp(10, P.rowH * 0.5, 12);
+    ctx.font = '600 ' + fsz + 'px ' + FONT;
+    rows.forEach(([a, b], i) => {
+      const y = P.y + i * P.rowH + P.rowH / 2;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COL.muted;
+      let x = P.x;
+      const ls = fsz * 0.1;
+      for (const ch of a.toUpperCase()) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + ls; }
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(b, P.x + P.w, y);
+      if (i) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(Math.round(P.x), Math.round(P.y + i * P.rowH), Math.round(P.w), 1); }
+    });
+  }
+
+  function wheelAlpha(t) {
+    if (G.mode !== 'C') return 1;
+    const f = wheelFade, p = clamp(0, (t - f.t0) / f.dur, 1);
+    return f.from + (f.to - f.from) * easeOut(p);
+  }
+  function fadeWheel(to, dur) {
+    const t = now();
+    wheelFade = { from: wheelAlpha(t), to, t0: t, dur: D(dur) || 1 };
+    kick();
+  }
+
+  function drawStage(t) {
+    if (!G) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, G.W, G.H);
+    drawTable(t);
+    drawBets(t);
+    if (G.mode !== 'C') {
+      drawWheel(t, 1);
+      if (G.pay) drawPaytable();
+    } else {
+      const a = wheelAlpha(t);
+      if (a > 0.001) {
+        ctx.fillStyle = 'rgba(0,0,0,' + (0.72 * a).toFixed(3) + ')';
+        ctx.fillRect(0, 0, G.W, G.H);
+        drawWheel(t, a);
+      }
+    }
+  }
+
+  /* ---------- flights (chips moving across the screen) ---------- */
+  function fly(from, to, amount, opts) {
+    opts = opts || {};
+    const f = {
+      x0: from[0], y0: from[1], x1: to[0], y1: to[1], amount,
+      t0: now() + (opts.delay || 0), dur: D(opts.dur || 260), fade: !!opts.fade, shrink: opts.shrink || 1,
+      onLand: opts.onLand || null,
+    };
+    if (reduceMotion) { f.dur = 1; f.t0 = now(); }
+    flights.push(f);
+    kick();
+    return f;
+  }
+  function drawFx(t) {
+    const w = window.innerWidth, h = window.innerHeight;
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.clearRect(0, 0, w, h);
+    if (!G) return;
+    const s = G.chip;
+    const done = [];
+    for (const f of flights) {
+      const p = clamp(0, (t - f.t0) / f.dur, 1);
+      if (t < f.t0) continue;
+      if (p >= 1) { done.push(f); continue; }
+      const e = easeOut4(p);
+      const x = f.x0 + (f.x1 - f.x0) * e, y = f.y0 + (f.y1 - f.y0) * e;
+      const alpha = f.fade ? 1 - p * p : 1;
+      const sc = 1 + (f.shrink - 1) * e;
+      drawChip(fctx, x, y, s, f.amount, alpha, sc);
+    }
+    for (const f of done) land(f);
+  }
+  function land(f) {
+    const i = flights.indexOf(f);
+    if (i < 0) return;
+    flights.splice(i, 1);
+    if (f.onLand) f.onLand();
+  }
+
+  /* ---------- animation loop ---------- */
+  let rafId = 0, lastFrame = 0, watchdog = 0;
+  function kick() {
+    if (paused) return;
+    if (!rafId) rafId = requestAnimationFrame(frame);
+    if (!watchdog) watchdog = setTimeout(guard, 200);
+  }
+  // requestAnimationFrame can stall in a hidden frame; keep timed events moving anyway.
+  function guard() {
+    watchdog = 0;
+    if (paused) return;
+    if (performance.now() - lastFrame > 180) frame(true);
+    else if (busy(now())) kick();
+  }
+  function busy(t) {
+    if (spinA || flights.length || queue.length) return true;
+    if (G && G.mode === 'C' && t - wheelFade.t0 < wheelFade.dur) return true;
+    if (t - hubAt < 340 || t - markAt < 720) return true;
+    for (const k in bump) if (t - bump[k] < 260) return true;
+    return false;
+  }
+  function frame(fromGuard) {
+    if (fromGuard !== true) rafId = 0;
+    lastFrame = performance.now();
+    const t = now();
+    for (let guardN = 0; queue.length && queue[0].t <= t && guardN < 50; guardN++) queue.shift().fn();
+    if (spinA && spinState(t).p >= 1) endSpin();
+    drawStage(t);
+    drawFx(t);
+    if (busy(t)) kick();
+  }
+  function redraw() { if (!rafId) rafId = requestAnimationFrame(frame); }
+
+  /* ---------- spin ---------- */
+  function spinState(t) {
+    const S = spinA;
+    const p = S.T ? clamp(0, (t - S.t0) / S.T, 1) : 1;
+    const e = easeOut(p);
+    const w = S.w0 + S.wd * e;
+    const phi = S.phi0 + S.dphi * e;
+    // Ball radius: rides the track, drops across the numbers, hops a few pockets, settles.
+    const TR = 0.87, PR = 0.6;
+    let r;
+    if (p < 0.52) r = TR;
+    else if (p < 0.68) r = TR + (PR - TR) * easeInOut((p - 0.52) / 0.16);
+    else {
+      const q = (p - 0.68) / 0.32;
+      r = PR + Math.abs(Math.sin(q * Math.PI * 3)) * Math.pow(1 - q, 2) * 0.07;
+    }
+    return { p, w, ball: w + phi, r };
+  }
+
+  function startSpin() {
+    if (overlayOpen || phase !== 'bet' || !ROU.total(st.bets)) return;
+    finishFlights();
+    const n = ROU.randomNumber();
+    const r = ROU.spin(st, n);
+    if (!r) return;
+    r.best = V.gameOver(st.cash) && st.cash > ROU.START;
+    V.score(st.cash);
+    save();
+    undoStack = [];
+    round = r;
+    disp = { bets: Object.assign({}, r.bets), pay: {} };
+    phase = 'spin';
+    hoverKey = null;
+    histHold = true;
+    renderHist(false);
+    showRead(null);
+    setWin(0);
+    bestTag.hidden = true;
+
+    const idx = ROU.ORDER.indexOf(n);
+    const T = reduceMotion ? 0 : 4800 + Math.random() * 700;
+    const w0 = wheelSt.angle;
+    const wd = T ? 2.4 * (T / 1000) / 3 : 0;
+    const b0 = Math.random() * TAU;
+    const phi0 = b0 - w0;
+    const target = idx * STEP;
+    const d = (((target - phi0) % TAU) + TAU) % TAU;
+    spinA = { t0: now(), T, w0, wd, phi0, dphi: d - TAU * 6, idx, n };
+    wheelSt.ballRel = null;
+    if (G.mode === 'C') fadeWheel(1, 220);
+    renderAll();
+    kick();
+  }
+
+  function endSpin() {
+    const S = spinA;
+    spinA = null;
+    wheelSt.angle = ((S.w0 + S.wd) % TAU + TAU) % TAU;
+    wheelSt.ballRel = S.idx * STEP;
+    phase = 'settle';
+    const t = now();
+    mark = S.n; markAt = t;
+    hubNum = S.n; hubAt = t;
+    histHold = false;
+    renderHist(true);
+    renderControls();
+    if (G.mode === 'C') {
+      at(D(950), () => fadeWheel(0, 260));
+      at(D(1150), settleLosses);
+    } else at(D(650), settleLosses);
+  }
+
+  function skip() {
+    if (phase === 'spin' && spinA) {
+      spinA.t0 = now() - spinA.T - 1;
+      frame(true);
+    } else if (phase === 'settle') {
+      for (let i = 0; i < 200 && phase === 'settle' && (queue.length || flights.length); i++) {
+        if (flights.length) { finishFlights(); continue; }
+        queue.shift().fn();
+      }
+      wheelFade = { from: 0, to: 0, t0: 0, dur: 1 };
+      redraw();
+    }
+  }
+
+  function settleLosses() {
+    const R = round;
+    if (!R) return;
+    const lose = R.lose.slice().sort((a, b) => spotS(a.key)[0] - spotS(b.key)[0]);
+    const dealer = toClient([G.dealer.x, G.dealer.y]);
+    lose.forEach((l, i) => {
+      const from = toClient(spotS(l.key));
+      delete disp.bets[l.key];
+      fly(from, dealer, l.amt, { delay: i * 22, dur: 420, fade: true, shrink: 0.7 });
+    });
+    redraw();
+    at(lose.length ? D(260 + lose.length * 22) : 0, settleWins);
+  }
+
+  function settleWins() {
+    const R = round;
+    if (!R) return;
+    if (!R.wins.length) { at(D(200), finishRound); return; }
+    const dealer = toClient([G.dealer.x, G.dealer.y]);
+    R.wins.forEach((wn, i) => {
+      const p = spotS(wn.key);
+      const to = toClient([p[0] + G.chip * 0.5, p[1] - G.chip * 0.5]);
+      fly(dealer, to, wn.pay, {
+        delay: i * 60, dur: 460,
+        onLand: () => { if (disp) { disp.pay[wn.key] = wn.pay; bump[wn.key] = now(); redraw(); } },
+      });
+    });
+    at(D(460 + R.wins.length * 60 + 650), collect);
+  }
+
+  function collect() {
+    const R = round;
+    if (!R) return;
+    const bank = centerOf($('cashNum'));
+    let left = R.wins.length;
+    R.wins.forEach((wn, i) => {
+      const p = spotS(wn.key);
+      const from = toClient(p);
+      if (disp) { delete disp.bets[wn.key]; delete disp.pay[wn.key]; }
+      fly(from, bank, wn.amt + wn.pay, {
+        delay: i * 40, dur: 480, shrink: 0.8,
+        onLand: () => {
+          if (--left === 0) { setCash(st.cash); setWin(R.ret); }
+        },
+      });
+    });
+    redraw();
+    at(D(480 + R.wins.length * 40 + 60), finishRound);
+  }
+
+  function finishRound() {
+    const R = round;
+    if (!R) return;
+    round = null;
+    disp = null;
+    phase = 'bet';
+    setCash(st.cash);
+    setWin(R.ret);
+    if (R.best) {
+      bestTag.hidden = false;
+      bestTag.classList.remove('pop'); bestTag.offsetWidth; bestTag.classList.add('pop');
+      at(D(1800), () => { bestTag.hidden = true; });
+    }
+    renderAll();
+    if (ROU.isBroke(st)) at(D(600), () => { if (ROU.isBroke(st) && phase === 'bet' && !overlayOpen) showOver(); });
+  }
+
+  /* ---------- betting ---------- */
+  function finishFlights() {
+    while (flights.length) land(flights[0]);
+  }
+
+  function animateDeltas(deltas, source) {
+    const bank = centerOf($('cashNum'));
+    const src = source ? centerOf(source) : bank;
+    deltas.forEach(([k, d], i) => {
+      const spot = toClient(spotS(k));
+      if (d > 0) {
+        inflight[k] = (inflight[k] || 0) + d;
+        fly(src, spot, d, {
+          delay: i * 18, dur: 240,
+          onLand: () => { inflight[k] -= d; if (inflight[k] <= 0) delete inflight[k]; bump[k] = now(); redraw(); },
+        });
+      } else {
+        fly(spot, bank, -d, { delay: i * 18, dur: 320, fade: true, shrink: 0.8 });
+      }
+    });
+  }
+
+  function doDeltas(deltas, source, record) {
+    if (overlayOpen || phase !== 'bet') return false;
+    if (!ROU.apply(st, deltas)) return false;
+    if (record !== false) undoStack.push(deltas);
+    save();
+    animateDeltas(deltas, source);
+    renderAll();
+    return true;
+  }
+
+  function placeAt(key) {
+    const v = ROU.CHIPS[st.sel];
+    if (v > st.cash) return;
+    if (doDeltas([[key, v]], chipBtns[st.sel])) showRead(key);
+  }
+  function undo() {
+    if (phase !== 'bet' || !undoStack.length) return;
+    const last = undoStack[undoStack.length - 1];
+    const neg = last.map(([k, d]) => [k, -d]);
+    finishFlights();
+    if (doDeltas(neg, btn.undo, false)) undoStack.pop();
+  }
+  function clearBets() {
+    if (phase !== 'bet' || !ROU.total(st.bets)) return;
+    finishFlights();
+    doDeltas(ROU.entries(st.bets, -1), null);
+  }
+  function rebet() {
+    if (phase !== 'bet' || !ROU.canRebet(st)) return;
+    doDeltas(ROU.entries(st.last, 1), btn.rebet);
+  }
+  function double() {
+    if (phase !== 'bet' || !ROU.canDouble(st)) return;
+    finishFlights();
+    doDeltas(ROU.entries(st.bets, 1), btn.double);
+  }
+  function removeAt(key) {
+    if (phase !== 'bet' || !key || !st.bets[key]) return;
+    finishFlights();
+    doDeltas([[key, -st.bets[key]]], null);
+    showRead(key);
+  }
+
+  /* ---------- HUD ---------- */
+  let cashShown = null, cashTween = 0, cashSnap = 0;
+  function setCash(v) {
+    const el = $('cashNum');
+    if (cashShown === v) return;
+    cancelAnimationFrame(cashTween); clearTimeout(cashSnap);
+    const from = cashShown;
+    cashShown = v;
+    if (from === null || reduceMotion || v <= from) { el.textContent = fmt(v); el.classList.remove('gain'); return; }
+    el.classList.add('gain');
+    const t0 = performance.now(), dur = 500;
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / dur);
+      el.textContent = fmt(from + (v - from) * easeOut(p));
+      if (p < 1) cashTween = requestAnimationFrame(step);
+      else el.classList.remove('gain');
+    };
+    cashTween = requestAnimationFrame(step);
+    cashSnap = setTimeout(() => { cancelAnimationFrame(cashTween); el.textContent = fmt(v); el.classList.remove('gain'); }, dur + 150);
+  }
+  function setWin(v) {
+    const el = $('winNum');
+    el.textContent = fmt(v);
+    el.classList.toggle('hot', v > 0);
+  }
+  function renderHud() {
+    if (phase === 'bet') setCash(st.cash);
+    else if (cashShown === null && round) setCash(st.cash - round.ret);
+    const bet = phase === 'bet' ? ROU.total(st.bets) : (round ? round.staked : 0);
+    $('betNum').textContent = fmt(bet);
+  }
+
+  function readParts(key) {
+    const b = key && ROU.BETS[key];
+    if (!b) return null;
+    const amt = st.bets[key] || 0;
+    return { name: ROU.nameOf(key), odds: ROU.payout(key) + ':1', amt: amt ? fmt(amt) : '' };
+  }
+  let readKey = undefined;
+  function showRead(key) {
+    const r = readParts(key);
+    const k = r ? r.name + '|' + r.amt : '';
+    if (k === readKey) return;
+    readKey = k;
+    $('readName').textContent = r ? r.name : '';
+    $('readOdds').textContent = r ? r.odds : '';
+    $('readAmt').textContent = r ? r.amt : '';
+  }
+
+  let histKey = '';
+  function renderHist(pop) {
+    const list = histHold ? st.hist.slice(1) : st.hist;
+    const cell = histEl.clientHeight || 24;
+    const fit = Math.max(1, Math.floor((histEl.clientWidth + 3) / (cell + 3)));
+    const show = list.slice(0, fit);
+    const key = show.join(',') + '|' + fit;
+    if (key === histKey && !pop) return;
+    histKey = key;
+    histEl.innerHTML = show.map((n) => '<i class="' + ROU.colorOf(n) + '">' + n + '</i>').join('');
+    if (pop && !reduceMotion && histEl.firstChild) histEl.firstChild.classList.add('in');
+  }
+
+  function renderControls() {
+    const bet = phase === 'bet' && !overlayOpen;
+    // keep the selected chip affordable
+    if (bet && ROU.CHIPS[st.sel] > st.cash && st.cash >= ROU.CHIPS[0]) {
+      let i = st.sel;
+      while (i > 0 && ROU.CHIPS[i] > st.cash) i--;
+      st.sel = i;
+    }
+    chipBtns.forEach((b, i) => {
+      b.disabled = !bet || ROU.CHIPS[i] > st.cash;
+      b.classList.toggle('sel', i === st.sel);
+    });
+    const total = ROU.total(st.bets);
+    btn.undo.disabled = !bet || !undoStack.length;
+    btn.clear.disabled = !bet || !total;
+    btn.rebet.disabled = !bet || !ROU.canRebet(st);
+    btn.double.disabled = !bet || !ROU.canDouble(st);
+    const anim = phase !== 'bet';
+    btn.spin.textContent = anim ? 'Skip' : 'Spin';
+    btn.spin.disabled = overlayOpen || (!anim && !total);
+  }
+
+  function renderAll() {
+    renderHud();
+    renderControls();
+    redraw();
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    startCard.hidden = card !== startCard;
+    overCard.hidden = card !== overCard;
+    overlayOpen = true;
+    overlay.hidden = false;
+    overlay.offsetWidth;
+    overlay.classList.add('show');
+    renderControls();
+    setTimeout(() => { try { card.querySelector('.btn.primary').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    renderControls();
+  }
+  const bestNow = () => Math.max(V.best(), st.peak || 0, st.cash + ROU.total(st.bets));
+  function showStart() {
+    $('stCash').textContent = fmt(st.cash + ROU.total(st.bets));
+    $('stBest').textContent = fmt(bestNow());
+    openOverlay(startCard);
+  }
+  function showOver() {
+    $('ovCash').textContent = fmt(st.cash);
+    $('ovBest').textContent = fmt(bestNow());
+    openOverlay(overCard);
+  }
+
+  /* ---------- input ---------- */
+  chipBtns.forEach((b, i) => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    st.sel = i;
+    save();
+    renderControls();
+    redraw();
+  }));
+  btn.undo.addEventListener('click', undo);
+  btn.clear.addEventListener('click', clearBets);
+  btn.rebet.addEventListener('click', rebet);
+  btn.double.addEventListener('click', double);
+  btn.spin.addEventListener('click', () => { if (phase === 'bet') startSpin(); else skip(); });
+  $('playBtn').addEventListener('click', () => { hideOverlay(); redraw(); });
+  $('againBtn').addEventListener('click', () => {
+    ROU.fresh(st);
+    save();
+    hideOverlay();
+    cashShown = null;
+    setWin(0);
+    renderAll();
+  });
+
+  cv.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (overlayOpen) return;
+    if (phase !== 'bet') { skip(); return; }
+    if (e.button !== 0) return;
+    press = { id: e.pointerId, type: e.pointerType };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    setHover(hitAt(e));
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (phase !== 'bet' || overlayOpen) return;
+    if (press && press.id !== e.pointerId) return;
+    if (press || e.pointerType === 'mouse') setHover(hitAt(e));
+  });
+  cv.addEventListener('pointerup', (e) => {
+    if (!press || press.id !== e.pointerId) return;
+    const type = press.type;
+    press = null;
+    const k = hitAt(e);
+    if (k && phase === 'bet') placeAt(k);
+    if (type !== 'mouse') { hoverKey = null; redraw(); }
+    else setHover(k);
+  });
+  cv.addEventListener('pointercancel', () => { press = null; setHover(null); });
+  cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !press) { setHover(null); showRead(null); } });
+  cv.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (phase === 'bet' && !overlayOpen) removeAt(hitAt(e));
+  });
+
+  function setHover(k) {
+    if (k === hoverKey) return;
+    hoverKey = k;
+    if (k) showRead(k);
+    redraw();
+  }
+
+  document.addEventListener('pointerdown', () => { window.focus(); }, true);
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (overlayOpen) {
+      if ((k === 'Enter' || k === ' ') && !(e.target && e.target.tagName === 'BUTTON')) {
+        e.preventDefault();
+        (startCard.hidden ? $('againBtn') : $('playBtn')).click();
+      }
+      return;
+    }
+    if (k === ' ' || k === 'Enter') {
+      if (e.target && e.target.tagName === 'BUTTON' && e.target !== btn.spin) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (phase === 'bet') startSpin(); else skip();
+      return;
+    }
+    if (e.repeat || phase !== 'bet') return;
+    const ci = ['1', '2', '3', '4', '5'].indexOf(k);
+    if (ci >= 0) { e.preventDefault(); chipBtns[ci].click(); return; }
+    if (k === 'z' || k === 'Backspace') { e.preventDefault(); undo(); return; }
+    if (k === 'c' || k === 'Delete') { e.preventDefault(); clearBets(); return; }
+    if (k === 'r') { e.preventDefault(); rebet(); return; }
+    if (k === 'd') { e.preventDefault(); double(); return; }
+  });
+
+  V.onPause((p) => {
+    p = !!p;
+    if (p === paused) return;
+    if (p) { pausedAt = performance.now(); paused = true; }
+    else { pauseShift += performance.now() - pausedAt; paused = false; kick(); }
+  });
+
+  /* ---------- layout ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight, m = Math.min(vw, vh);
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.setProperty('--pad', Math.round(clamp(8, m * 0.022, 16)) + 'px');
+    app.style.setProperty('--gap', Math.round(clamp(6, m * 0.016, 12)) + 'px');
+    const side = vh < 480 && vw >= vh * 1.45 && vw >= 560;
+    app.classList.toggle('side', side);
+    app.classList.toggle('narrow', !side && vw < 680);
+    head.classList.remove('nobrand');
+    if (head.scrollWidth > head.clientWidth + 1 || vw < 560) head.classList.add('nobrand');
+
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    const W = stage.clientWidth, H = stage.clientHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    fx.width = Math.round(vw * dpr); fx.height = Math.round(vh * dpr);
+    G = computeGeom(W, H, fs);
+    stageRect = cv.getBoundingClientRect();
+    histKey = '';
+    renderHist(false);
+  }
+
+  let raf = 0;
+  function relayout() {
+    finishFlights();
+    layout();
+    drawStage(now());
+    drawFx(now());
+  }
+  const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(relayout); setTimeout(relayout, 120); };
+  window.addEventListener('resize', onResize);
+  if (window.ResizeObserver) {
+    let seen = '';
+    new ResizeObserver(() => {
+      const k = window.innerWidth + 'x' + window.innerHeight + 'x' + stage.clientWidth + 'x' + stage.clientHeight;
+      if (k !== seen) { seen = k; onResize(); }
+    }).observe(document.documentElement);
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { readFonts(); relayout(); }).catch(() => {});
+
+  /* ---------- boot ---------- */
+  readFonts();
+  layout();
+  setWin(0);
+  renderAll();
+  drawStage(now());
+  app.classList.add('ready');
+  if (ROU.isBroke(st)) showOver(); else showStart();
+  V.ready();
+
+})();
+</script>
+</body>
+</html>

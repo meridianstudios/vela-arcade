@@ -2,6 +2,7 @@ import './style.css'
 import { GAMES, TAGS, bySlug, playable } from './games.js'
 import { UPDATES, CURRENT_VERSION } from './updates.js'
 import { startHeartbeat, countOnline, visitTotals } from './online.js'
+import * as Account from './account.js'
 
 const app = document.getElementById('app')
 const searchInput = document.getElementById('search')
@@ -372,6 +373,73 @@ document.addEventListener('click', (e) => {
   if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'))
 })
 window.addEventListener('popstate', route)
+
+/* ── account ─────────────────────────────────────────────────────
+   Optional. One quiet button in the bar; nothing else on the site asks. */
+
+const accountEl = document.getElementById('account')
+const personIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>'
+let signingIn = false
+
+function renderAccount({ user }) {
+  if (!user) {
+    accountEl.innerHTML = `
+      <button class="account-btn" id="sign-in" ${signingIn ? 'disabled' : ''} aria-label="Sign in">
+        ${personIcon}<span>Sign in</span>
+      </button>`
+    return
+  }
+  accountEl.innerHTML = `
+    <button class="account-btn signed" id="account-open" aria-haspopup="true" aria-expanded="false" aria-label="Account">
+      <span class="avatar">${esc((user.name.trim()[0] || 'P').toUpperCase())}</span>
+    </button>
+    <div class="account-menu" id="account-menu" hidden>
+      <span class="label">${esc(user.name)}</span>
+      <button class="account-item" id="sign-out">Sign out</button>
+    </div>`
+}
+
+// Bests may arrive from another device after the lobby has drawn.
+function refreshBests() {
+  document.querySelectorAll('.card[data-slug]').forEach((el) => {
+    const g = bySlug(el.dataset.slug)
+    const best = g && g.scores ? bestFor(g.slug) : 0
+    if (!best) return
+    let meta = el.querySelector('.card-meta')
+    if (!meta) { meta = document.createElement('div'); meta.className = 'card-meta'; el.querySelector('.card-body').append(meta) }
+    meta.innerHTML = `<span class="label">${esc(g.bestLabel || 'Best')} <span class="best">${fmt(best)}</span></span>`
+  })
+}
+
+Account.onChange((state) => {
+  renderAccount(state)
+  if (state.bestsChanged) refreshBests()
+})
+
+accountEl.addEventListener('click', async (e) => {
+  const menu = document.getElementById('account-menu')
+  if (e.target.closest('#sign-in')) {
+    signingIn = true
+    e.target.closest('#sign-in').disabled = true
+    try { await Account.signIn() } catch (err) {
+      // Closing the popup is not an error worth showing.
+      if (!/popup-closed|cancelled-popup/.test(String(err && err.code))) console.warn('sign in failed', err)
+    }
+    signingIn = false
+    const btn = document.getElementById('sign-in')
+    if (btn) btn.disabled = false
+  } else if (e.target.closest('#account-open')) {
+    menu.hidden = !menu.hidden
+    e.target.closest('#account-open').setAttribute('aria-expanded', String(!menu.hidden))
+  } else if (e.target.closest('#sign-out')) {
+    menu.hidden = true
+    await Account.signOut()
+  }
+})
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('account-menu')
+  if (menu && !menu.hidden && !e.target.closest('#account')) menu.hidden = true
+})
 
 document.getElementById('version').textContent = 'Version ' + CURRENT_VERSION
 startHeartbeat()
