@@ -1,6 +1,7 @@
 import './style.css'
 import { GAMES, TAGS, bySlug, playable } from './games.js'
 import { UPDATES, CURRENT_VERSION } from './updates.js'
+import { RULES } from './rules.js'
 import { startHeartbeat, countOnline, visitTotals } from './online.js'
 import * as Account from './account.js'
 
@@ -222,6 +223,15 @@ function renderPlay(slug) {
           ${g.controls ? `<dt>Controls</dt><dd>${esc(g.controls)}</dd>` : ''}
           ${external && !g.via && g.tags.includes('Multiplayer') ? `<dt>Rooms</dt><dd>Room codes and invite links come from the game, so friends can join from their own devices.</dd>` : ''}
         </dl>
+        ${RULES[g.slug] ? `
+        <div class="rules">
+          <span class="label">Rules</span>
+          ${RULES[g.slug].map((sec) => `
+          <section>
+            <h3>${esc(sec.h)}</h3>
+            <ul>${sec.items.map((li) => `<li>${esc(li)}</li>`).join('')}</ul>
+          </section>`).join('')}
+        </div>` : ''}
       </div>
       <div>
         ${hasBoard(g) ? `

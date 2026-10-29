@@ -299,6 +299,13 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 .about-text { font-size: 15px; max-width: 640px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin-top: 22px; font-size: 14px; color: var(--text-2); }
 .facts dt { font-weight: 600; font-size: 11px; line-height: 21px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.rules { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); max-width: 640px; }
+.rules > .label { display: block; margin-bottom: 18px; }
+.rules section + section { margin-top: 18px; }
+.rules h3 { font-family: var(--font-display); font-weight: 600; font-size: 15px; margin-bottom: 8px; }
+.rules ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.rules li { position: relative; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.rules li::before { content: ""; position: absolute; left: 0; top: 0.78em; width: 8px; height: 2px; background: var(--vela); }
 .more { display: flex; flex-direction: column; gap: 2px; }
 .more a { display: flex; align-items: center; gap: 12px; padding: 6px; margin: 0 -6px; transition: background-color 0.15s var(--ease); }
 .more a:hover { background: var(--bg-2); }

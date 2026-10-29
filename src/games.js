@@ -683,18 +683,7 @@ export const CATALOGUE = [
     bestLabel: 'Best Hard streak',
     art: `<g fill="currentColor"><g opacity=".45"><rect x="6" y="6" width="52" height="3"/><rect x="6" y="55" width="52" height="3"/><rect x="6" y="6" width="3" height="52"/><rect x="55" y="6" width="3" height="52"/><rect x="16" y="16" width="32" height="3"/><rect x="16" y="45" width="32" height="3"/><rect x="16" y="16" width="3" height="32"/><rect x="45" y="16" width="3" height="32"/><rect x="26" y="26" width="12" height="3"/><rect x="26" y="35" width="12" height="3"/><rect x="26" y="26" width="3" height="12"/><rect x="35" y="26" width="3" height="12"/><rect x="6" y="30.5" width="20" height="3"/><rect x="38" y="30.5" width="20" height="3"/><rect x="30.5" y="6" width="3" height="20"/><rect x="30.5" y="38" width="3" height="20"/></g><circle cx="7.5" cy="7.5" r="6.5"/><circle cx="32" cy="7.5" r="6.5"/><circle cx="56.5" cy="7.5" r="6.5"/><circle cx="17.5" cy="46.5" r="6"/><circle cx="17.5" cy="46.5" r="2.6" style="fill:var(--tile)"/><circle cx="46.5" cy="32" r="6"/><circle cx="46.5" cy="32" r="2.6" style="fill:var(--tile)"/></g>`,
   },
-  {
-    slug: 'snakes-and-ladders',
-    title: 'Snakes and Ladders',
-    description:
-      'The classic race to 100 on a 10 by 10 board for 2 to 4 players, any mix of people on one device and computer players. A 6 rolls again, and it takes the exact roll to land on 100. Play the Classic, Quick or Long board.',
-    kind: 'inhouse',
-    src: '/games/snakes-and-ladders/index.html',
-    tags: ['Solo', 'Multiplayer'],
-    players: '1 to 4 players',
-    controls: 'Tap Roll or the die, or press Space. Esc opens the menu.',
-    art: `<g fill="currentColor" opacity=".45"><rect x="12" y="10" width="4" height="44"/><rect x="28" y="10" width="4" height="44"/><rect x="16" y="15" width="12" height="3"/><rect x="16" y="24" width="12" height="3"/><rect x="16" y="33" width="12" height="3"/><rect x="16" y="42" width="12" height="3"/></g><path d="M46 16 C56 24 36 29 44 39 C50 47 46 53 36 54" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><ellipse cx="46" cy="14" rx="7" ry="6" fill="currentColor"/><rect x="42.5" y="11.5" width="2.5" height="2.5" style="fill:var(--tile)"/><rect x="47.5" y="11.5" width="2.5" height="2.5" style="fill:var(--tile)"/>`,
-  },
+
   {
     slug: 'spades',
     title: 'Spades',

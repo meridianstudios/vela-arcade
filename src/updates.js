@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.3.2',
+    date: '2026-10-29',
+    games: [],
+    changes: [
+      'Rules on the game page for Onitama, Dominoes, Chinese Checkers, Nine Men\'s Morris, Spades, Hearts, Yatzy, the casino games and more.',
+      'Snakes and Ladders is gone.',
+    ],
+  },
+  {
     version: '1.3.1',
     date: '2026-10-29',
     games: [],
@@ -16,7 +25,7 @@ export const UPDATES = [
   {
     version: '1.3',
     date: '2026-10-29',
-    games: ['spades', 'dominoes', 'nine-mens-morris', 'chinese-checkers', 'snakes-and-ladders'],
+    games: ['spades', 'dominoes', 'nine-mens-morris', 'chinese-checkers'],
     changes: [
       'Accounts: a username and a password, no email. Google sign-in is gone.',
       'Global leaderboards on every game with a score.',
