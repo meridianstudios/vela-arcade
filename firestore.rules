@@ -74,6 +74,31 @@ service cloud.firestore {
         && request.resource.data.bests.size() <= 500;
     }
 
+    // Global leaderboards, one entry per account per game, src/account.js.
+    // Anyone can read the top of a board (capped so a query can't run up the
+    // bill). Only a username account writes, only its own entry, only under
+    // its own name, and a score can only go up.
+    match /boards/{slug}/scores/{uid} {
+      function account() {
+        return signedIn() && request.auth.uid == uid
+          && request.auth.token.firebase.sign_in_provider == 'password'
+          && request.auth.token.email.matches('^[a-z0-9_]{3,16}@players[.]invalid$');
+      }
+      function validEntry() {
+        let d = request.resource.data;
+        return slug.matches('^[a-z0-9-]{1,40}$')
+          && d.keys().hasOnly(['name', 'score', 'at'])
+          && d.name is string
+          && d.name.lower() + '@players.invalid' == request.auth.token.email
+          && d.score is number && d.score > 0 && d.score < 1000000000000
+          && d.at == request.time;
+      }
+      allow get: if true;
+      allow list: if request.query.limit <= 25;
+      allow create: if account() && validEntry();
+      allow update: if account() && validEntry() && request.resource.data.score > resource.data.score;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

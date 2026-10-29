@@ -1,0 +1,2179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Nine Men's Morris</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.35);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ink: #0b0c0f;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --S: 360px;
+    --pd: 34px;
+    --side: 280px;
+    --g: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+  }
+  button, input { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- layout ---------- */
+  .game { display: grid; visibility: hidden; }
+  .game.ready { visibility: visible; }
+  .game.col { grid-template-columns: var(--S); row-gap: var(--g); }
+  .game.row { grid-template-columns: var(--S) var(--side); column-gap: calc(var(--g) * 2.5); align-items: stretch; }
+  .bcol { display: grid; grid-template-columns: var(--S); row-gap: var(--g); }
+
+  /* ---------- player bars ---------- */
+  .pbar {
+    display: flex; align-items: center; gap: 0.6em;
+    height: 2.4em; min-width: 0;
+    color: var(--muted);
+    transition: color 180ms var(--ease);
+  }
+  .pbar.on { color: var(--text); }
+  .chip { width: 0.8em; height: 0.8em; flex: none; border: 1px solid var(--ink); box-shadow: 0 0 0 1px var(--line); border-radius: 50%; }
+  .chip.c1 { background: #fff; }
+  .chip.c0 { background: var(--brand); }
+  .pbar.on .chip { box-shadow: 0 0 0 1px var(--text); }
+  .pname { font-weight: 600; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+  .pname small { font-weight: 400; color: var(--muted); margin-left: 0.5em; font-size: 0.9em; }
+  .hand { display: flex; align-items: center; flex: 1 1 auto; min-width: 0; overflow: hidden; height: 100%; }
+  .hand svg { width: 1.05em; height: 1.05em; flex: none; margin-right: -0.42em; transition: opacity 200ms var(--ease); }
+  .hand .n { font-size: 0.78em; font-weight: 600; color: var(--muted); margin-left: 0.7em; font-variant-numeric: tabular-nums; }
+  .tag { flex: none; font: 600 0.66em/1 var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-hover); }
+  .left-n {
+    flex: none; min-width: 2.6em; height: 100%;
+    display: grid; place-items: center; padding: 0 0.5em;
+    background: var(--surface); border: 1px solid var(--line);
+    font: 300 1.15em/1 var(--font-display); font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    transition: background 180ms var(--ease), color 180ms var(--ease), border-color 180ms var(--ease);
+  }
+  .pbar.on .left-n { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .left-n.hit { animation: hit 320ms var(--ease); }
+  @keyframes hit { 0% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+  /* ---------- board ---------- */
+  .board {
+    position: relative;
+    width: var(--S); height: var(--S);
+    background: #111317;
+    box-shadow: 0 0 0 1px var(--line);
+    touch-action: none;
+    outline: none;
+  }
+  .board.shake { animation: shake 240ms linear; }
+  @keyframes shake {
+    0% { transform: translate(0, 0); } 20% { transform: translate(-3px, 1px); } 40% { transform: translate(3px, -1px); }
+    60% { transform: translate(-2px, -1px); } 80% { transform: translate(2px, 1px); } 100% { transform: translate(0, 0); }
+  }
+  .board svg.layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .ln { fill: #3a3e46; }
+  .pt { fill: #5b6069; }
+  .co { fill: rgba(255, 255, 255, 0.26); font-weight: 600; }
+  .tg { fill: var(--brand); opacity: 0.85; transition: opacity 150ms var(--ease); }
+  .tg.soft { opacity: 0.5; }
+  .tg.hov { opacity: 1; }
+  .from { fill: var(--brand); opacity: 0.6; }
+  .box { fill: none; stroke-width: 2; }
+  .box.last { stroke: var(--brand); opacity: 0.45; }
+  .box.sel { stroke: var(--brand-hover); }
+  .box.rem { stroke: var(--brand-hover); animation: remp 700ms ease-in-out infinite alternate; }
+  @keyframes remp { from { opacity: 1; } to { opacity: 0.3; } }
+  .ghost { opacity: 0.32; }
+  .ghost.g0 { fill: var(--brand); }
+  .ghost.g1 { fill: #fff; }
+  .mill { fill: var(--brand); transition: opacity 260ms var(--ease); }
+  .mill.blink { animation: mblink 540ms steps(1, end) both; }
+  .mill.out { opacity: 0; }
+  @keyframes mblink { 0% { opacity: 1; } 20% { opacity: 0.15; } 40% { opacity: 1; } 60% { opacity: 0.15; } 80%, 100% { opacity: 1; } }
+
+  .pieces { position: absolute; inset: 0; pointer-events: none; }
+  .pc {
+    position: absolute; left: 0; top: 0;
+    width: var(--pd); height: var(--pd);
+    will-change: transform;
+    transition: opacity 220ms var(--ease);
+  }
+  .pc.anim { transition: transform var(--mv, 230ms) var(--ease), opacity 220ms var(--ease); }
+  .pc.mover { z-index: 3; }
+  .pc.drag { z-index: 5; }
+  .pc.drag svg, .pc.lift svg { transform: scale(1.1); }
+  .pc.gone { opacity: 0; }
+  .pc.gone svg { transform: scale(0.35); transition: transform 260ms var(--ease); }
+  .pc.pop svg { animation: pop 320ms var(--ease); }
+  .pc.drop svg { animation: drop 280ms var(--ease) both; }
+  @keyframes pop { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }
+  @keyframes drop { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .pc svg { display: block; width: 100%; height: 100%; overflow: visible; transition: transform 120ms var(--ease); }
+  .p0 { --f: #ea5426; --e: #b83f19; --r: #b83f19; }
+  .p1 { --f: #ffffff; --e: #8f939b; --r: #c2c5cb; }
+  svg .e { fill: var(--e); }
+  svg .f { fill: var(--f); }
+  svg .r { fill: none; stroke: var(--r); stroke-width: 3; }
+  .spark {
+    position: absolute; left: 0; top: 0; z-index: 4;
+    width: 6px; height: 6px;
+    transition: transform 420ms var(--ease), opacity 420ms linear;
+  }
+  .board.mine { cursor: pointer; }
+
+  /* ---------- side ---------- */
+  .side { display: flex; flex-direction: column; gap: var(--g); min-width: 0; min-height: 0; }
+  .game.row .side { height: 100%; }
+  .status {
+    min-height: 1.6em;
+    display: flex; align-items: center; gap: 0.6em;
+    font-size: 0.95em; font-weight: 600;
+  }
+  .status::before { content: ""; width: 0.55em; height: 0.55em; background: var(--brand); flex: none; }
+  .status.idle::before { background: var(--faint); }
+  .game.row .status { font-size: 1.15em; font-weight: 300; font-family: var(--font-display); min-height: 2.2em; }
+  .moves {
+    background: var(--surface); border: 1px solid var(--line);
+    font-size: 0.86em; font-variant-numeric: tabular-nums;
+    min-height: 0;
+  }
+  .game.row .moves { flex: 1 1 auto; overflow-y: auto; padding: 0.4em 0; display: grid; grid-template-columns: 3em 1fr 1fr; align-content: start; }
+  .game.col .moves { height: 2.5em; overflow-x: auto; overflow-y: hidden; white-space: nowrap; display: flex; align-items: center; padding: 0 0.6em; scrollbar-width: none; }
+  .game.col .moves::-webkit-scrollbar { display: none; }
+  .moves .n { color: var(--faint); padding: 0.28em 0 0.28em 0.9em; }
+  .moves .m { padding: 0.28em 0.5em; color: var(--muted); }
+  .moves .m.cur { color: var(--text); background: var(--surface-2); box-shadow: inset 2px 0 0 var(--brand); }
+  .game.col .moves .n { padding: 0 0.15em 0 0.5em; }
+  .game.col .moves .n:first-child { padding-left: 0; }
+  .game.col .moves .m { padding: 0.3em 0.35em; }
+  .moves .empty { color: var(--faint); padding: 0.3em 0.9em; grid-column: 1 / -1; }
+  .game.col .moves .empty { padding: 0; }
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4em; }
+  .game.row .actions { grid-template-columns: 1fr 1fr; }
+  .game.row .actions .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 3.3em; padding: 0 1.1em; min-width: 0;
+    border-radius: 0; border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.74em var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn svg { width: 1.35em; height: 1.35em; flex: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn.armed, .btn.armed:hover { background: var(--surface); border-color: var(--brand); color: var(--brand-hover); }
+  .actions .btn { padding: 0 0.4em; letter-spacing: 0.1em; }
+  .narrow .actions .btn svg { display: none; }
+
+  /* ---------- result card ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0; transition: opacity 220ms var(--ease);
+  }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(86%, 20em);
+    padding: 1.3em 1.3em 1.2em;
+    background: var(--surface); border: 1px solid var(--line);
+    transform: translateY(24px); transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card h2 { margin: 0; font: 300 2em/1.1 var(--font-display); }
+  .card p { margin: 0.45em 0 0; color: var(--muted); font-size: 0.92em; }
+  .card .rows { margin-top: 0.9em; border-top: 1px solid var(--line); }
+  .card .rw { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.5em 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 0.88em; }
+  .card .rw b { color: var(--text); font: 300 1.5em/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .card .badge { margin-left: 0.7em; font: 600 0.78em var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-hover); }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 7em; }
+
+  /* ---------- menu ---------- */
+  .menu {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .panel { width: min(100%, 23em); margin: auto 0; display: flex; flex-direction: column; gap: 0.6em; }
+  .panel h1 {
+    margin: 0 0 0.1em;
+    font: 300 2.6em/1 var(--font-display);
+    display: flex; align-items: center; gap: 0.32em;
+  }
+  .panel h1::before { content: ""; width: 0.3em; height: 0.3em; background: var(--brand); flex: none; margin-top: 0.06em; }
+  .panel h2 { margin: 0 0 0.2em; font: 300 1.9em/1.1 var(--font-display); }
+  .panel .sub { margin: 0 0 0.9em; color: var(--muted); font-size: 0.92em; line-height: 1.45; }
+  .lab {
+    display: block; margin-top: 0.5em;
+    font: 600 0.7em/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tile {
+    display: flex; align-items: center; gap: 0.9em;
+    height: 3.6em; padding: 0 1.1em;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: var(--surface);
+    font: 600 1em var(--font); text-align: left;
+    cursor: pointer;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .tile::after { content: ""; margin-left: auto; width: 0.5em; height: 0.5em; border: solid var(--muted); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .tile:hover { background: var(--surface-2); border-color: var(--brand); }
+  .tile:active { transform: scale(0.985); }
+  .tile:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .tile.primary { background: var(--brand); border-color: var(--brand); }
+  .tile.primary::after { border-color: #fff; }
+  .tile.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .tile:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+  .tile small { font-weight: 400; color: var(--muted); }
+  .tile.primary small { color: rgba(255, 255, 255, 0.85); }
+  .note { margin: 0; color: var(--muted); font-size: 0.85em; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0; height: 2.7em; min-width: 0;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: transparent; cursor: pointer;
+    font-weight: 600; font-size: 0.9em;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .seg button + button { margin-left: -1px; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.06); }
+  .seg button.on { background: var(--brand); border-color: var(--brand); position: relative; z-index: 1; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; position: relative; z-index: 2; }
+  .field {
+    height: 2.9em; width: 100%; padding: 0 0.8em;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: var(--surface); outline: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  .field:focus { border-color: var(--brand); }
+  .field.link { color: var(--muted); font-size: 0.85em; height: 2.6em; }
+  .field.code { text-transform: uppercase; letter-spacing: 0.3em; font-weight: 600; }
+  .rowb { display: flex; gap: 0.5em; }
+  .rowb > * { flex: 1 1 0; }
+  .rowb .btn { height: 3.6em; }
+  .block { border-top: 1px solid var(--line); padding-top: 0.6em; margin-top: 0.4em; display: flex; flex-direction: column; gap: 0.5em; }
+  .err { margin: 0; min-height: 1.2em; color: var(--brand-hover); font-size: 0.88em; }
+  .bigcode {
+    font: 300 3.2em/1 var(--font-display);
+    letter-spacing: 0.14em;
+    padding: 0.35em 0 0.3em;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    user-select: text; -webkit-user-select: text;
+  }
+  .wait { display: flex; align-items: center; gap: 0.6em; color: var(--muted); font-size: 0.92em; }
+  .wait i { width: 0.55em; height: 0.55em; background: var(--brand); animation: blink 1.2s steps(2, end) infinite; flex: none; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pc.anim, .pc { transition-duration: 1ms; }
+    .pc.pop svg, .pc.drop svg, .left-n.hit, .board.shake, .mill.blink { animation: none; }
+    .box.rem { animation: none; }
+    .overlay, .card { transition: none; }
+    .wait i { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="game col" id="game">
+  <div class="bcol">
+    <div class="pbar" id="barTop"></div>
+    <div class="board" id="board" tabindex="-1" aria-label="Nine Men's Morris board">
+      <svg class="layer" id="lines" aria-hidden="true"></svg>
+      <svg class="layer" id="marks" aria-hidden="true"><g id="gMill"></g><g id="gFx"></g><g id="gMarks"></g></svg>
+      <div class="pieces" id="pieces"></div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="card" role="dialog" aria-live="polite">
+          <h2 id="ovTitle"></h2>
+          <p id="ovText"></p>
+          <div class="rows" id="ovRows" hidden></div>
+          <div class="btns" id="ovButtons"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pbar" id="barBot"></div>
+  </div>
+  <aside class="side" id="side">
+    <div class="status" id="status"></div>
+    <div class="moves" id="moves"></div>
+    <div class="actions" id="actions"></div>
+  </aside>
+</div>
+
+<div class="menu" id="menu">
+  <div class="panel" data-view="home">
+    <h1>Nine Men's Morris</h1>
+    <p class="sub">Tap a point to place a piece. Drag or tap a piece to move it.</p>
+    <button class="tile primary" id="contBtn" type="button" hidden>Continue <small id="contInfo"></small></button>
+    <button class="tile" type="button" data-go="cpu">Vs computer</button>
+    <button class="tile" type="button" data-go="pass">Pass and play</button>
+    <button class="tile" type="button" data-go="online" id="onlineTile">Online</button>
+    <p class="note" id="onlineNote" hidden>Online play is not set up yet.</p>
+  </div>
+
+  <div class="panel" data-view="cpu" hidden>
+    <h2>Vs computer</h2>
+    <span class="lab">Level</span>
+    <div class="seg" id="segLevel">
+      <button type="button" data-v="1">Easy</button><button type="button" data-v="2">Normal</button><button type="button" data-v="3">Hard</button>
+    </div>
+    <span class="lab">Play as</span>
+    <div class="seg" id="segCpuColor">
+      <button type="button" data-v="0">Orange</button><button type="button" data-v="1">White</button><button type="button" data-v="r">Random</button>
+    </div>
+    <div class="rowb" style="margin-top:0.9em">
+      <button class="btn" type="button" data-go="home">Back</button>
+      <button class="btn primary" type="button" id="cpuStart">Start</button>
+    </div>
+  </div>
+
+  <div class="panel" data-view="online" hidden>
+    <h2>Online</h2>
+    <span class="lab">Your name</span>
+    <input class="field" id="nameIn" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Player">
+    <div class="block">
+      <span class="lab">New room</span>
+      <div class="seg" id="segOnColor">
+        <button type="button" data-v="0">Orange</button><button type="button" data-v="1">White</button><button type="button" data-v="r">Random</button>
+      </div>
+      <button class="btn primary" type="button" id="createBtn">Create room</button>
+    </div>
+    <div class="block">
+      <span class="lab">Join a room</span>
+      <div class="rowb">
+        <input class="field code" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="Code">
+        <button class="btn" type="button" id="joinBtn" style="height:auto">Join</button>
+      </div>
+    </div>
+    <p class="err" id="onErr"></p>
+    <button class="btn" type="button" data-go="home">Back</button>
+  </div>
+
+  <div class="panel" data-view="lobby" hidden>
+    <span class="lab">Room code</span>
+    <div class="bigcode" id="lobbyCode"></div>
+    <input class="field link" id="lobbyLink" readonly aria-label="Invite link">
+    <div class="wait"><i></i><span id="lobbyWait">Waiting for an opponent</span></div>
+    <p class="note" id="lobbyInfo"></p>
+    <div class="rowb" style="margin-top:0.6em">
+      <button class="btn" type="button" id="lobbyLeave">Leave</button>
+      <button class="btn primary" type="button" id="copyBtn">Copy link</button>
+    </div>
+  </div>
+
+  <div class="panel" data-view="joining" hidden>
+    <h2>Online</h2>
+    <div class="wait"><i></i><span id="joinWait">Joining room</span></div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="nine-mens-morris"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {} };
+
+  /* ===== CORE START (rules; also runs inside the engine worker) ===== */
+  function MorrisCore() {
+    'use strict';
+    // 24 points, row by row from the top-left, on a 7 x 7 grid.
+    //  0 ----- 1 ----- 2
+    //  | 3 --- 4 --- 5 |
+    //  | | 6 - 7 - 8 | |
+    //  9 10 11    12 13 14
+    //  | | 15 -16 -17| |
+    //  | 18 -- 19 -- 20|
+    // 21 ---- 22 ---- 23
+    const PX = [0, 3, 6, 1, 3, 5, 2, 3, 4, 0, 1, 2, 4, 5, 6, 2, 3, 4, 1, 3, 5, 0, 3, 6];
+    const PY = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6];
+    const MILLS = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11], [12, 13, 14], [15, 16, 17], [18, 19, 20], [21, 22, 23],
+      [0, 9, 21], [3, 10, 18], [6, 11, 15], [1, 4, 7], [16, 19, 22], [8, 12, 17], [5, 13, 20], [2, 14, 23],
+    ];
+    const LINES = new Int8Array(48);
+    MILLS.forEach((l, i) => { LINES[i * 3] = l[0]; LINES[i * 3 + 1] = l[1]; LINES[i * 3 + 2] = l[2]; });
+    const NAME = PX.map((x, i) => 'abcdefg'[x] + (7 - PY[i]));
+    // Every board line is a mill line, so neighbours are the next point along each line.
+    const ADJ = Array.from({ length: 24 }, () => []);
+    for (const [a, b, c] of MILLS) { ADJ[a].push(b); ADJ[b].push(a, c); ADJ[c].push(b); }
+    const AN = new Int8Array(24), AL = new Int8Array(96);
+    for (let p = 0; p < 24; p++) { AN[p] = ADJ[p].length; ADJ[p].forEach((q, k) => { AL[p * 4 + k] = q; }); }
+    // MO: for each point, the other two points of each of its two mills. PL: those mills' indices.
+    const MO = new Int8Array(96), PL = new Int8Array(48);
+    for (let p = 0; p < 24; p++) {
+      let k = 0;
+      MILLS.forEach((l, li) => {
+        if (!l.includes(p)) return;
+        const o = l.filter((x) => x !== p);
+        MO[p * 4 + k * 2] = o[0]; MO[p * 4 + k * 2 + 1] = o[1]; PL[p * 2 + k] = li;
+        k++;
+      });
+    }
+    const HAND = 9;
+    const DRAW_PLIES = 100;  // 50 moves each without a capture
+
+    let seed = 0x2f6b3a91;
+    function rnd() { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return seed | 0; }
+    const ZL = new Int32Array(3 * 24), ZH = new Int32Array(3 * 24);
+    for (let i = 0; i < ZL.length; i++) { ZL[i] = rnd(); ZH[i] = rnd(); }
+    const ZNL = new Int32Array(20), ZNH = new Int32Array(20);
+    for (let i = 0; i < 20; i++) { ZNL[i] = rnd(); ZNH[i] = rnd(); }
+    const ZSL = rnd(), ZSH = rnd();
+
+    // A move is one non-zero int: from (-1 when placing), to, and the opponent piece removed (-1 if none).
+    const mv = (f, t, r) => (f + 1) | (t << 5) | ((r + 1) << 10) | 32768;
+    const mF = (m) => (m & 31) - 1, mT = (m) => (m >> 5) & 31, mR = (m) => ((m >> 10) & 31) - 1;
+    function note(m) {
+      const f = mF(m), r = mR(m);
+      return (f >= 0 ? NAME[f] + '-' : '') + NAME[mT(m)] + (r >= 0 ? 'x' + NAME[r] : '');
+    }
+
+    function Pos() {
+      this.b = new Int8Array(24);       // 0 empty, 1 orange, 2 white
+      this.hand = new Int8Array(2);     // pieces still to place
+      this.cnt = new Int8Array(2);      // pieces on the board
+      this.turn = 0; this.half = 0; this.hl = 0; this.hh = 0;
+      this.st = []; this.kl = []; this.kh = [];
+      this._rl = new Int8Array(24);
+    }
+    const P = Pos.prototype;
+    P.reset = function () {
+      this.b.fill(0);
+      this.hand[0] = this.hand[1] = HAND;
+      this.cnt[0] = this.cnt[1] = 0;
+      this.turn = 0; this.half = 0; this.st = []; this.kl = []; this.kh = [];
+      this.rehash();
+      return this;
+    };
+    P.rehash = function () {
+      let hl = 0, hh = 0;
+      for (let p = 0; p < 24; p++) { const v = this.b[p]; if (v) { hl ^= ZL[v * 24 + p]; hh ^= ZH[v * 24 + p]; } }
+      hl ^= ZNL[this.hand[0]] ^ ZNL[10 + this.hand[1]];
+      hh ^= ZNH[this.hand[0]] ^ ZNH[10 + this.hand[1]];
+      if (this.turn) { hl ^= ZSL; hh ^= ZSH; }
+      this.hl = hl; this.hh = hh;
+    };
+    P.total = function (s) { return this.hand[s] + this.cnt[s]; };
+    P.flying = function (s) { return this.hand[s] === 0 && this.cnt[s] === 3; };
+    P.inMill = function (p) {
+      const b = this.b, v = b[p];
+      if (!v) return false;
+      return (b[MO[p * 4]] === v && b[MO[p * 4 + 1]] === v) || (b[MO[p * 4 + 2]] === v && b[MO[p * 4 + 3]] === v);
+    };
+    // Would a piece of value v arriving at t (and leaving f) complete a mill?
+    P.closes = function (f, t, v) {
+      const b = this.b;
+      for (let k = 0; k < 4; k += 2) {
+        const a = MO[t * 4 + k], c = MO[t * 4 + k + 1];
+        if (a !== f && c !== f && b[a] === v && b[c] === v) return true;
+      }
+      return false;
+    };
+    // Opponent pieces that may be taken: those not in a mill, or any of them if all are in mills.
+    P.removable = function (out) {
+      const b = this.b, ov = 2 - this.turn;
+      let n = 0;
+      for (let p = 0; p < 24; p++) if (b[p] === ov && !this.inMill(p)) out[n++] = p;
+      if (!n) for (let p = 0; p < 24; p++) if (b[p] === ov) out[n++] = p;
+      return n;
+    };
+    // Writes the legal moves into buf from index n; returns the new end. onlyMills: just the mill-closing ones.
+    P.genInto = function (buf, n, onlyMills) {
+      const b = this.b, us = this.turn, v = us + 1, rl = this._rl;
+      let rn = -1;
+      const add = (f, t) => {
+        if (this.closes(f, t, v)) {
+          if (rn < 0) rn = this.removable(rl);
+          if (!rn) buf[n++] = mv(f, t, -1);
+          else for (let i = 0; i < rn; i++) buf[n++] = mv(f, t, rl[i]);
+        } else if (!onlyMills) buf[n++] = mv(f, t, -1);
+      };
+      if (this.hand[us] > 0) {
+        for (let t = 0; t < 24; t++) if (!b[t]) add(-1, t);
+      } else if (this.cnt[us] === 3) {
+        for (let f = 0; f < 24; f++) {
+          if (b[f] !== v) continue;
+          for (let t = 0; t < 24; t++) if (!b[t]) add(f, t);
+        }
+      } else {
+        for (let f = 0; f < 24; f++) {
+          if (b[f] !== v) continue;
+          for (let k = 0, e = AN[f]; k < e; k++) { const t = AL[f * 4 + k]; if (!b[t]) add(f, t); }
+        }
+      }
+      return n;
+    };
+    const genBuf = new Int32Array(640);
+    P.gen = function () { const n = this.genInto(genBuf, 0, false); return Array.from(genBuf.subarray(0, n)); };
+    P.hasMove = function () {
+      const us = this.turn, v = us + 1, b = this.b;
+      if (this.hand[us] > 0 || this.cnt[us] === 3) return true;
+      for (let f = 0; f < 24; f++) {
+        if (b[f] !== v) continue;
+        for (let k = 0, e = AN[f]; k < e; k++) if (!b[AL[f * 4 + k]]) return true;
+      }
+      return false;
+    };
+
+    P.make = function (m) {
+      const b = this.b, us = this.turn, v = us + 1, f = mF(m), t = mT(m), r = mR(m);
+      this.kl.push(this.hl); this.kh.push(this.hh);
+      this.st.push(m, this.half);
+      let hl = this.hl, hh = this.hh;
+      if (f < 0) {
+        const o = us * 10 + this.hand[us];
+        hl ^= ZNL[o] ^ ZNL[o - 1]; hh ^= ZNH[o] ^ ZNH[o - 1];
+        this.hand[us]--; this.cnt[us]++;
+      } else {
+        b[f] = 0; hl ^= ZL[v * 24 + f]; hh ^= ZH[v * 24 + f];
+      }
+      b[t] = v; hl ^= ZL[v * 24 + t]; hh ^= ZH[v * 24 + t];
+      if (r >= 0) {
+        const ov = 2 - us;
+        b[r] = 0; this.cnt[us ^ 1]--;
+        hl ^= ZL[ov * 24 + r]; hh ^= ZH[ov * 24 + r];
+      }
+      this.half = (f < 0 || r >= 0) ? 0 : this.half + 1;
+      this.turn = us ^ 1;
+      this.hl = hl ^ ZSL; this.hh = hh ^ ZSH;
+    };
+    P.unmake = function () {
+      const b = this.b, st = this.st;
+      this.half = st.pop();
+      const m = st.pop();
+      const us = this.turn ^ 1, v = us + 1, f = mF(m), t = mT(m), r = mR(m);
+      this.turn = us;
+      if (r >= 0) { b[r] = 2 - us; this.cnt[us ^ 1]++; }
+      b[t] = 0;
+      if (f < 0) { this.hand[us]++; this.cnt[us]--; } else b[f] = v;
+      this.hl = this.kl.pop(); this.hh = this.kh.pop();
+    };
+    // Earlier occurrences of this position (same side to move) since the last placement or capture.
+    P.reps = function () {
+      let n = 0;
+      const len = this.kl.length;
+      for (let i = len - 2; i >= 0 && i >= len - this.half; i -= 2) if (this.kl[i] === this.hl && this.kh[i] === this.hh) n++;
+      return n;
+    };
+    P.status = function (legal) {
+      const us = this.turn;
+      if (this.total(us) < 3) return { over: true, winner: us ^ 1, reason: 'taken' };
+      legal = legal || this.gen();
+      if (!legal.length) return { over: true, winner: us ^ 1, reason: 'blocked' };
+      if (this.half >= DRAW_PLIES) return { over: true, winner: null, reason: 'fifty' };
+      if (this.reps() >= 2) return { over: true, winner: null, reason: 'repetition' };
+      return { over: false, winner: null, reason: '' };
+    };
+    // For tests: cells is 24 chars ('.', 'o', 'w'), hands [orange, white].
+    P.load = function (cells, turn, hands) {
+      let c0 = 0, c1 = 0;
+      for (let p = 0; p < 24; p++) {
+        const v = cells[p] === 'o' ? 1 : cells[p] === 'w' ? 2 : 0;
+        this.b[p] = v; if (v === 1) c0++; if (v === 2) c1++;
+      }
+      this.cnt[0] = c0; this.cnt[1] = c1;
+      this.hand[0] = hands ? hands[0] : 0; this.hand[1] = hands ? hands[1] : 0;
+      this.turn = turn ? 1 : 0; this.half = 0; this.st = []; this.kl = []; this.kh = [];
+      this.rehash();
+      return this;
+    };
+
+    function Game() { this.pos = new Pos().reset(); this.moves = []; this.notes = []; }
+    Game.prototype.legal = function () { return this.pos.gen(); };
+    Game.prototype.find = function (n, legal) {
+      legal = legal || this.pos.gen();
+      for (let i = 0; i < legal.length; i++) if (note(legal[i]) === n) return legal[i];
+      return null;
+    };
+    Game.prototype.play = function (m) { this.notes.push(note(m)); this.moves.push(m); this.pos.make(m); };
+    Game.prototype.status = function () { return this.pos.status(); };
+    Game.fromNotes = function (list) {
+      const g = new Game();
+      for (const n of list || []) {
+        if (g.pos.status().over) return null;
+        const m = g.find(n);
+        if (!m) return null;
+        g.play(m);
+      }
+      return g;
+    };
+
+    return {
+      PX, PY, MILLS, LINES, NAME, ADJ, AN, AL, MO, PL, HAND, DRAW_PLIES,
+      mv, mF, mT, mR, note, Pos, Game,
+    };
+  }
+  /* ===== CORE END ===== */
+
+  /* ===== ENGINE START ===== */
+  function MorrisEngine(C) {
+    'use strict';
+    const { Pos, note, mF, mT, mR, MO, PL, AN, AL, LINES, DRAW_PLIES } = C;
+    const WIN = 100000, MATED = WIN - 1000;
+    const TT_SIZE = 1 << 20, TT_MASK = TT_SIZE - 1;
+    const ttL = new Int32Array(TT_SIZE), ttH = new Int32Array(TT_SIZE), ttS = new Int32Array(TT_SIZE), ttM = new Int32Array(TT_SIZE);
+    const ttD = new Int8Array(TT_SIZE), ttF = new Int8Array(TT_SIZE);
+    const EXACT = 1, LOWER = 2, UPPER = 3;
+    const MAXPLY = 100, STRIDE = 640, QMAX = 4;
+    const buf = new Int32Array((MAXPLY + 2) * STRIDE), sc = new Int32Array((MAXPLY + 2) * STRIDE);
+    const hist = new Int32Array(25 * 24);
+    const killer = new Int32Array((MAXPLY + 2) * 2);
+    const STOP = { stop: true };
+    const LEVELS = {
+      1: { depth: 2, noise: 90, random: 0.2, time: 500 },
+      2: { depth: 4, noise: 14, random: 0, time: 900 },
+      3: { depth: 60, noise: 0, random: 0, time: 2000 },
+    };
+    const lineC = new Int8Array(32);   // per line: [own count of side 1, side 2] packed below
+    const mob = new Int16Array(2), blk = new Int16Array(2);
+
+    // Can side s bring a piece to empty point e (not one already on line li) next move?
+    function reach(pos, s, e, li) {
+      if (pos.hand[s] > 0 || pos.cnt[s] === 3) return true;
+      const b = pos.b, v = s + 1, a = LINES[li * 3], c = LINES[li * 3 + 1], d = LINES[li * 3 + 2];
+      for (let k = 0, n = AN[e]; k < n; k++) {
+        const q = AL[e * 4 + k];
+        if (b[q] === v && q !== a && q !== c && q !== d) return true;
+      }
+      return false;
+    }
+
+    function evaluate(pos) {
+      const b = pos.b, hand = pos.hand, cnt = pos.cnt, turn = pos.turn;
+      const placing = hand[0] + hand[1] > 0;
+      let closed0 = 0, closed1 = 0, two0 = 0, two1 = 0, live0 = 0, live1 = 0, open0 = 0, open1 = 0;
+      for (let li = 0; li < 16; li++) {
+        const a = LINES[li * 3], c = LINES[li * 3 + 1], d = LINES[li * 3 + 2];
+        const x = b[a], y = b[c], z = b[d];
+        const n1 = (x === 1) + (y === 1) + (z === 1), n2 = (x === 2) + (y === 2) + (z === 2);
+        if (n1 === 3) closed0++;
+        else if (n2 === 3) closed1++;
+        else if (n1 === 2 && n2 === 0) { two0++; if (reach(pos, 0, x === 0 ? a : y === 0 ? c : d, li)) live0++; }
+        else if (n2 === 2 && n1 === 0) { two1++; if (reach(pos, 1, x === 0 ? a : y === 0 ? c : d, li)) live1++; }
+      }
+      mob[0] = mob[1] = 0; blk[0] = blk[1] = 0;
+      for (let p = 0; p < 24; p++) {
+        const v = b[p];
+        if (!v) continue;
+        let e = 0;
+        for (let k = 0, n = AN[p]; k < n; k++) if (!b[AL[p * 4 + k]]) e++;
+        mob[v - 1] += e;
+        if (!e) blk[v - 1]++;
+        // A closed mill that can open (a piece steps out) and close again.
+        if (e && !placing && pos.inMill(p)) { if (v === 1) open0++; else open1++; }
+      }
+      let score = 0;
+      for (let s = 0; s < 2; s++) {
+        const closed = s ? closed1 : closed0, two = s ? two1 : two0, live = s ? live1 : live0, open = s ? open1 : open0;
+        let e = (hand[s] + cnt[s]) * 100;
+        if (placing) {
+          e += closed * 14 + two * 9 + live * 3 + mob[s] * 2 - blk[s] * 6;
+          if (s !== turn && live >= 2) e += 30;
+        } else if (cnt[s] === 3) {
+          e += closed * 6 + live * 26;
+          if (s !== turn && live >= 2) e += 70;
+        } else {
+          e += closed * 14 + two * 4 + live * 26 + open * 8 + mob[s] * 5 - blk[s] * 3;
+          if (!mob[s]) e -= 260;
+          if (s !== turn && live >= 2) e += 40;
+        }
+        score += s ? -e : e;
+      }
+      score += turn === 0 ? 6 : -6;
+      return turn === 0 ? score : -score;
+    }
+
+    // How much taking the piece on r hurts its owner.
+    function removalValue(pos, r) {
+      const b = pos.b, v = b[r];
+      let s = 0;
+      for (let k = 0; k < 2; k++) {
+        const li = PL[r * 2 + k];
+        let own = 0, emp = 0;
+        for (let j = 0; j < 3; j++) { const q = b[LINES[li * 3 + j]]; if (q === v) own++; else if (!q) emp++; }
+        if (own === 2 && emp === 1) s += 6;
+      }
+      for (let k = 0, n = AN[r]; k < n; k++) if (!b[AL[r * 4 + k]]) s++;
+      return s;
+    }
+    // Does the move block an opponent line of two?
+    function blocks(pos, t) {
+      const b = pos.b, ov = 2 - pos.turn;
+      return (b[MO[t * 4]] === ov && b[MO[t * 4 + 1]] === ov) || (b[MO[t * 4 + 2]] === ov && b[MO[t * 4 + 3]] === ov);
+    }
+
+    let nodes = 0, deadline = 0;
+
+    function scoreMoves(pos, off, n, ttMove, ply) {
+      const k0 = killer[ply * 2], k1 = killer[ply * 2 + 1];
+      for (let i = 0; i < n; i++) {
+        const m = buf[off + i], t = mT(m), r = mR(m);
+        let v = hist[(mF(m) + 1) * 24 + t];
+        if (m === ttMove) v += 1 << 30;
+        if (r >= 0) v += 4000000 + removalValue(pos, r) * 10000;
+        else if (pos.closes(mF(m), t, pos.turn + 1)) v += 4000000;
+        if (blocks(pos, t)) v += 1000000;
+        if (m === k0) v += 400000; else if (m === k1) v += 300000;
+        sc[off + i] = v;
+      }
+    }
+    function pick(off, n, k) {
+      let bi = k, bv = sc[off + k];
+      for (let i = k + 1; i < n; i++) if (sc[off + i] > bv) { bv = sc[off + i]; bi = i; }
+      if (bi !== k) {
+        const m = buf[off + k]; buf[off + k] = buf[off + bi]; buf[off + bi] = m;
+        const s = sc[off + k]; sc[off + k] = sc[off + bi]; sc[off + bi] = s;
+      }
+    }
+
+    function qsearch(pos, alpha, beta, ply, qd) {
+      if ((++nodes & 1023) === 0 && Date.now() > deadline) throw STOP;
+      const us = pos.turn;
+      if (pos.total(us) < 3 || !pos.hasMove()) return -WIN + ply;
+      let best = evaluate(pos);
+      if (best >= beta || qd >= QMAX || ply >= MAXPLY) return best;
+      if (best > alpha) alpha = best;
+      const off = ply * STRIDE;
+      const n = pos.genInto(buf, off, true) - off;
+      if (!n) return best;
+      scoreMoves(pos, off, n, 0, ply);
+      for (let k = 0; k < n; k++) {
+        pick(off, n, k);
+        pos.make(buf[off + k]);
+        const s = -qsearch(pos, -beta, -alpha, ply + 1, qd + 1);
+        pos.unmake();
+        if (s > best) { best = s; if (s > alpha) { alpha = s; if (s >= beta) break; } }
+      }
+      return best;
+    }
+
+    function search(pos, depth, alpha, beta, ply) {
+      if ((++nodes & 1023) === 0 && Date.now() > deadline) throw STOP;
+      const us = pos.turn;
+      if (pos.total(us) < 3) return -WIN + ply;
+      if (ply > 0) {
+        if (pos.half >= DRAW_PLIES) return 0;
+        if (pos.half >= 4 && pos.reps() >= 1) return 0;
+      }
+      if (depth <= 0) return qsearch(pos, alpha, beta, ply, 0);
+      if (ply >= MAXPLY) return evaluate(pos);
+
+      const ti = pos.hl & TT_MASK;
+      let ttMove = 0;
+      if (ttL[ti] === pos.hl && ttH[ti] === pos.hh) {
+        ttMove = ttM[ti];
+        if (ttD[ti] >= depth && ply > 0) {
+          let s = ttS[ti];
+          if (s > MATED) s -= ply; else if (s < -MATED) s += ply;
+          const f = ttF[ti];
+          if (f === EXACT) return s;
+          if (f === LOWER && s >= beta) return s;
+          if (f === UPPER && s <= alpha) return s;
+        }
+      }
+      const off = ply * STRIDE;
+      const n = pos.genInto(buf, off, false) - off;
+      if (!n) return -WIN + ply;
+      const ext = n === 1 && ply < 60 ? 1 : 0;
+      scoreMoves(pos, off, n, ttMove, ply);
+      const a0 = alpha;
+      let best = -WIN * 2, bestM = 0;
+      for (let k = 0; k < n; k++) {
+        pick(off, n, k);
+        const m = buf[off + k];
+        const quiet = sc[off + k] < 300000;
+        pos.make(m);
+        let s;
+        const d1 = depth - 1 + ext;
+        if (k === 0) s = -search(pos, d1, -beta, -alpha, ply + 1);
+        else {
+          // Late quiet moves get a shallower look first.
+          const red = (depth >= 3 && k >= 3 && quiet) ? 1 : 0;
+          s = -search(pos, d1 - red, -alpha - 1, -alpha, ply + 1);
+          if (red && s > alpha) s = -search(pos, d1, -alpha - 1, -alpha, ply + 1);
+          if (s > alpha && s < beta) s = -search(pos, d1, -beta, -alpha, ply + 1);
+        }
+        pos.unmake();
+        if (s > best) { best = s; bestM = m; }
+        if (s > alpha) alpha = s;
+        if (alpha >= beta) {
+          if (mR(m) < 0) {
+            hist[(mF(m) + 1) * 24 + mT(m)] += depth * depth + 1;
+            if (killer[ply * 2] !== m) { killer[ply * 2 + 1] = killer[ply * 2]; killer[ply * 2] = m; }
+          }
+          break;
+        }
+      }
+      let st = best;
+      if (st > MATED) st += ply; else if (st < -MATED) st -= ply;
+      ttL[ti] = pos.hl; ttH[ti] = pos.hh; ttS[ti] = st; ttD[ti] = Math.max(-1, Math.min(127, depth)); ttM[ti] = bestM;
+      ttF[ti] = best <= a0 ? UPPER : best >= beta ? LOWER : EXACT;
+      return best;
+    }
+
+    function think(req) {
+      const pos = new Pos().reset();
+      for (const nt of req.notes || []) {
+        let found = 0;
+        for (const m of pos.gen()) if (note(m) === nt) { found = m; break; }
+        if (!found) return { move: null };
+        pos.make(found);
+      }
+      const cfg = LEVELS[req.level] || LEVELS[2];
+      const moves = pos.gen();
+      if (!moves.length || pos.total(pos.turn) < 3) return { move: null };
+      if (moves.length === 1) return { move: note(moves[0]), depth: 0 };
+      nodes = 0;
+      const start = Date.now();
+      const budget = req.time || cfg.time;
+      deadline = start + budget;
+      hist.fill(0); killer.fill(0);
+
+      if (cfg.noise) {
+        // Lower levels: score every move to a fixed depth, then pick with noise.
+        if (Math.random() < cfg.random) return { move: note(moves[(Math.random() * moves.length) | 0]), depth: 0 };
+        const scores = moves.map(() => 0);
+        let reached = 0;
+        try {
+          for (let d = 1; d <= cfg.depth; d++) {
+            const cur = [];
+            for (const m of moves) { pos.make(m); cur.push(-search(pos, d - 1, -WIN * 2, WIN * 2, 1)); pos.unmake(); }
+            for (let i = 0; i < moves.length; i++) scores[i] = cur[i];
+            reached = d;
+          }
+        } catch (e) { if (e !== STOP) throw e; }
+        let bi = 0, bv = -Infinity;
+        for (let i = 0; i < moves.length; i++) {
+          const v = scores[i] + (Math.random() * 2 - 1) * cfg.noise;
+          if (v > bv) { bv = v; bi = i; }
+        }
+        return { move: note(moves[bi]), depth: reached, score: scores[bi], nodes };
+      }
+
+      // Hard: iterative deepening alpha-beta. Root moves are shuffled so equal choices vary.
+      const ordered = moves.slice();
+      for (let i = ordered.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; const t = ordered[i]; ordered[i] = ordered[j]; ordered[j] = t; }
+      // Mill-closing moves and blocks first.
+      const rootKey = (m) => (mR(m) >= 0 ? 2 : 0) + (blocks(pos, mT(m)) ? 1 : 0);
+      ordered.sort((a, b) => rootKey(b) - rootKey(a));
+      let best = ordered[0], bestScore = 0, done = 0;
+      for (let d = 1; d <= cfg.depth; d++) {
+        let alpha = -WIN * 2, curBest = 0, curScore = -WIN * 2;
+        try {
+          for (let k = 0; k < ordered.length; k++) {
+            const m = ordered[k];
+            pos.make(m);
+            let s;
+            if (k === 0) s = -search(pos, d - 1, -WIN * 2, -alpha, 1);
+            else {
+              s = -search(pos, d - 1, -alpha - 1, -alpha, 1);
+              if (s > alpha) s = -search(pos, d - 1, -WIN * 2, -alpha, 1);
+            }
+            pos.unmake();
+            if (s > curScore) { curScore = s; curBest = m; }
+            if (s > alpha) alpha = s;
+          }
+        } catch (e) {
+          if (e !== STOP) throw e;
+          // A better move found before time ran out is still better.
+          if (curBest && curScore > bestScore && curBest !== best) { best = curBest; bestScore = curScore; }
+          break;
+        }
+        best = curBest; bestScore = curScore; done = d;
+        ordered.splice(ordered.indexOf(best), 1); ordered.unshift(best);
+        if (Math.abs(bestScore) > MATED) break;
+        if (Date.now() - start > budget * 0.45) break;
+      }
+      return { move: note(best), depth: done, score: bestScore, nodes };
+    }
+
+    return { think, evaluate };
+  }
+  /* ===== ENGINE END ===== */
+
+  const C = MorrisCore();
+  const { Game, PX, PY, MILLS, mF, mT, mR, MO } = C;
+
+  /* ---------- engine worker ---------- */
+  const WORKER_SRC = '"use strict";\n' + MorrisCore.toString() + '\n' + MorrisEngine.toString() +
+    '\nconst E = MorrisEngine(MorrisCore());\nonmessage = function (e) { const r = E.think(e.data); r.id = e.data.id; postMessage(r); };';
+  let worker = null, workerUrl = null, inlineEngine = null, noWorker = false;
+  let searchId = 0, thinking = false, thinkStarted = 0, thinkTimer = 0;
+  const MIN_THINK = 450;
+
+  function stopEngine() {
+    searchId++;
+    clearTimeout(thinkTimer);
+    if (thinking && worker) { worker.terminate(); worker = null; }
+    thinking = false;
+  }
+  function askEngine() {
+    const id = ++searchId;
+    thinking = true; thinkStarted = Date.now();
+    const req = { id, notes: game.notes.slice(), level: S.level };
+    const inline = () => {
+      if (!inlineEngine) inlineEngine = MorrisEngine(C);
+      setTimeout(() => { if (id === searchId) { const r = inlineEngine.think(Object.assign({}, req, { time: 500 })); r.id = id; onEngine(r); } }, 60);
+    };
+    try {
+      if (noWorker) throw new Error('no worker');
+      if (!worker) {
+        if (!workerUrl) workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+        worker = new Worker(workerUrl);
+        worker.onmessage = (e) => onEngine(e.data);
+      }
+      worker.onerror = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        try { worker.terminate(); } catch (_) {}
+        worker = null; noWorker = true;
+        inline();
+      };
+      worker.postMessage(req);
+    } catch (_) { inline(); }
+    render();
+  }
+  function onEngine(r) {
+    if (r.id !== searchId || S.mode !== 'cpu') return;
+    const wait = Math.max(0, MIN_THINK - (Date.now() - thinkStarted), animUntil - Date.now());
+    thinkTimer = setTimeout(() => {
+      if (r.id !== searchId) return;
+      thinking = false;
+      const m = r.move ? game.find(r.move) : null;
+      if (m) commit(m, { move: true });
+      else render();
+    }, wait);
+  }
+
+  /* ---------- state ---------- */
+  const S = {
+    mode: null,          // 'cpu' | 'pass' | 'online'
+    level: 2,
+    cpuPref: '1',
+    my: 1,               // my colour in cpu and online: 0 orange, 1 white
+    result: null,        // { winner: 0 | 1 | null, reason }
+    sel: -1,             // selected piece (moving)
+    pend: null,          // { f, t } a mill was closed; waiting for the piece to take
+    undone: false,       // undo used this game (a Hard win then does not count)
+    streak: null,
+    lastShownResult: '',
+  };
+  let game = new Game();
+  let legalNow = [];
+
+  const SAVE_KEY = 'vela:nine-mens-morris:save';
+  const PREF_KEY = 'vela:nine-mens-morris:prefs';
+  const ROOM_KEY = 'vela:nine-mens-morris:room';
+  const STREAK_KEY = 'vela:nine-mens-morris:streak';
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } },
+    set(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+  };
+  const prefs = Object.assign({ level: 2, cpuColor: '0', onColor: 'r', name: '' }, store.get(PREF_KEY) || {});
+  const LEVEL_NAME = { 1: 'Easy', 2: 'Normal', 3: 'Hard' };
+
+  function saveLocal() {
+    if (S.mode !== 'cpu' && S.mode !== 'pass') return;
+    if (S.result) { store.set(SAVE_KEY, null); return; }
+    store.set(SAVE_KEY, { mode: S.mode, level: S.level, my: S.my, cpuPref: S.cpuPref, notes: game.notes, undone: S.undone });
+  }
+  function hardStreak() { const v = store.get(STREAK_KEY); return v && Number(v.n) || 0; }
+  function setHardStreak(n) { store.set(STREAK_KEY, { n }); }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const gameEl = $('game'), board = $('board'), linesEl = $('lines'), marksEl = $('marks'), piecesEl = $('pieces');
+  const gMill = $('gMill'), gFx = $('gFx'), gMarks = $('gMarks');
+  const overlay = $('overlay'), statusEl = $('status'), movesEl = $('moves'), actionsEl = $('actions');
+  const barTop = $('barTop'), barBot = $('barBot'), menu = $('menu');
+  const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
+  function pieceSvg(side) {
+    return '<svg viewBox="0 0 100 100" class="p' + side + '" aria-hidden="true">' +
+      '<circle class="e" cx="50" cy="55" r="44"/><circle class="f" cx="50" cy="48" r="44"/><circle class="r" cx="50" cy="48" r="30"/></svg>';
+  }
+
+  /* ---------- geometry ---------- */
+  const geo = { S: 360, M: 30, G: 50, pd: 34, ps: 8, lw: 2, x: new Float64Array(24), y: new Float64Array(24) };
+  function computeGeo(S0) {
+    geo.S = S0;
+    geo.M = Math.round(S0 * 0.085);
+    geo.G = (S0 - 2 * geo.M) / 6;
+    geo.pd = Math.round(geo.G * 0.64);
+    geo.ps = 2 * Math.round(S0 / 120) + 2;
+    geo.lw = S0 >= 720 ? 4 : 2;
+    for (let p = 0; p < 24; p++) { geo.x[p] = Math.round(geo.M + PX[p] * geo.G); geo.y[p] = Math.round(geo.M + PY[p] * geo.G); }
+    board.style.setProperty('--pd', geo.pd + 'px');
+  }
+  function drawLines() {
+    const { S, lw, ps, M } = geo, h = lw / 2;
+    let s = '';
+    for (const [a, , c] of MILLS) {
+      const x1 = geo.x[a], y1 = geo.y[a], x2 = geo.x[c], y2 = geo.y[c];
+      s += '<rect class="ln" x="' + (x1 - h) + '" y="' + (y1 - h) + '" width="' + (x2 - x1 + lw) + '" height="' + (y2 - y1 + lw) + '"/>';
+    }
+    for (let p = 0; p < 24; p++) s += '<rect class="pt" x="' + (geo.x[p] - ps / 2) + '" y="' + (geo.y[p] - ps / 2) + '" width="' + ps + '" height="' + ps + '"/>';
+    const fs = Math.max(8, Math.round(M * 0.3));
+    const font = getComputedStyle(document.documentElement).getPropertyValue('--font') || 'sans-serif';
+    for (let i = 0; i < 7; i++) {
+      const gx = Math.round(M + i * geo.G);
+      s += '<text class="co" x="' + gx + '" y="' + (S - Math.round(M * 0.22)) + '" text-anchor="middle" font-size="' + fs + '" style="font-family:' + font.replace(/"/g, "'") + '">' + 'abcdefg'[i] + '</text>';
+      s += '<text class="co" x="' + Math.round(M * 0.24) + '" y="' + gx + '" text-anchor="middle" dominant-baseline="central" font-size="' + fs + '" style="font-family:' + font.replace(/"/g, "'") + '">' + (7 - i) + '</text>';
+    }
+    linesEl.setAttribute('viewBox', '0 0 ' + S + ' ' + S);
+    marksEl.setAttribute('viewBox', '0 0 ' + S + ' ' + S);
+    linesEl.setAttribute('shape-rendering', 'crispEdges');
+    linesEl.innerHTML = s;
+  }
+  function pointAt(clientX, clientY) {
+    const r = board.getBoundingClientRect();
+    const x = (clientX - r.left) * geo.S / r.width, y = (clientY - r.top) * geo.S / r.height;
+    let best = -1, bd = geo.G * 0.48;
+    for (let p = 0; p < 24; p++) {
+      const d = Math.hypot(geo.x[p] - x, geo.y[p] - y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+  function lineRect(li, w) {
+    const l = MILLS[li], a = l[0], c = l[2], h = w / 2;
+    return '<rect x="' + (geo.x[a] - h) + '" y="' + (geo.y[a] - h) + '" width="' + (geo.x[c] - geo.x[a] + w) + '" height="' + (geo.y[c] - geo.y[a] + w) + '"/>';
+  }
+  // Mill lines through t that are all side's colour on board b.
+  function millsAt(b, t, side) {
+    const v = side + 1, out = [];
+    if (b[t] !== v) return out;
+    MILLS.forEach((l, li) => { if (l.includes(t) && l.every((p) => b[p] === v)) out.push(li); });
+    return out;
+  }
+
+  /* ---------- selection ---------- */
+  // The board as shown: during a pending removal the moved piece is already on its new point.
+  function dispBoard() {
+    const b = game.pos.b.slice();
+    if (S.pend) { const v = game.pos.turn + 1; if (S.pend.f >= 0) b[S.pend.f] = 0; b[S.pend.t] = v; }
+    return b;
+  }
+  function placing() { return game.pos.hand[game.pos.turn] > 0; }
+  function targets() {
+    const out = new Set();
+    if (S.pend) return out;
+    if (placing()) { for (const m of legalNow) out.add(mT(m)); return out; }
+    if (S.sel < 0) return out;
+    for (const m of legalNow) if (mF(m) === S.sel) out.add(mT(m));
+    return out;
+  }
+  function removables() {
+    const out = new Set();
+    if (!S.pend) return out;
+    for (const m of legalNow) if (mF(m) === S.pend.f && mT(m) === S.pend.t && mR(m) >= 0) out.add(mR(m));
+    return out;
+  }
+  function clearSel() { S.sel = -1; S.pend = null; }
+
+  /* ---------- rendering ---------- */
+  let pieceEls = new Map();
+  let animTimers = [], animUntil = 0, marksTimer = 0;
+  const MOVE_MS = reduceMotion ? 0 : 230, FLY_MS = reduceMotion ? 0 : 320, BLINK_MS = reduceMotion ? 0 : 540;
+  function stopAnim() { animTimers.forEach(clearTimeout); animTimers = []; animUntil = 0; gFx.textContent = ''; board.classList.remove('shake'); }
+  const animating = () => Date.now() < animUntil;
+  function later(fn, t) { animTimers.push(setTimeout(fn, t)); }
+
+  let hoverPt = -1;
+  function lastMove() { return game.moves.length ? game.moves[game.moves.length - 1] : 0; }
+
+  function renderMarks() {
+    clearTimeout(marksTimer);
+    const { pd, ps } = geo;
+    const now = Date.now();
+    let s = '';
+    const lm = lastMove();
+    const mine = canMove();
+    if (lm && !S.pend && !S.result) {
+      const f = mF(lm), t = mT(lm);
+      if (f >= 0) s += '<rect class="from" x="' + (geo.x[f] - ps / 2) + '" y="' + (geo.y[f] - ps / 2) + '" width="' + ps + '" height="' + ps + '"/>';
+      if (game.pos.b[t]) s += box(t, 'last');
+    }
+    if (mine) {
+      const tg = targets(), soft = placing();
+      for (const t of tg) {
+        const z = ps + (t === hoverPt ? 8 : 4);
+        s += '<rect class="tg' + (soft ? ' soft' : '') + (t === hoverPt ? ' hov' : '') + '" x="' + (geo.x[t] - z / 2) + '" y="' + (geo.y[t] - z / 2) + '" width="' + z + '" height="' + z + '"/>';
+      }
+      if (hoverPt >= 0 && tg.has(hoverPt) && !drag) s += '<circle class="ghost g' + game.pos.turn + '" cx="' + geo.x[hoverPt] + '" cy="' + geo.y[hoverPt] + '" r="' + pd / 2 + '"/>';
+      if (S.sel >= 0) s += box(S.sel, 'sel');
+    }
+    let wake = Infinity;
+    if (S.pend && mine) {
+      if (now >= S.pend.at) for (const r of removables()) s += box(r, 'rem');
+      else wake = S.pend.at;
+    }
+    gMarks.innerHTML = s;
+    // The steady mill line while a removal is pending.
+    const key = S.pend && now >= S.pend.lit ? S.pend.lines.join(',') : '';
+    if (gMill.dataset.k !== key) {
+      gMill.dataset.k = key;
+      gMill.innerHTML = key ? S.pend.lines.map((li) => '<g class="mill">' + lineRect(li, millW()) + '</g>').join('') : '';
+    }
+    if (S.pend && now < S.pend.lit) wake = Math.min(wake, S.pend.lit);
+    if (wake < Infinity) marksTimer = setTimeout(renderMarks, wake - now + 10);
+  }
+  const millW = () => Math.max(4, Math.round(geo.ps * 0.55 / 2) * 2);
+  function box(p, cls) {
+    const z = geo.pd + 8;
+    return '<rect class="box ' + cls + '" x="' + (geo.x[p] - z / 2) + '" y="' + (geo.y[p] - z / 2) + '" width="' + z + '" height="' + z + '"/>';
+  }
+
+  function placeEl(el, p) {
+    el.style.transform = 'translate(' + (geo.x[p] - geo.pd / 2) + 'px,' + (geo.y[p] - geo.pd / 2) + 'px)';
+  }
+  function makePiece(side, p) {
+    const el = document.createElement('div');
+    el.className = 'pc';
+    el.innerHTML = pieceSvg(side);
+    placeEl(el, p);
+    piecesEl.appendChild(el);
+    return el;
+  }
+  function sparks(p, side) {
+    if (reduceMotion) return;
+    const col = side ? '#ffffff' : '#ea5426';
+    const n = 10;
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('i');
+      el.className = 'spark';
+      el.style.background = i % 3 === 2 ? (side ? '#8f939b' : '#ff7a4d') : col;
+      const x0 = geo.x[p] - 3, y0 = geo.y[p] - 3;
+      el.style.transform = 'translate(' + x0 + 'px,' + y0 + 'px)';
+      piecesEl.appendChild(el);
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.5, d = geo.pd * (0.7 + Math.random() * 0.6);
+      void el.offsetWidth;
+      el.style.transform = 'translate(' + (x0 + Math.cos(a) * d) + 'px,' + (y0 + Math.sin(a) * d) + 'px) rotate(' + ((Math.random() * 180) | 0) + 'deg)';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 460);
+    }
+  }
+  function blinkLines(lines, hold, steady) {
+    if (!lines.length) return null;
+    const g = document.createElementNS(SVGNS, 'g');
+    g.innerHTML = lines.map((li) => '<g class="mill' + (steady ? '' : ' blink') + '">' + lineRect(li, millW()) + '</g>').join('');
+    gFx.appendChild(g);
+    if (hold !== undefined) later(() => { g.querySelectorAll('.mill').forEach((e) => e.classList.add('out')); }, hold);
+    return g;
+  }
+  function popAt(points) { for (const p of points) { const el = pieceEls.get(p); if (el && !reduceMotion) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } } }
+
+  // Redraw every piece. anim: { f, t, r, side, move, blink: [lines], fade: [lines], remove }
+  //   move: the mover travels from f (or drops in when placing); blink: the mill flashes;
+  //   remove: the taken piece on r shrinks away; fade: a steady mill line fades out.
+  function renderPieces(anim) {
+    if (!anim && animating()) return;
+    stopAnim();
+    piecesEl.textContent = '';
+    pieceEls = new Map();
+    const b = dispBoard();
+    for (let p = 0; p < 24; p++) {
+      if (!b[p]) continue;
+      if (anim && anim.move && p === anim.t && anim.f >= 0) continue;
+      const el = makePiece(b[p] - 1, p);
+      if (p === S.sel) el.classList.add('lift');
+      pieceEls.set(p, el);
+    }
+    if (!anim) return;
+    const { f, t, r, side } = anim;
+    let T = 0;
+    if (anim.move) {
+      if (f >= 0) {
+        const el = makePiece(side, f);
+        el.classList.add('mover');
+        pieceEls.set(t, el);
+        const dur = anim.fly ? FLY_MS : MOVE_MS;
+        if (dur) {
+          el.style.setProperty('--mv', dur + 'ms');
+          void piecesEl.offsetWidth;
+          el.classList.add('anim');
+        }
+        placeEl(el, t);
+        T = dur;
+      } else {
+        const el = pieceEls.get(t);
+        if (el && !reduceMotion) el.classList.add('drop');
+        T = MOVE_MS ? 200 : 0;
+      }
+    }
+    if (anim.blink && anim.blink.length) {
+      const pts = new Set();
+      anim.blink.forEach((li) => MILLS[li].forEach((p) => pts.add(p)));
+      const go = () => { blinkLines(anim.blink, anim.remove ? BLINK_MS + 200 : BLINK_MS + 120); popAt(pts); };
+      if (T) later(go, T); else go();
+      T += BLINK_MS;
+    }
+    if (anim.fade && anim.fade.length) blinkLines(anim.fade, 120, true);
+    if (anim.remove && r >= 0) {
+      const ghost = makePiece(side ^ 1, r);
+      const go = () => {
+        ghost.classList.add('gone');
+        setTimeout(() => ghost.remove(), 320);
+        sparks(r, side ^ 1);
+        if (!reduceMotion) { board.classList.remove('shake'); void board.offsetWidth; board.classList.add('shake'); }
+        const bar = side ^ 1;
+        const ln = (bottomSide() === bar ? barBot : barTop).querySelector('.left-n');
+        if (ln && !reduceMotion) { ln.classList.remove('hit'); void ln.offsetWidth; ln.classList.add('hit'); }
+      };
+      if (T) later(go, T); else go();
+      T += reduceMotion ? 0 : 260;
+    }
+    if (T) later(() => { gFx.textContent = ''; board.classList.remove('shake'); }, T + 300);
+    animUntil = Date.now() + T;
+  }
+
+  function nameFor(color) {
+    if (S.mode === 'cpu') return color === S.my ? 'You' : 'Computer<small>' + LEVEL_NAME[S.level] + '</small>';
+    if (S.mode === 'online' && ON.room) {
+      const uid = uidOf(ON.room.state, color);
+      return esc((ON.room.names || {})[uid] || 'Player') + (uid === ON.me ? '<small>You</small>' : '');
+    }
+    return colorName(color);
+  }
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function bottomSide() { return S.mode === 'pass' || !S.mode ? 0 : S.my; }
+
+  function renderBars() {
+    const bottom = bottomSide(), top = bottom ^ 1;
+    const pos = game.pos, turn = pos.turn;
+    [[barTop, top], [barBot, bottom]].forEach(([el, color]) => {
+      let hand = pos.hand[color], cnt = pos.cnt[color];
+      if (S.pend && color === turn && S.pend.f < 0) { hand--; cnt++; }
+      let hs = '';
+      for (let i = 0; i < hand; i++) hs += pieceSvg(color);
+      if (hand) hs += '<span class="n">' + hand + '</span>';
+      let html = '<span class="chip c' + color + '"></span><span class="pname">' + nameFor(color) + '</span><span class="hand" title="To place">' + hs + '</span>';
+      if (!S.result && hand === 0 && cnt === 3) html += '<span class="tag">Flying</span>';
+      if (S.mode === 'online' && ON.room) {
+        const uid = uidOf(ON.room.state, color);
+        if (uid !== ON.me && ON.room.phase !== 'lobby' && (hasLeft(uid) || Rooms.isAway(ON.room, uid))) html += '<span class="tag">' + (hasLeft(uid) ? 'Left' : 'Away') + '</span>';
+      }
+      html += '<span class="left-n" title="Pieces left">' + (hand + cnt) + '</span>';
+      el.innerHTML = html;
+      el.classList.toggle('on', !S.result && turn === color);
+    });
+  }
+
+  function renderMoves() {
+    const notes = game.notes;
+    let html = '';
+    if (!notes.length) html = '<span class="empty">No moves yet</span>';
+    for (let i = 0; i < notes.length; i++) {
+      if (i % 2 === 0) html += '<span class="n">' + (i / 2 + 1) + '.</span>';
+      html += '<span class="m' + (i === notes.length - 1 ? ' cur' : '') + '">' + notes[i] + '</span>';
+    }
+    if (notes.length % 2 === 1 && gameEl.classList.contains('row')) html += '<span></span>';
+    movesEl.innerHTML = html;
+    if (gameEl.classList.contains('row')) movesEl.scrollTop = movesEl.scrollHeight;
+    else movesEl.scrollLeft = movesEl.scrollWidth;
+  }
+
+  const colorName = (c) => (c === 0 ? 'Orange' : 'White');
+  function resultText(r) {
+    const loser = r.winner === null ? null : r.winner ^ 1;
+    const youLose = (S.mode === 'cpu' || S.mode === 'online') && r.winner !== null && r.winner !== S.my;
+    const who = () => (S.mode === 'pass' ? colorName(loser) + ' has' : youLose ? 'You have' : S.mode === 'cpu' ? 'The computer has' : 'Your opponent has');
+    if (r.reason === 'taken') return who() + ' two pieces left';
+    if (r.reason === 'blocked') return who() + ' no legal move';
+    if (r.reason === 'fifty') return '50 moves each without a capture';
+    if (r.reason === 'repetition') return 'Same position three times';
+    if (r.reason === 'agreement') return 'Draw agreed';
+    if (r.reason === 'left') return 'Your opponent left';
+    if (r.reason === 'resign') {
+      if (S.mode === 'pass') return colorName(loser) + ' resigned';
+      return youLose ? 'You resigned' : (S.mode === 'cpu' ? 'The computer resigned' : 'Your opponent resigned');
+    }
+    return '';
+  }
+  function resultTitle(r) {
+    if (r.winner === null) return 'Draw';
+    if (S.mode === 'pass') return colorName(r.winner) + ' wins';
+    return r.winner === S.my ? 'You win' : 'You lose';
+  }
+
+  function doing(side) {
+    const p = game.pos;
+    if (S.pend) return side ? 'Remove an orange piece' : 'Remove a white piece';
+    if (p.hand[side] > 0) return 'Place a piece';
+    if (p.cnt[side] === 3) return 'Move a piece anywhere';
+    return 'Move a piece';
+  }
+  function statusText() {
+    const turn = game.pos.turn;
+    if (S.result) return resultTitle(S.result) + '. ' + resultText(S.result);
+    if (S.mode === 'cpu') {
+      if (turn !== S.my) return 'Computer is thinking';
+      return doing(turn);
+    }
+    if (S.mode === 'online' && ON.room) {
+      const st = ON.room.state;
+      const opp = uidOf(st, S.my ^ 1);
+      if (hasLeft(opp)) return 'Your opponent left';
+      if (Rooms.isAway(ON.room, opp)) return 'Opponent disconnected';
+      if (hasOffer(st) && st.drawOffer !== S.my) return 'Your opponent offers a draw';
+      if (turn !== S.my) return "Opponent's move";
+      return doing(turn);
+    }
+    const d = doing(turn);
+    return colorName(turn) + ': ' + d.charAt(0).toLowerCase() + d.slice(1);
+  }
+
+  let flash = '', flashTimer = 0;
+  function showFlash(t) { flash = t; clearTimeout(flashTimer); flashTimer = setTimeout(() => { flash = ''; renderStatus(); }, 3200); renderStatus(); }
+  function renderStatus() {
+    statusEl.textContent = flash || statusText();
+    statusEl.classList.toggle('idle', !!S.result);
+  }
+
+  /* ---------- action buttons ---------- */
+  const ICON = {
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+    flag: '<path d="M5 21V4"/><path d="M5 4h13l-3 4.5 3 4.5H5"/>',
+    plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+    draw: '<path d="M5 9h14"/><path d="M5 15h14"/>',
+    exit: '<path d="M14 4H5v16h9"/><path d="M10 12h11"/><path d="m17 8 4 4-4 4"/>',
+    again: '<path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M20 10a8 8 0 0 0-14.5-3L4 10"/><path d="M4 14a8 8 0 0 0 14.5 3L20 14"/>',
+  };
+  function btnHtml(id, icon, label, cls) {
+    return '<button class="btn' + (cls ? ' ' + cls : '') + '" type="button" data-act="' + id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">' + ICON[icon] + '</svg><span>' + label + '</span></button>';
+  }
+  let armed = '', armTimer = 0;
+  function arm(id) { armed = id; clearTimeout(armTimer); armTimer = setTimeout(() => { armed = ''; renderActions(); }, 2600); renderActions(); }
+  function disarm() { if (armed) { armed = ''; clearTimeout(armTimer); } }
+  const hasOffer = (st) => st.drawOffer === 0 || st.drawOffer === 1;
+
+  function renderActions() {
+    let html = '';
+    const inPlay = !S.result;
+    if (S.mode === 'online') {
+      const st = ON.room ? ON.room.state : null;
+      if (st) {
+        if (S.result) {
+          const opp = uidOf(st, S.my ^ 1);
+          const asked = (st.rematch || []).includes(ON.me), offered = (st.rematch || []).includes(opp);
+          html += btnHtml('rematch', 'again', asked ? 'Asked' : offered ? 'Accept rematch' : 'Rematch', offered && !asked ? 'primary' : '');
+        } else if (hasOffer(st) && st.drawOffer !== S.my) html += btnHtml('accept', 'draw', 'Accept draw', 'primary');
+        else html += btnHtml('draw', 'draw', st.drawOffer === S.my ? 'Offered' : 'Draw');
+        html += btnHtml('resign', 'flag', armed === 'resign' ? 'Sure?' : 'Resign', armed === 'resign' ? 'armed' : '');
+        html += btnHtml('leave', 'exit', armed === 'leave' ? 'Sure?' : 'Leave', armed === 'leave' ? 'armed' : '');
+      }
+    } else {
+      html += btnHtml('undo', 'undo', 'Undo');
+      html += btnHtml('resign', 'flag', armed === 'resign' ? 'Sure?' : 'Resign', armed === 'resign' ? 'armed' : '');
+      html += btnHtml('new', 'plus', 'New game', inPlay ? '' : 'primary');
+    }
+    actionsEl.innerHTML = html;
+    const q = (a) => actionsEl.querySelector('[data-act="' + a + '"]');
+    if (S.mode !== 'online') {
+      q('undo').disabled = !canUndo();
+      q('resign').disabled = !inPlay || !game.moves.length;
+    } else if (ON.room) {
+      const st = ON.room.state;
+      q('resign').disabled = !inPlay;
+      const d = q('draw'); if (d) d.disabled = !inPlay || hasOffer(st) || game.moves.length < 2;
+      const rm = q('rematch'); if (rm) rm.disabled = (st.rematch || []).includes(ON.me) || anyLeft();
+    }
+  }
+  function canUndo() {
+    if (S.mode === 'online') return false;
+    if (S.pend) return true;
+    if (!game.moves.length) return false;
+    if (S.result && S.result.reason === 'resign') return false;
+    if (S.mode === 'cpu') return game.notes.some((_, i) => (i % 2) === S.my);
+    return true;
+  }
+
+  actionsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const a = b.dataset.act;
+    if (a === 'undo') { disarm(); undo(); return; }
+    if (a === 'new') { disarm(); openMenu('home'); return; }
+    if (a === 'resign') {
+      if (armed !== 'resign') { arm('resign'); return; }
+      disarm();
+      if (S.mode === 'online') onlineResign(); else resignLocal();
+      return;
+    }
+    if (a === 'leave') {
+      if (!S.result && armed !== 'leave') { arm('leave'); return; }
+      disarm(); onlineLeave(); return;
+    }
+    if (a === 'draw') { onlineDraw('offer'); return; }
+    if (a === 'accept') { onlineDraw('accept'); return; }
+    if (a === 'rematch') { onlineRematch(); return; }
+  });
+
+  function render(anim) {
+    legalNow = S.result ? [] : game.pos.gen();
+    if (S.pend && !legalNow.some((m) => mF(m) === S.pend.f && mT(m) === S.pend.t)) S.pend = null;
+    if (S.sel >= 0 && !legalNow.some((m) => mF(m) === S.sel)) S.sel = -1;
+    renderPieces(anim);
+    renderMarks();
+    renderBars();
+    renderMoves();
+    renderStatus();
+    renderActions();
+    board.classList.toggle('mine', canMove());
+  }
+
+  /* ---------- moving ---------- */
+  function canMove() {
+    if (S.result || !overlay.hidden) return false;
+    const turn = game.pos.turn;
+    if (S.mode === 'pass') return true;
+    if (S.mode === 'cpu') return !thinking && turn === S.my;
+    if (S.mode === 'online') return !!ON.room && ON.room.phase === 'play' && !ON.pending && turn === S.my;
+    return false;
+  }
+  const movable = (p) => legalNow.some((m) => mF(m) === p);
+
+  // The player chose to move (or place) onto t.
+  function choose(f, t, dragged) {
+    const cs = legalNow.filter((m) => mF(m) === f && mT(m) === t);
+    if (!cs.length) return false;
+    hoverPt = -1;
+    if (cs.length === 1 && mR(cs[0]) < 0) { commit(cs[0], { move: !dragged }); return true; }
+    // A mill: show it, then wait for the piece to take.
+    const side = game.pos.turn;
+    S.sel = -1;
+    const fly = f >= 0 && game.pos.flying(side);
+    const T = dragged ? 0 : (f >= 0 ? (fly ? FLY_MS : MOVE_MS) : (MOVE_MS ? 200 : 0));
+    const now = Date.now();
+    S.pend = { f, t, lines: [], at: now + T, lit: now + T + BLINK_MS };
+    S.pend.lines = millsAt(dispBoard(), t, side);
+    renderPieces({ f, t, r: -1, side, move: !dragged, fly, blink: S.pend.lines, remove: false });
+    renderMarks(); renderBars(); renderStatus(); renderActions();
+    return true;
+  }
+  function takeAt(r) {
+    if (!S.pend) return false;
+    const m = legalNow.find((x) => mF(x) === S.pend.f && mT(x) === S.pend.t && mR(x) === r);
+    if (!m) return false;
+    const lines = S.pend.lines;
+    commit(m, { fade: lines });
+    return true;
+  }
+
+  // Play m. opts: { move } animate the mover; { fade } steady mill lines to fade (removal step).
+  function commit(m, opts) {
+    disarm();
+    const side = game.pos.turn;
+    game.play(m);
+    S.sel = -1; S.pend = null; hoverPt = -1;
+    const f = mF(m), t = mT(m), r = mR(m);
+    const lines = opts.fade ? [] : millsAt(game.pos.b, t, side);
+    const anim = { f, t, r, side, move: !!opts.move, fly: f >= 0 && game.pos.flying(side), blink: lines, fade: opts.fade || [], remove: r >= 0 };
+    if (S.mode === 'online') {
+      ON.pending = true;
+      render(anim);
+      sendMove(C.note(m));
+      return;
+    }
+    const st = game.status();
+    if (st.over) S.result = { winner: st.winner, reason: st.reason };
+    render(anim);
+    saveLocal();
+    if (S.result) { finishLocal(); return; }
+    if (S.mode === 'cpu' && game.pos.turn !== S.my) askEngine();
+  }
+
+  function finishLocal() {
+    stopEngine();
+    store.set(SAVE_KEY, null);
+    if (S.mode === 'cpu' && S.level === 3) {
+      const won = S.result.winner === S.my;
+      const prev = hardStreak();
+      const n = won ? (S.undone ? prev : prev + 1) : 0;
+      setHardStreak(n);
+      S.streak = { n, counted: !won || !S.undone, isBest: V.gameOver(n) && n > 0 };
+    } else S.streak = null;
+    setTimeout(() => showResult(), Math.max(reduceMotion ? 50 : 420, animUntil - Date.now() + 300));
+  }
+
+  function resignLocal() {
+    if (S.result) return;
+    stopEngine();
+    stopAnim();
+    clearSel();
+    const loser = S.mode === 'cpu' ? S.my : game.pos.turn;
+    S.result = { winner: loser ^ 1, reason: 'resign' };
+    render();
+    finishLocal();
+  }
+
+  function undo() {
+    if (!canUndo()) return;
+    stopEngine();
+    stopAnim();
+    hideOverlay();
+    if (S.pend) { clearSel(); render(); return; }
+    let n = game.notes.length - 1;
+    if (S.mode === 'cpu') {
+      // back to the last position where it was my move, with one of my moves removed
+      while (n > 0 && n % 2 !== S.my) n--;
+      if (n % 2 !== S.my) return;
+      if (S.level === 3) S.undone = true;
+    }
+    game = Game.fromNotes(game.notes.slice(0, n)) || new Game();
+    S.result = null; S.streak = null; S.lastShownResult = '';
+    clearSel();
+    render();
+    saveLocal();
+    if (S.mode === 'cpu' && game.pos.turn !== S.my) askEngine();
+  }
+
+  /* ---------- pointer input ---------- */
+  let drag = null;
+  function refreshSel() { renderPieces(); renderMarks(); renderStatus(); }
+  board.addEventListener('pointerdown', (e) => {
+    if (!overlay.hidden) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (!canMove()) return;
+    if (S.pend ? Date.now() < S.pend.at : animating()) return;
+    const p = pointAt(e.clientX, e.clientY);
+    if (S.pend) {
+      if (p >= 0 && removables().has(p)) { takeAt(p); return; }
+      // Tapping the piece that made the mill takes the move back.
+      if (p === S.pend.t) { clearSel(); render(); }
+      return;
+    }
+    if (p < 0) { if (S.sel >= 0) { S.sel = -1; refreshSel(); } return; }
+    if (placing()) { choose(-1, p, false); return; }
+    if (S.sel >= 0 && targets().has(p)) { choose(S.sel, p, false); return; }
+    const v = game.pos.turn + 1;
+    if (game.pos.b[p] === v && movable(p)) {
+      const was = p === S.sel;
+      if (!was) { S.sel = p; refreshSel(); }
+      drag = { id: e.pointerId, pt: p, el: pieceEls.get(p), x: e.clientX, y: e.clientY, moved: false, was, hover: -1 };
+      try { board.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+      return;
+    }
+    if (S.sel >= 0) { S.sel = -1; refreshSel(); }
+  });
+  board.addEventListener('pointermove', (e) => {
+    if (!drag) {
+      if (e.pointerType !== 'mouse') return;
+      const p = canMove() && !animating() ? pointAt(e.clientX, e.clientY) : -1;
+      const h = p >= 0 && targets().has(p) ? p : -1;
+      if (h !== hoverPt) { hoverPt = h; renderMarks(); }
+      return;
+    }
+    if (e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < Math.max(4, geo.G * 0.12)) return;
+    if (!drag.moved) { drag.moved = true; if (drag.el) { drag.el.classList.add('drag'); drag.el.classList.remove('anim'); } }
+    const r = board.getBoundingClientRect();
+    const k = geo.S / r.width, half = geo.pd / 2;
+    if (drag.el) drag.el.style.transform = 'translate(' + ((e.clientX - r.left) * k - half) + 'px,' + ((e.clientY - r.top) * k - half) + 'px)';
+    const over = pointAt(e.clientX, e.clientY);
+    const h = over >= 0 && targets().has(over) ? over : -1;
+    if (h !== hoverPt) { hoverPt = h; renderMarks(); }
+  });
+  board.addEventListener('pointerleave', (e) => { if (!drag && e.pointerType === 'mouse' && hoverPt >= 0) { hoverPt = -1; renderMarks(); } });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag;
+    drag = null;
+    hoverPt = -1;
+    if (d.el) d.el.classList.remove('drag');
+    if (d.moved) {
+      const to = e.type === 'pointerup' ? pointAt(e.clientX, e.clientY) : -1;
+      if (to >= 0 && targets().has(to) && choose(d.pt, to, true)) return;
+      if (d.el) { d.el.style.setProperty('--mv', '180ms'); d.el.classList.add('anim'); placeEl(d.el, d.pt); }
+      renderMarks();
+      return;
+    }
+    // a plain tap on the selected piece deselects it
+    if (d.was) { S.sel = -1; refreshSel(); }
+  }
+  board.addEventListener('pointerup', endDrag);
+  board.addEventListener('pointercancel', endDrag);
+  board.addEventListener('lostpointercapture', (e) => { if (drag && e.pointerId === drag.id) endDrag({ pointerId: e.pointerId, type: 'pointercancel' }); });
+  board.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  document.addEventListener('touchmove', (e) => { if (!e.target.closest('.moves, .menu')) e.preventDefault(); }, { passive: false });
+  window.addEventListener('pointerdown', () => { window.focus(); }, true);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target && e.target.tagName === 'INPUT') return;
+    if (!menu.hidden) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (S.mode !== 'online') undo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Escape') {
+      if (S.pend) { clearSel(); render(); }
+      else if (S.sel >= 0) { S.sel = -1; refreshSel(); }
+      return;
+    }
+    if ((e.key === 'u' || e.key === 'U') && S.mode !== 'online') { undo(); return; }
+  });
+
+  /* ---------- result overlay ---------- */
+  function showResult() {
+    if (!S.result) return;
+    const key = (ON.room ? ON.room.state.n : 0) + ':' + game.notes.length + ':' + S.result.reason;
+    if (S.lastShownResult === key) return;
+    S.lastShownResult = key;
+    $('ovTitle').textContent = resultTitle(S.result);
+    $('ovText').textContent = resultText(S.result);
+    const rows = $('ovRows');
+    if (S.mode === 'cpu' && S.streak) {
+      const k = S.streak;
+      rows.innerHTML =
+        '<div class="rw"><span>Hard streak' + (k.counted ? '' : '<span class="badge">Undo used</span>') + '</span><b>' + k.n + '</b></div>' +
+        '<div class="rw"><span>Best' + (k.isBest ? '<span class="badge">New best</span>' : '') + '</span><b>' + V.best() + '</b></div>';
+      rows.hidden = false;
+    } else { rows.hidden = true; rows.innerHTML = ''; }
+    const row = $('ovButtons');
+    row.textContent = '';
+    const btns = [];
+    if (S.mode === 'online') {
+      btns.push({ label: 'Rematch', primary: true, onClick: () => { hideOverlay(); onlineRematch(); }, off: anyLeft() });
+      btns.push({ label: 'View board', onClick: hideOverlay });
+    } else {
+      btns.push({ label: 'Play again', primary: true, onClick: () => { hideOverlay(); playAgain(); } });
+      btns.push({ label: 'View board', onClick: hideOverlay });
+    }
+    let first = null;
+    for (const b of btns) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'btn' + (b.primary ? ' primary' : '');
+      el.textContent = b.label;
+      el.disabled = !!b.off;
+      el.addEventListener('click', b.onClick);
+      row.appendChild(el);
+      if (!first) first = el;
+    }
+    overlay.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+    if (first) setTimeout(() => { try { first.focus({ preventScroll: true }); } catch (_) {} }, 60);
+    render();
+  }
+  function hideOverlay() {
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    board.classList.toggle('mine', canMove());
+    renderMarks();
+  }
+
+  /* ---------- starting games ---------- */
+  function startLocal(mode, opts) {
+    stopEngine();
+    stopAnim();
+    hideOverlay(); disarm();
+    // Walking away from an unfinished Hard game counts as a loss for the streak.
+    const prev = store.get(SAVE_KEY);
+    if (!opts.resume && prev && prev.mode === 'cpu' && prev.level === 3 && Array.isArray(prev.notes) && prev.notes.some((_, i) => i % 2 === prev.my)) setHardStreak(0);
+    S.mode = mode;
+    S.result = null; S.streak = null; S.lastShownResult = '';
+    clearSel();
+    game = opts.notes ? (Game.fromNotes(opts.notes) || new Game()) : new Game();
+    S.undone = !!opts.undone;
+    if (mode === 'cpu') {
+      S.level = opts.level;
+      S.cpuPref = opts.cpuPref;
+      S.my = opts.my !== undefined ? opts.my : (opts.cpuPref === 'r' ? (Math.random() < 0.5 ? 0 : 1) : Number(opts.cpuPref));
+    } else S.my = 0;
+    closeMenu();
+    const st = game.status();
+    if (st.over) S.result = { winner: st.winner, reason: st.reason };
+    render();
+    saveLocal();
+    if (S.mode === 'cpu' && !S.result && game.pos.turn !== S.my) askEngine();
+  }
+  function playAgain() {
+    if (S.mode === 'cpu') startLocal('cpu', { level: S.level, cpuPref: S.cpuPref });
+    else startLocal('pass', {});
+  }
+
+  /* ---------- menu ---------- */
+  function openMenu(view) {
+    if (S.mode === 'cpu') stopEngine();
+    menu.hidden = false;
+    showView(view || 'home');
+  }
+  function closeMenu() { menu.hidden = true; }
+  function showView(v) {
+    menu.querySelectorAll('.panel').forEach((p) => { p.hidden = p.dataset.view !== v; });
+    if (v === 'home') refreshHome();
+    if (v === 'online') { $('nameIn').value = prefs.name || ''; $('onErr').textContent = onlineError; onlineError = ''; }
+    const first = menu.querySelector('.panel:not([hidden]) button:not([hidden]):not(:disabled)');
+    if (first && !('ontouchstart' in window)) setTimeout(() => { try { first.focus({ preventScroll: true }); } catch (_) {} }, 30);
+  }
+  function refreshHome() {
+    const sv = store.get(SAVE_KEY);
+    const ok = sv && (sv.mode === 'cpu' || sv.mode === 'pass') && Array.isArray(sv.notes);
+    $('contBtn').hidden = !ok;
+    if (ok) $('contInfo').textContent = sv.mode === 'cpu' ? 'Vs computer, ' + (LEVEL_NAME[sv.level] || '') : 'Pass and play';
+    const tile = $('onlineTile'), note = $('onlineNote');
+    if (Rooms === undefined) { tile.disabled = true; note.hidden = true; }
+    else if (!Rooms || !Rooms.available) { tile.disabled = true; note.hidden = false; note.textContent = Rooms ? 'Online play is not set up yet.' : 'Online play is not available right now.'; }
+    else { tile.disabled = false; note.hidden = true; }
+  }
+
+  function bindSeg(id, key, cast) {
+    const el = $(id);
+    const paint = () => el.querySelectorAll('button').forEach((b) => b.classList.toggle('on', String(prefs[key]) === b.dataset.v));
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      prefs[key] = cast ? cast(b.dataset.v) : b.dataset.v;
+      store.set(PREF_KEY, prefs);
+      paint();
+    });
+    paint();
+  }
+  bindSeg('segLevel', 'level', Number);
+  bindSeg('segCpuColor', 'cpuColor');
+  bindSeg('segOnColor', 'onColor');
+
+  menu.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-go]');
+    if (!b || b.disabled) return;
+    const go = b.dataset.go;
+    if (go === 'pass') { startLocal('pass', {}); return; }
+    showView(go);
+  });
+  $('contBtn').addEventListener('click', () => {
+    const sv = store.get(SAVE_KEY);
+    if (!sv) { refreshHome(); return; }
+    const base = { notes: sv.notes, undone: sv.undone, resume: true };
+    startLocal(sv.mode, sv.mode === 'cpu' ? Object.assign(base, { level: sv.level, cpuPref: sv.cpuPref, my: sv.my }) : base);
+  });
+  $('cpuStart').addEventListener('click', () => startLocal('cpu', { level: prefs.level, cpuPref: String(prefs.cpuColor) }));
+
+  /* ---------- online ---------- */
+  let Rooms; // undefined while loading, null if it could not load
+  const ON = { code: null, room: null, me: null, unsub: null, stopBeat: null, pending: false, n: -1 };
+  let onlineError = '';
+
+  function friendly(e) {
+    if (Rooms && e instanceof Rooms.RoomError) return e.message;
+    return 'Could not reach the game server. Try again.';
+  }
+  function myName() {
+    const v = $('nameIn').value.replace(/\s+/g, ' ').trim().slice(0, 20);
+    if (v) { prefs.name = v; store.set(PREF_KEY, prefs); }
+    return v || prefs.name || 'Player';
+  }
+  function setBusy(on) { ['createBtn', 'joinBtn'].forEach((id) => { $(id).disabled = on; }); }
+
+  $('createBtn').addEventListener('click', async () => {
+    if (!Rooms || !Rooms.available) return;
+    $('onErr').textContent = '';
+    setBusy(true);
+    try {
+      const code = await Rooms.create({ game: 'nine-mens-morris', maxSeats: 2, name: myName(), state: { pref: String(prefs.onColor) } });
+      enterRoom(code);
+    } catch (e) { $('onErr').textContent = friendly(e); }
+    setBusy(false);
+  });
+  async function joinRoom(code, quiet) {
+    code = Rooms.normaliseCode(code);
+    if (code.length !== 6) { $('onErr').textContent = 'Room codes are six letters and numbers.'; return; }
+    if (quiet) { menu.hidden = false; showView('joining'); }
+    $('onErr').textContent = '';
+    setBusy(true);
+    try {
+      await Rooms.join(code, { game: 'nine-mens-morris', name: quiet ? (prefs.name || 'Player') : myName() });
+      enterRoom(code);
+    } catch (e) {
+      store.set(ROOM_KEY, null);
+      setUrlRoom(null);
+      if (quiet === 'saved') showView('home');
+      else { onlineError = friendly(e); showView('online'); }
+    }
+    setBusy(false);
+  }
+  $('joinBtn').addEventListener('click', () => joinRoom($('codeIn').value, false));
+  $('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinRoom($('codeIn').value, false); });
+  $('codeIn').addEventListener('input', (e) => { const v = Rooms ? Rooms.normaliseCode(e.target.value) : e.target.value; if (v !== e.target.value) e.target.value = v; });
+
+  function setUrlRoom(code) {
+    try {
+      const u = new URL(location.href);
+      if (code) u.searchParams.set('room', code); else u.searchParams.delete('room');
+      history.replaceState(null, '', u.toString());
+    } catch (_) {}
+  }
+
+  function enterRoom(code) {
+    leaveRoomLocal();
+    stopEngine();
+    ON.code = code; ON.me = Rooms.uid(); ON.room = null; ON.pending = false; ON.n = -1;
+    store.set(ROOM_KEY, { code, at: Date.now() });
+    setUrlRoom(code);
+    $('lobbyCode').textContent = code;
+    $('lobbyLink').value = Rooms.inviteUrl('nine-mens-morris', code);
+    $('lobbyWait').textContent = 'Connecting';
+    $('lobbyInfo').textContent = '';
+    menu.hidden = false;
+    showView('lobby');
+    ON.unsub = Rooms.watch(code, onRoom, () => {
+      if (S.mode === 'online') showFlash('Connection lost. Reconnecting.');
+      else $('lobbyWait').textContent = 'Reconnecting';
+    });
+    ON.stopBeat = Rooms.heartbeat(code);
+  }
+  function leaveRoomLocal() {
+    if (ON.unsub) { try { ON.unsub(); } catch (_) {} }
+    if (ON.stopBeat) ON.stopBeat();
+    ON.unsub = null; ON.stopBeat = null; ON.code = null; ON.room = null; ON.pending = false;
+  }
+
+  function onRoom(room) {
+    if (!ON.code) return;
+    if (!room) {
+      // An offline client can report the room missing from its cache; ask the server before giving up.
+      const code = ON.code;
+      Rooms.update(code, () => null).catch((e) => { if (ON.code === code && e instanceof Rooms.RoomError) roomClosed(); });
+      return;
+    }
+    onRoomData(room);
+  }
+  function roomClosed() {
+    leaveRoomLocal();
+    store.set(ROOM_KEY, null);
+    setUrlRoom(null);
+    S.mode = null;
+    onlineError = 'The room has closed.';
+    hideOverlay();
+    menu.hidden = false;
+    showView('online');
+  }
+  function onRoomData(room) {
+    ON.room = room;
+    if (room.phase === 'lobby') {
+      const st = room.state || {};
+      const host = room.hostUid === ON.me;
+      const pref = st.pref === '0' ? 0 : st.pref === '1' ? 1 : null;
+      $('lobbyInfo').textContent = pref === null ? 'Colours are picked at random.' : 'You play ' + colorName(host ? pref : pref ^ 1).toLowerCase() + '.';
+      $('lobbyWait').textContent = room.seats.length >= 2 ? 'Starting' : 'Waiting for an opponent';
+      if (S.mode === 'online') S.mode = null;
+      menu.hidden = false;
+      if (menu.querySelector('[data-view="lobby"]').hidden) showView('lobby');
+      // the host starts the game; the guest steps in only if the host is gone
+      clearTimeout(startTimer);
+      if (room.seats.length >= 2 && room.seats.includes(ON.me)) {
+        if (host) startTimer = setTimeout(startOnline, 900); else startTimer = setTimeout(() => { if (ON.room && ON.room.phase === 'lobby') startOnline(); }, 6000);
+      }
+      return;
+    }
+    if (!room.seats.includes(ON.me)) {
+      leaveRoomLocal(); store.set(ROOM_KEY, null); setUrlRoom(null);
+      onlineError = 'That game has already started.'; menu.hidden = false; showView('online');
+      return;
+    }
+    syncOnline(room);
+  }
+
+  const uidOf = (st, color) => (color === 0 ? st.orange : st.white);
+  function freshState(prev, orange, white, n) {
+    return { pref: prev.pref || 'r', orange, white, n, moves: [], turn: 0, result: null, drawOffer: null, rematch: [] };
+  }
+  let starting = false, startTimer = 0;
+  async function startOnline() {
+    if (starting) return;
+    starting = true;
+    try {
+      await Rooms.update(ON.code, (room) => {
+        if (room.phase !== 'lobby' || room.seats.length < 2) return null;
+        const host = room.hostUid, guest = room.seats.find((u) => u !== host);
+        let hc = room.state && room.state.pref;
+        hc = hc === '0' ? 0 : hc === '1' ? 1 : (Math.random() < 0.5 ? 0 : 1);
+        const orange = hc === 0 ? host : guest, white = hc === 0 ? guest : host;
+        return { phase: 'play', state: freshState(room.state || {}, orange, white, 1) };
+      });
+    } catch (_) {}
+    starting = false;
+  }
+
+  function syncOnline(room) {
+    const st = room.state;
+    const firstView = S.mode !== 'online';
+    if (firstView) {
+      stopEngine();
+      S.mode = 'online';
+      closeMenu();
+      hideOverlay(); disarm();
+      S.lastShownResult = '';
+      S.streak = null;
+    }
+    S.my = st.orange === ON.me ? 0 : 1;
+    let anim = null;
+    const newGame = st.n !== ON.n;
+    const moves = st.moves || [];
+    const ahead = ON.pending && game.notes.length > moves.length;
+    const same = !newGame && game.notes.length === moves.length && game.notes.every((u, i) => u === moves[i]);
+    if (!ahead && !same) {
+      const prevLen = newGame ? -1 : game.notes.length;
+      const g = Game.fromNotes(moves);
+      if (g) {
+        if (prevLen >= 0 && moves.length === prevLen + 1 && game.notes.every((u, i) => u === moves[i])) {
+          const m = g.moves[g.moves.length - 1], side = (moves.length - 1) % 2;
+          const f = mF(m), t = mT(m);
+          anim = { f, t, r: mR(m), side, move: true, fly: f >= 0 && g.pos.cnt[side] === 3 && g.pos.hand[side] === 0, blink: millsAt(g.pos.b, t, side), fade: [], remove: mR(m) >= 0 };
+        }
+        game = g;
+      }
+      clearSel();
+      stopAnim();
+    }
+    if (newGame) {
+      ON.n = st.n;
+      S.lastShownResult = '';
+      clearSel();
+      stopAnim();
+      hideOverlay();
+    }
+    S.result = st.result || null;
+    if (!st.result && !ahead) {
+      const s2 = game.status();
+      if (s2.over) S.result = { winner: s2.winner, reason: s2.reason };
+    }
+    render(anim);
+    if (S.result) setTimeout(showResult, Math.max(60, animUntil - Date.now() + 300));
+  }
+
+  // room.left: { uid: ms } for players who left mid-game (written by rooms.js)
+  function hasLeft(uid) { return !!(ON.room && ON.room.left && ON.room.left[uid]); }
+  function anyLeft() { return !!(ON.room && ON.room.left && Object.keys(ON.room.left).length); }
+  function myColorIn(st) { return st.orange === ON.me ? 0 : st.white === ON.me ? 1 : null; }
+
+  async function sendMove(n) {
+    const code = ON.code;
+    let ok = false;
+    try {
+      const r = await Rooms.update(code, (room) => {
+        const st = room.state;
+        if (room.phase !== 'play' || !st || st.result) return null;
+        const col = myColorIn(st);
+        if (col === null || st.turn !== col) return null;
+        const g = Game.fromNotes(st.moves || []);
+        if (!g || g.pos.turn !== col) return null;
+        const m = g.find(n);
+        if (!m) return null;
+        g.play(m);
+        const s = g.status();
+        const result = s.over ? { winner: s.winner, reason: s.reason } : null;
+        return {
+          phase: result ? 'done' : 'play',
+          state: Object.assign({}, st, { moves: g.notes, turn: g.pos.turn, result, drawOffer: null }),
+        };
+      });
+      ok = !!r;
+    } catch (e) {
+      if (ON.code === code) showFlash('Move not sent. Check your connection.');
+    }
+    if (ON.code !== code) return;
+    ON.pending = false;
+    if (!ok && ON.room) {
+      // rejected: snap back to the room's position
+      game = Game.fromNotes(ON.room.state.moves || []) || new Game();
+      syncOnline(ON.room);
+    } else render();
+  }
+
+  async function onlineResign() {
+    try {
+      await Rooms.update(ON.code, (room) => {
+        const st = room.state, col = myColorIn(st);
+        if (col === null || st.result || room.phase !== 'play') return null;
+        return { phase: 'done', state: Object.assign({}, st, { result: { winner: col ^ 1, reason: 'resign' }, drawOffer: null }) };
+      });
+    } catch (e) { showFlash(friendly(e)); }
+  }
+  async function onlineDraw(kind) {
+    try {
+      await Rooms.update(ON.code, (room) => {
+        const st = room.state, col = myColorIn(st);
+        if (col === null || st.result || room.phase !== 'play') return null;
+        if (kind === 'offer') {
+          if (hasOffer(st)) return null;
+          return { state: Object.assign({}, st, { drawOffer: col }) };
+        }
+        if (hasOffer(st) && st.drawOffer !== col) {
+          return { phase: 'done', state: Object.assign({}, st, { drawOffer: null, result: { winner: null, reason: 'agreement' } }) };
+        }
+        return null;
+      });
+    } catch (e) { showFlash(friendly(e)); }
+  }
+  async function onlineRematch() {
+    try {
+      await Rooms.update(ON.code, (room) => {
+        const st = room.state;
+        if (!st.result || myColorIn(st) === null || (room.left && Object.keys(room.left).length)) return null;
+        const want = new Set(st.rematch || []);
+        want.add(ON.me);
+        if (room.seats.length === 2 && room.seats.every((u) => want.has(u))) {
+          // colours swap every rematch
+          return { phase: 'play', state: freshState(st, st.white, st.orange, (st.n || 1) + 1) };
+        }
+        return { state: Object.assign({}, st, { rematch: Array.from(want) }) };
+      });
+    } catch (e) { showFlash(friendly(e)); }
+  }
+  async function onlineLeave() {
+    const code = ON.code;
+    const room = ON.room;
+    leaveRoomLocal();
+    if (code && room) {
+      try {
+        if (room.phase !== 'lobby') {
+          // leaving a game in progress resigns it; rooms.js marks room.left
+          await Rooms.update(code, (r) => {
+            const st = r.state, col = myColorIn(st);
+            if (col === null || st.result || r.phase !== 'play') return null;
+            return { phase: 'done', state: Object.assign({}, st, { result: { winner: col ^ 1, reason: 'resign' }, drawOffer: null }) };
+          });
+        }
+        await Rooms.leave(code);
+      } catch (_) {}
+    }
+    leaveRoomLocal();
+    store.set(ROOM_KEY, null);
+    setUrlRoom(null);
+    S.mode = null;
+    hideOverlay();
+    openMenu('home');
+  }
+  $('lobbyLeave').addEventListener('click', onlineLeave);
+  $('lobbyLink').addEventListener('focus', (e) => { try { e.target.select(); } catch (_) {} });
+  $('copyBtn').addEventListener('click', async () => {
+    if (!ON.code) return;
+    const url = Rooms.inviteUrl('nine-mens-morris', ON.code);
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (_) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (_) {}
+    }
+    const b = $('copyBtn');
+    b.textContent = ok ? 'Copied' : 'Copy the link above';
+    if (!ok) { try { $('lobbyLink').focus(); $('lobbyLink').select(); } catch (_) {} }
+    setTimeout(() => { b.textContent = 'Copy link'; }, 1600);
+  });
+
+  // The opponent's away state.
+  setInterval(() => {
+    if (S.mode !== 'online' || !ON.room) return;
+    renderBars(); renderStatus();
+  }, 3000);
+
+  /* ---------- layout: everything sized from the viewport ---------- */
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const m = Math.min(vw, vh);
+    const pad = clamp(8, m * 0.03, 24);
+    const fs = clamp(12, Math.min(vw / 30, vh / 44), 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    const g = clamp(6, m * 0.014, 12);
+    gameEl.style.setProperty('--g', g + 'px');
+    const set = (S0) => { gameEl.style.setProperty('--S', S0 + 'px'); };
+
+    // column: measure what is not board
+    gameEl.classList.add('col'); gameEl.classList.remove('row', 'narrow');
+    set(300);
+    const extraCol = gameEl.offsetHeight - 300;
+    const sCol = Math.min(vw - 2 * pad, vh - 2 * pad - extraCol);
+
+    // row: board column beside a side panel
+    const side = clamp(220, vw * 0.26, 300);
+    gameEl.classList.add('row'); gameEl.classList.remove('col');
+    gameEl.style.setProperty('--side', side + 'px');
+    const extraRow = gameEl.querySelector('.bcol').offsetHeight - 300;
+    const sRow = Math.min(vh - 2 * pad - extraRow, vw - 2 * pad - side - g * 2.5);
+
+    const useRow = vw >= 600 && sRow > sCol * 1.05;
+    const S0 = Math.floor(clamp(160, useRow ? sRow : sCol, 900) / 2) * 2;
+    gameEl.classList.toggle('row', useRow);
+    gameEl.classList.toggle('col', !useRow);
+    gameEl.classList.toggle('narrow', !useRow && S0 < 400);
+    set(S0);
+    computeGeo(S0);
+    drawLines();
+    gMill.dataset.k = '';
+    stopAnim();
+    renderPieces();
+    renderMarks();
+    renderMoves();
+  }
+  let raf = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(layout); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  computeGeo(360);
+  render();
+  layout();
+  gameEl.classList.add('ready');
+  showView('home');
+  V.ready();
+
+  import('../_shared/rooms.js').then((mod) => {
+    Rooms = mod;
+    refreshHome();
+    if (!Rooms.available) return;
+    const urlCode = Rooms.codeFromUrl();
+    const saved = store.get(ROOM_KEY);
+    if (urlCode) joinRoom(urlCode, 'url');
+    else if (saved && saved.code && Date.now() - (saved.at || 0) < 1000 * 60 * 60 * 24) joinRoom(saved.code, 'saved');
+  }).catch(() => {
+    Rooms = null;
+    refreshHome();
+  });
+})();
+</script>
+</body>
+</html>

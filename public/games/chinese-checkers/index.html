@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c0f">
+<title>Chinese Checkers</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.35);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ink: #0b0c0f;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --bw: 320px;
+    --bh: 370px;
+    --m: 20px;
+    --side: 260px;
+    --g: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+  }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- layout ---------- */
+  .game { display: grid; visibility: hidden; gap: var(--g); }
+  .game.ready { visibility: visible; }
+  .side { display: contents; }
+  .game.col {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "pl pl" "bd bd" "st ac";
+    width: max(var(--bw), 300px);
+  }
+  .game.row {
+    grid-template-columns: var(--bw) var(--side);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "bd st" "bd pl" "bd ac";
+    column-gap: calc(var(--g) * 2.5);
+    height: var(--bh);
+  }
+  .board { grid-area: bd; justify-self: center; }
+  .players { grid-area: pl; }
+  .status { grid-area: st; }
+  .actions { grid-area: ac; }
+
+  /* ---------- players ---------- */
+  .players { display: flex; gap: 4px; min-width: 0; }
+  .game.row .players { flex-direction: column; gap: 0; align-self: start; border-top: 1px solid var(--line); }
+  .pl {
+    flex: 1 1 0; min-width: 0;
+    display: flex; align-items: center; gap: 0.5em;
+    height: 2.6em; padding: 0 0.6em;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--muted);
+    box-shadow: inset 0 -2px 0 transparent;
+    transition: color 180ms var(--ease), box-shadow 180ms var(--ease), background 180ms var(--ease);
+  }
+  .game.row .pl { flex: none; height: 2.9em; background: transparent; border: 0; border-bottom: 1px solid var(--line); box-shadow: inset 2px 0 0 transparent; padding: 0 0.7em; }
+  .pl.on { color: var(--text); box-shadow: inset 0 -2px 0 var(--brand); background: var(--surface-2); }
+  .game.row .pl.on { box-shadow: inset 2px 0 0 var(--brand); background: var(--surface); }
+  .pl .nm { font-weight: 600; font-size: 0.86em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+  .players.compact .pl { justify-content: center; padding: 0 0.3em; gap: 0.35em; }
+  .players.compact .nm { display: none; }
+  .pl .ct { flex: none; font: 300 1.2em/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .pl .ct small { font: 400 0.6em var(--font); color: var(--faint); margin-left: 0.1em; }
+  .players.compact .ct small { display: none; }
+  .pl.win .ct { color: var(--brand-hover); }
+  .chip { width: 1.15em; height: 1.15em; flex: none; display: block; }
+  .chip svg { display: block; width: 100%; height: 100%; }
+
+  /* ---------- status and actions ---------- */
+  .status {
+    min-width: 0; min-height: 2.6em;
+    display: flex; align-items: center; gap: 0.6em;
+    font-size: 0.95em; font-weight: 600;
+  }
+  .status span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .game.row .status { font: 300 1.5em/1.1 var(--font-display); min-height: 2em; }
+  .game.row .status .chip { width: 0.9em; height: 0.9em; }
+  .status.flash span { color: var(--brand-hover); }
+  .actions { display: flex; gap: 0.4em; align-items: center; }
+  .game.row .actions { align-items: end; }
+  .game.row .actions .btn { flex: 1 1 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 3.3em; padding: 0 1.3em; min-width: 0;
+    border-radius: 0; border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.74em var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+
+  /* ---------- board ---------- */
+  .board {
+    position: relative;
+    width: var(--bw); height: var(--bh);
+    touch-action: none;
+    outline: none;
+  }
+  .board.mine { cursor: pointer; }
+  .board > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+  .star { fill: var(--surface); }
+  .tint { opacity: 0.09; }
+  .tgt { fill: var(--brand); fill-opacity: 0; stroke: var(--brand-hover); stroke-width: 1.5px; vector-effect: non-scaling-stroke; opacity: 0; transition: opacity 220ms var(--ease); }
+  .tgt.on { opacity: 0.85; }
+  .hole { fill: var(--ink); stroke: rgba(255, 255, 255, 0.09); stroke-width: 1px; vector-effect: non-scaling-stroke; }
+  .trail { fill: none; stroke: var(--brand); stroke-width: 2px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; opacity: 0.55; }
+  .trail.preview { opacity: 0.9; stroke: var(--brand-hover); }
+  .hop { fill: var(--brand); opacity: 0.7; }
+  .from { fill: none; stroke: var(--brand); stroke-width: 1.5px; vector-effect: non-scaling-stroke; opacity: 0.6; }
+  .selring { fill: none; stroke: var(--brand-hover); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+  .dest { fill: var(--brand); transform-box: fill-box; transform-origin: center; animation: dest-in 220ms var(--ease) both; }
+  .dest.hot { fill: var(--brand-hover); transform: scale(1.45); }
+  @keyframes dest-in { from { transform: scale(0); } to { transform: scale(1); } }
+
+  .marbles { position: absolute; inset: 0; pointer-events: none; }
+  .mb {
+    position: absolute; left: 0; top: 0;
+    width: var(--m); height: var(--m);
+    will-change: transform;
+  }
+  .mb.moving { z-index: 3; }
+  .mb svg { display: block; width: 100%; height: 100%; transition: transform 160ms var(--ease); }
+  .mb.sel svg { transform: scale(1.2); }
+  .mb.pop svg { animation: pop 340ms var(--ease) both; }
+  .mb.nudge { animation: nudge 260ms var(--ease); }
+  @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  @keyframes nudge { 0%, 100% { translate: 0 0; } 25% { translate: -2px 0; } 75% { translate: 2px 0; } }
+  .pulse {
+    position: absolute; left: 0; top: 0;
+    width: var(--m); height: var(--m);
+    border: 2px solid var(--brand-hover); border-radius: 50%;
+    pointer-events: none; opacity: 0;
+  }
+
+  /* ---------- result card ---------- */
+  .overlay {
+    position: absolute; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0; transition: opacity 220ms var(--ease);
+  }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(92%, 20em);
+    padding: 1.3em 1.3em 1.2em;
+    background: var(--surface); border: 1px solid var(--line);
+    transform: translateY(24px); transition: transform 300ms var(--ease);
+  }
+  .overlay.show .card { transform: none; }
+  .card h2 { margin: 0; font: 300 2em/1.1 var(--font-display); }
+  .card .rows { margin-top: 0.9em; border-top: 1px solid var(--line); }
+  .card .rw { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.5em 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 0.88em; }
+  .card .rw b { color: var(--text); font: 300 1.5em/1 var(--font-display); font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 0.4em; }
+  .card .rw b .chip { width: 0.8em; height: 0.8em; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; flex-wrap: wrap; }
+  .card .btns .btn { flex: 1 1 7em; }
+
+  /* ---------- menu ---------- */
+  .menu {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .panel { width: min(100%, 23em); margin: auto 0; display: flex; flex-direction: column; gap: 0.6em; }
+  .panel h1 {
+    margin: 0 0 0.1em;
+    font: 300 2.4em/1.05 var(--font-display);
+    display: flex; align-items: center; gap: 0.32em;
+  }
+  .panel h1::before { content: ""; width: 0.3em; height: 0.3em; background: var(--brand); flex: none; margin-top: 0.06em; }
+  .panel .sub { margin: 0 0 0.7em; color: var(--muted); font-size: 0.92em; line-height: 1.45; }
+  .lab {
+    display: block; margin-top: 0.5em;
+    font: 600 0.7em/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tile {
+    display: flex; align-items: center; gap: 0.9em;
+    height: 3.6em; padding: 0 1.1em;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: var(--surface);
+    font: 600 1em var(--font); text-align: left;
+    cursor: pointer;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .tile::after { content: ""; margin-left: auto; width: 0.5em; height: 0.5em; border: solid var(--muted); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .tile:hover { background: var(--surface-2); border-color: var(--brand); }
+  .tile:active { transform: scale(0.985); }
+  .tile:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .tile small { font-weight: 400; color: var(--muted); }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0; height: 2.7em; min-width: 0;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: transparent; cursor: pointer;
+    font-weight: 600; font-size: 0.9em;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .seg button + button { margin-left: -1px; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.06); }
+  .seg button.on { background: var(--brand); border-color: var(--brand); position: relative; z-index: 1; }
+  .seg button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; position: relative; z-index: 2; }
+  .seats { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+  .seat { display: flex; align-items: center; gap: 0.7em; padding: 0.35em 0; border-bottom: 1px solid var(--line); }
+  .seat .chip { width: 1.3em; height: 1.3em; }
+  .seat .nm { flex: 1 1 auto; font-weight: 600; font-size: 0.92em; white-space: nowrap; }
+  .seat .seg { flex: 0 0 12.5em; }
+  .seat .seg button { height: 2.4em; font-size: 0.82em; }
+  .start { height: 3.6em; margin-top: 0.7em; font-size: 0.8em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mb svg, .overlay, .card, .tgt, .pl { transition: none; }
+    .mb.pop svg, .mb.nudge, .dest { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="game col" id="game">
+  <div class="board" id="board" tabindex="-1" aria-label="Chinese checkers board">
+    <svg id="bsvg" xmlns="http://www.w3.org/2000/svg">
+      <g id="gStar"></g>
+      <g id="gTint"></g>
+      <g id="gHoles"></g>
+      <g id="gTrail"></g>
+      <g id="gFx"></g>
+    </svg>
+    <div class="marbles" id="marbles"></div>
+    <div class="overlay" id="overlay" hidden>
+      <div class="card" role="dialog" aria-live="polite">
+        <h2 id="ovTitle"></h2>
+        <div class="rows" id="ovRows"></div>
+        <div class="btns">
+          <button class="btn" type="button" id="ovMenu">Menu</button>
+          <button class="btn primary" type="button" id="ovAgain">Play again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="status" id="status"></div>
+    <div class="players" id="players"></div>
+    <div class="actions"><button class="btn" type="button" id="menuBtn">Menu</button></div>
+  </div>
+</div>
+
+<div class="menu" id="menu">
+  <div class="panel">
+    <h1>Chinese Checkers</h1>
+    <p class="sub">Tap a marble, then tap a hole.</p>
+    <button class="tile" id="contBtn" type="button" hidden>Continue <small id="contInfo"></small></button>
+    <span class="lab">Players</span>
+    <div class="seg" id="segCount">
+      <button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="6">6</button>
+    </div>
+    <span class="lab">Seats</span>
+    <div class="seats" id="seats"></div>
+    <button class="btn primary start" type="button" id="startBtn">Start</button>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="chinese-checkers"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {} };
+
+  /* ===== CORE START ===== */
+  function ChineseCheckersCore() {
+    // Holes use cube coordinates (x, y, z), x + y + z = 0. The star is the
+    // union of two triangles: every coordinate <= 4, or every coordinate >= -4.
+    // On screen x grows to the right and z grows downward.
+    const S3 = Math.sqrt(3) / 2;
+    const CX = [], CY = [], CZ = [], SX = [], SY = [];
+    const KEY = new Map();
+    for (let z = -8; z <= 8; z++) {
+      for (let x = -8; x <= 8; x++) {
+        const y = -x - z;
+        if (y < -8 || y > 8) continue;
+        const a = x <= 4 && y <= 4 && z <= 4, b = x >= -4 && y >= -4 && z >= -4;
+        if (!a && !b) continue;
+        KEY.set(x * 100 + z, CX.length);
+        CX.push(x); CY.push(y); CZ.push(z);
+        SX.push(x + z / 2); SY.push(z * S3);
+      }
+    }
+    const N = CX.length;
+    const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+    const NB = new Int16Array(N * 6).fill(-1);
+    for (let i = 0; i < N; i++) {
+      for (let d = 0; d < 6; d++) {
+        const k = (CX[i] + DIRS[d][0]) * 100 + CZ[i] + DIRS[d][1];
+        if (KEY.has(k)) NB[i * 6 + d] = KEY.get(k);
+      }
+    }
+    const coord = (i, c) => (c === 0 ? CX[i] : c === 1 ? CY[i] : CZ[i]);
+
+    // Six points, numbered clockwise from the top: 0 top, 1 upper right,
+    // 2 lower right, 3 bottom, 4 lower left, 5 upper left. Point k faces k + 3.
+    const POINT = new Int8Array(N).fill(-1);
+    const PT_C = [], PT_G = [], PT_HOLES = [];
+    [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]].forEach(([c, g]) => {
+      let sx = 0, sy = 0;
+      const hs = [];
+      for (let i = 0; i < N; i++) if (g * coord(i, c) > 4) { hs.push(i); sx += SX[i]; sy += SY[i]; }
+      const ang = Math.atan2(sy, sx) * 180 / Math.PI;
+      const pos = Math.round((((ang + 90) % 360) + 360) % 360 / 60) % 6;
+      PT_C[pos] = c; PT_G[pos] = g; PT_HOLES[pos] = hs;
+      for (const i of hs) POINT[i] = pos;
+    });
+    // DEPTH: how far a hole is toward point t (8 at its tip, -8 at the far tip).
+    // LAT: sideways distance from the line through both tips.
+    const DEPTH = new Int8Array(6 * N), LAT = new Int8Array(6 * N);
+    for (let t = 0; t < 6; t++) {
+      const c = PT_C[t], g = PT_G[t], o = [0, 1, 2].filter((k) => k !== c);
+      for (let i = 0; i < N; i++) {
+        DEPTH[t * N + i] = g * coord(i, c);
+        LAT[t * N + i] = Math.abs(coord(i, o[0]) - coord(i, o[1]));
+      }
+    }
+
+    const LAYOUTS = { 2: [3, 0], 3: [3, 5, 1], 4: [3, 4, 0, 1], 6: [3, 4, 5, 0, 1, 2] };
+
+    function setup(n) {
+      const pos = LAYOUTS[n].slice(), board = new Int8Array(N);
+      pos.forEach((ps, p) => { for (const i of PT_HOLES[ps]) board[i] = p + 1; });
+      return { n, pos, board, turn: 0, ply: 0 };
+    }
+    const target = (st, p) => (st.pos[p] + 3) % 6;
+
+    const seen = new Int16Array(N), queue = new Int16Array(N);
+    // Every legal destination for the marble on `from`: one step to an empty
+    // neighbour, or any chain of jumps over single marbles. A marble already in
+    // its target point stays inside it.
+    function reach(b, from, tgt) {
+      const out = [];
+      const own = b[from];
+      b[from] = 0;
+      const lock = POINT[from] === tgt;
+      for (let d = 0; d < 6; d++) {
+        const n = NB[from * 6 + d];
+        if (n >= 0 && !b[n] && (!lock || POINT[n] === tgt)) out.push({ f: from, t: n, path: [n], jump: false });
+      }
+      seen.fill(-2);
+      seen[from] = -1;
+      let qh = 0, qt = 0;
+      queue[qt++] = from;
+      while (qh < qt) {
+        const u = queue[qh++];
+        for (let d = 0; d < 6; d++) {
+          const m = NB[u * 6 + d];
+          if (m < 0 || !b[m]) continue;
+          const l = NB[m * 6 + d];
+          if (l < 0 || b[l] || seen[l] !== -2) continue;
+          seen[l] = u;
+          queue[qt++] = l;
+        }
+      }
+      for (let k = 1; k < qt; k++) {
+        const l = queue[k];
+        if (lock && POINT[l] !== tgt) continue;
+        const path = [];
+        for (let v = l; v !== from; v = seen[v]) path.push(v);
+        path.reverse();
+        out.push({ f: from, t: l, path, jump: true });
+      }
+      b[from] = own;
+      return out;
+    }
+    function movesFor(st, p) {
+      const t = target(st, p), b = st.board, v = p + 1, out = [];
+      for (let i = 0; i < N; i++) {
+        if (b[i] !== v) continue;
+        const r = reach(b, i, t);
+        for (let k = 0; k < r.length; k++) out.push(r[k]);
+      }
+      return out;
+    }
+    function homeCount(st, p) {
+      let n = 0;
+      for (const i of PT_HOLES[target(st, p)]) if (st.board[i] === p + 1) n++;
+      return n;
+    }
+    const won = (st, p) => homeCount(st, p) === 10;
+    function apply(st, m) {
+      const v = st.board[m.f];
+      st.board[m.f] = 0;
+      st.board[m.t] = v;
+    }
+
+    // ----- computer player -----
+    const W_LAT = 0.035, W_GAP = 0.2, GAP = 5, W_LAG = 0.3;
+    const ds = new Int8Array(10);
+    // Progress toward the target, less: drifting sideways outside the target,
+    // a wide spread between the front and the back marble, and any marble
+    // lagging well behind the average (a straggler can get shut in at home).
+    function evalP(b, v, t) {
+      let sum = 0, mn = 99, mx = -99, lat = 0, n = 0;
+      const o = t * N;
+      for (let i = 0; i < N; i++) {
+        if (b[i] !== v) continue;
+        const d = DEPTH[o + i];
+        ds[n++] = d;
+        sum += d;
+        if (d < mn) mn = d;
+        if (d > mx) mx = d;
+        if (POINT[i] !== t) { const l = LAT[o + i]; lat += l * l; }
+      }
+      const avg = sum / n;
+      let lag = 0;
+      for (let k = 0; k < n; k++) { const q = avg - ds[k] - 4; if (q > 0) lag += q * q; }
+      return sum - W_LAT * lat - W_GAP * Math.max(0, mx - mn - GAP) - W_LAG * lag;
+    }
+    // Two plies of its own moves: the best gain now plus most of the best gain
+    // it sets up for next turn. Undoing its own last move is discouraged.
+    function choose(st, p, last, rnd) {
+      const t = target(st, p), b = st.board, v = p + 1;
+      const ms = movesFor(st, p);
+      if (!ms.length) return null;
+      const base = evalP(b, v, t);
+      let best = -Infinity, pick = ms[0];
+      for (const m of ms) {
+        b[m.f] = 0; b[m.t] = v;
+        const e1 = evalP(b, v, t);
+        let s;
+        if (won(st, p)) s = 1000;
+        else {
+          let e2 = e1;
+          const ms2 = movesFor(st, p);
+          for (let k = 0; k < ms2.length; k++) {
+            const m2 = ms2[k];
+            b[m2.f] = 0; b[m2.t] = v;
+            const e = evalP(b, v, t);
+            if (e > e2) e2 = e;
+            b[m2.t] = 0; b[m2.f] = v;
+          }
+          s = (e1 - base) + 0.6 * (e2 - e1);
+        }
+        b[m.t] = 0; b[m.f] = v;
+        if (last && m.f === last.t && m.t === last.f) s -= 3;
+        s += rnd() * 0.05;
+        if (s > best) { best = s; pick = m; }
+      }
+      return pick;
+    }
+
+    return { N, NB, SX, SY, CX, CY, CZ, POINT, PT_HOLES, DEPTH, LAT, LAYOUTS, setup, target, reach, movesFor, homeCount, won, apply, choose, evalP };
+  }
+  /* ===== CORE END ===== */
+
+  const C = ChineseCheckersCore();
+  const N = C.N;
+
+  // ----- looks: six sides, each a tone and a mark so they read in greyscale -----
+  const TONES = ['#ea5426', '#ffffff', '#8a8f98', '#c4c7cd', '#b83f19', '#5d626b'];
+  const INK = '#0b0c0f';
+  function look(k) {
+    const t = TONES[k];
+    let s = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="' + t + '"/>';
+    if (k === 1) s += '<circle cx="50" cy="50" r="21" fill="' + INK + '"/>';
+    else if (k === 2) s += '<path d="M4 50A46 46 0 0 0 96 50Z" fill="' + INK + '"/><circle cx="50" cy="50" r="43" fill="none" stroke="' + t + '" stroke-width="6"/>';
+    else if (k === 3) s += '<rect x="8" y="40" width="84" height="20" fill="' + INK + '"/><circle cx="50" cy="50" r="43" fill="none" stroke="' + t + '" stroke-width="6"/>';
+    else if (k === 4) s += '<circle cx="50" cy="50" r="14" fill="#fff"/>';
+    else if (k === 5) s += '<rect x="35" y="35" width="30" height="30" fill="#fff"/>';
+    return s + '</svg>';
+  }
+  const LOOKS = TONES.map((_, k) => look(k));
+  const chip = (k) => '<i class="chip">' + LOOKS[k] + '</i>';
+
+  const $ = (id) => document.getElementById(id);
+  const gameEl = $('game'), boardEl = $('board'), svg = $('bsvg'), marblesEl = $('marbles');
+  const gStar = $('gStar'), gTint = $('gTint'), gHoles = $('gHoles'), gTrail = $('gTrail'), gFx = $('gFx');
+  const statusEl = $('status'), playersEl = $('players'), overlay = $('overlay'), menuEl = $('menu');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = 'http://www.w3.org/2000/svg';
+  const SAVE_KEY = 'vela:chinese-checkers:save', CFG_KEY = 'vela:chinese-checkers:setup';
+
+  // ----- board geometry (units: one hole spacing) -----
+  const HOLE_R = 0.3, MARBLE_R = 0.42, MARGIN = 0.65;
+  const S3 = Math.sqrt(3) / 2;
+  const scr = (x, z) => [x + z / 2, z * S3];
+  function grow(tri, by) {
+    const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cy = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+    const side = Math.hypot(tri[1][0] - tri[0][0], tri[1][1] - tri[0][1]);
+    const r = side / (2 * Math.sqrt(3)), f = (r + by) / r;
+    return tri.map(([x, y]) => [cx + (x - cx) * f, cy + (y - cy) * f]);
+  }
+  const TRI_A = grow([scr(4, -8), scr(4, 4), scr(-8, 4)], MARGIN);
+  const TRI_B = grow([scr(-4, 8), scr(-4, -4), scr(8, -4)], MARGIN);
+  const ALL = TRI_A.concat(TRI_B);
+  const BX0 = Math.min(...ALL.map((p) => p[0])), BX1 = Math.max(...ALL.map((p) => p[0]));
+  const BY0 = Math.min(...ALL.map((p) => p[1])), BY1 = Math.max(...ALL.map((p) => p[1]));
+  const BW = BX1 - BX0, BH = BY1 - BY0;
+  // Each point's triangle: its tip and its two base corners, grown a little.
+  const PT_TRI = [];
+  for (let k = 0; k < 6; k++) {
+    const hs = C.PT_HOLES[k], o = k * N;
+    const tip = hs.find((i) => C.DEPTH[o + i] === 8);
+    const base = hs.filter((i) => C.DEPTH[o + i] === 5 && C.LAT[o + i] === 3);
+    PT_TRI[k] = grow([tip, base[0], base[1]].map((i) => [C.SX[i], C.SY[i]]), 0.55);
+  }
+  const ptsAttr = (pts) => pts.map((p) => p[0].toFixed(3) + ',' + p[1].toFixed(3)).join(' ');
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  svg.setAttribute('viewBox', BX0 + ' ' + BY0 + ' ' + BW + ' ' + BH);
+  el('polygon', { class: 'star', points: ptsAttr(TRI_A) }, gStar);
+  el('polygon', { class: 'star', points: ptsAttr(TRI_B) }, gStar);
+  for (let i = 0; i < N; i++) el('circle', { class: 'hole', cx: C.SX[i], cy: C.SY[i], r: HOLE_R }, gHoles);
+  const tgtEls = [];
+  for (let k = 0; k < 6; k++) tgtEls[k] = el('polygon', { class: 'tgt', points: ptsAttr(PT_TRI[k]) }, gTint);
+
+  // ----- state -----
+  let U = 20;                 // px per unit
+  let G = null;               // current game
+  let elAt = new Array(N).fill(null);
+  let sel = -1, destMap = new Map(), hotDest = -1;
+  let busy = false, paused = false, cpuTimer = 0, cpuPending = false, flashTimer = 0;
+  let setupN = 2, setupKinds = ['h', 'c', 'c', 'c', 'c', 'c'];
+
+  try {
+    const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || 'null');
+    if (cfg && C.LAYOUTS[cfg.n] && Array.isArray(cfg.kinds)) {
+      setupN = cfg.n;
+      setupKinds = setupKinds.map((k, i) => (cfg.kinds[i] === 'h' || cfg.kinds[i] === 'c' ? cfg.kinds[i] : k));
+    }
+  } catch (_) {}
+
+  function namesFor(kinds) {
+    const humans = kinds.filter((k) => k === 'h').length;
+    return kinds.map((k, p) => (k === 'h' ? (humans === 1 ? 'You' : 'Player ' + (p + 1)) : 'Computer ' + (p + 1)));
+  }
+
+  // ----- layout -----
+  function layout() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const g = W < 520 ? 8 : 14;
+    const fs = W < 400 ? 14 : 15;
+    document.body.style.fontSize = fs + 'px';
+    const row = W >= 640 && W > H * 1.15;
+    let u;
+    if (row) {
+      const side = Math.max(220, Math.min(300, W * 0.26));
+      document.documentElement.style.setProperty('--side', side + 'px');
+      u = Math.min((W - 2 * g - side - g * 2.5) / BW, (H - 2 * g) / BH);
+    } else {
+      const top = 2.6 * fs, foot = 3.3 * 0.74 * fs + 2;
+      u = Math.min((W - 2 * g) / BW, (H - 2 * g - top - foot - 2 * g) / BH);
+    }
+    U = Math.max(8, u);
+    document.documentElement.style.setProperty('--g', g + 'px');
+    document.documentElement.style.setProperty('--bw', (BW * U).toFixed(2) + 'px');
+    document.documentElement.style.setProperty('--bh', (BH * U).toFixed(2) + 'px');
+    document.documentElement.style.setProperty('--m', (2 * MARBLE_R * U).toFixed(2) + 'px');
+    gameEl.classList.toggle('row', row);
+    gameEl.classList.toggle('col', !row);
+    for (let i = 0; i < N; i++) if (elAt[i]) place(elAt[i], i);
+    fitPlayers();
+  }
+  function fitPlayers() {
+    if (!G) return;
+    const row = gameEl.classList.contains('row');
+    const w = BW * U;
+    playersEl.classList.toggle('compact', !row && w / G.st.n < 118);
+  }
+  const hx = (i) => (C.SX[i] - BX0) * U;
+  const hy = (i) => (C.SY[i] - BY0) * U;
+  const tf = (i, s) => 'translate(' + (hx(i) - MARBLE_R * U).toFixed(2) + 'px,' + (hy(i) - MARBLE_R * U).toFixed(2) + 'px)' + (s ? ' scale(' + s + ')' : '');
+  function place(e, i) { e.style.transform = tf(i); }
+
+  // ----- rendering -----
+  function buildMarbles() {
+    marblesEl.textContent = '';
+    elAt = new Array(N).fill(null);
+    const b = G.st.board;
+    for (let i = 0; i < N; i++) {
+      if (!b[i]) continue;
+      const e = document.createElement('div');
+      e.className = 'mb';
+      e.innerHTML = LOOKS[b[i] - 1];
+      place(e, i);
+      marblesEl.appendChild(e);
+      elAt[i] = e;
+    }
+  }
+  function buildTints() {
+    gTint.querySelectorAll('.tint').forEach((e) => e.remove());
+    G.st.pos.forEach((ps, p) => {
+      const e = el('polygon', { class: 'tint', points: ptsAttr(PT_TRI[ps]), fill: TONES[p] });
+      gTint.insertBefore(e, gTint.firstChild);
+    });
+  }
+  function renderPlayers() {
+    const st = G.st;
+    let h = '';
+    for (let p = 0; p < st.n; p++) {
+      const n = C.homeCount(st, p);
+      h += '<div class="pl' + (p === st.turn && !G.over ? ' on' : '') + (G.over && G.winner === p ? ' win on' : '') + '">' + chip(p) +
+        '<span class="nm">' + G.names[p] + '</span><b class="ct">' + n + '<small>/10</small></b></div>';
+    }
+    playersEl.innerHTML = h;
+    fitPlayers();
+  }
+  function renderStatus(text) {
+    const p = G.st.turn;
+    if (!text) {
+      if (G.over) text = G.names[G.winner] === 'You' ? 'You win' : G.names[G.winner] + ' wins';
+      else if (G.kinds[p] === 'h') text = G.names[p] === 'You' ? 'Your turn' : G.names[p] + ' to move';
+      else text = G.names[p];
+    }
+    statusEl.innerHTML = chip(G.over ? G.winner : p) + '<span>' + text + '</span>';
+  }
+  function showTarget() {
+    const p = G.st.turn, t = C.target(G.st, p);
+    tgtEls.forEach((e, k) => e.classList.toggle('on', !G.over && k === t));
+  }
+  function drawTrail(path, preview) {
+    const g = preview ? gFx : gTrail;
+    if (!preview) gTrail.textContent = '';
+    if (!path || path.length < 2) return;
+    el('polyline', { class: 'trail' + (preview ? ' preview' : ''), points: path.map((i) => C.SX[i] + ',' + C.SY[i]).join(' ') }, g);
+    if (!preview) {
+      el('circle', { class: 'from', cx: C.SX[path[0]], cy: C.SY[path[0]], r: HOLE_R + 0.06 }, g);
+      for (let k = 1; k < path.length - 1; k++) el('circle', { class: 'hop', cx: C.SX[path[k]], cy: C.SY[path[k]], r: 0.1 }, g);
+    }
+  }
+  function drawSelection() {
+    gFx.textContent = '';
+    if (sel < 0) return;
+    el('circle', { class: 'selring', cx: C.SX[sel], cy: C.SY[sel], r: 0.5 }, gFx);
+    if (hotDest >= 0 && destMap.has(hotDest)) drawTrail([sel].concat(destMap.get(hotDest).path), true);
+    let n = 0;
+    destMap.forEach((m, t) => {
+      const c = el('circle', { class: 'dest' + (t === hotDest ? ' hot' : ''), cx: C.SX[t], cy: C.SY[t], r: 0.17 }, gFx);
+      if (!reduce) c.style.animationDelay = Math.min(n++ * 12, 160) + 'ms';
+    });
+  }
+
+  // ----- selection and input -----
+  function clearSel() {
+    if (sel >= 0 && elAt[sel]) elAt[sel].classList.remove('sel');
+    sel = -1; hotDest = -1; destMap = new Map();
+    drawSelection();
+  }
+  function select(i) {
+    clearSel();
+    const ms = C.reach(G.st.board, i, C.target(G.st, G.st.turn));
+    if (!ms.length) {
+      const e = elAt[i];
+      if (e && !reduce) { e.classList.remove('nudge'); void e.offsetWidth; e.classList.add('nudge'); }
+      return;
+    }
+    sel = i;
+    ms.forEach((m) => destMap.set(m.t, m));
+    if (elAt[i]) elAt[i].classList.add('sel');
+    drawSelection();
+  }
+  function humanTurn() {
+    return G && !G.over && !busy && menuEl.hidden && G.kinds[G.st.turn] === 'h';
+  }
+  function holeAt(e) {
+    const r = boardEl.getBoundingClientRect();
+    const ux = (e.clientX - r.left) / U + BX0, uy = (e.clientY - r.top) / U + BY0;
+    let best = -1, bd = 0.62 * 0.62;
+    for (let i = 0; i < N; i++) {
+      const dx = C.SX[i] - ux, dy = C.SY[i] - uy, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  }
+  boardEl.addEventListener('pointerdown', (e) => {
+    window.focus();
+    if (!humanTurn()) return;
+    e.preventDefault();
+    const i = holeAt(e);
+    if (i >= 0 && sel >= 0 && destMap.has(i)) { doMove(destMap.get(i)); return; }
+    if (i >= 0 && G.st.board[i] === G.st.turn + 1) {
+      if (sel === i) clearSel(); else select(i);
+      return;
+    }
+    clearSel();
+  });
+  boardEl.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse' || sel < 0 || !humanTurn()) return;
+    const i = holeAt(e);
+    const h = destMap.has(i) ? i : -1;
+    if (h !== hotDest) { hotDest = h; drawSelection(); }
+  });
+  boardEl.addEventListener('pointerleave', () => { if (hotDest >= 0) { hotDest = -1; drawSelection(); } });
+  boardEl.addEventListener('contextmenu', (e) => e.preventDefault());
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sel >= 0) clearSel();
+  });
+
+  // ----- motion -----
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  function hop(e, a, b, jump) {
+    const dur = reduce ? 1 : jump ? 200 : 190;
+    let anim = null;
+    try {
+      if (jump) {
+        // Lift over the middle marble: biggest at the half-way point.
+        const mx = (hx(a) + hx(b)) / 2 - MARBLE_R * U, my = (hy(a) + hy(b)) / 2 - MARBLE_R * U;
+        const mid = 'translate(' + mx.toFixed(2) + 'px,' + my.toFixed(2) + 'px) scale(1.28)';
+        anim = e.animate([{ transform: tf(a) }, { transform: mid }, { transform: tf(b) }], { duration: dur, easing: 'cubic-bezier(0.35, 0, 0.25, 1)' });
+      } else {
+        anim = e.animate([{ transform: tf(a) }, { transform: tf(b) }], { duration: dur, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)' });
+      }
+    } catch (_) {}
+    place(e, b);
+    const done = anim ? Promise.race([anim.finished.catch(() => {}), wait(dur + 120)]) : Promise.resolve();
+    return done.then(() => { if (anim) anim.cancel(); place(e, b); land(b); });
+  }
+  function land(i) {
+    if (reduce) return;
+    const p = document.createElement('div');
+    p.className = 'pulse';
+    p.style.transform = tf(i);
+    marblesEl.appendChild(p);
+    try {
+      const a = p.animate([{ transform: tf(i, 0.7), opacity: 0.8 }, { transform: tf(i, 1.6), opacity: 0 }], { duration: 260, easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)' });
+      a.finished.then(() => p.remove(), () => p.remove());
+    } catch (_) {}
+    setTimeout(() => p.remove(), 400);
+  }
+  async function animatePath(e, path, jump) {
+    if (!e) return;
+    e.classList.add('moving');
+    for (let k = 1; k < path.length; k++) await hop(e, path[k - 1], path[k], jump);
+    e.classList.remove('moving');
+  }
+
+  // ----- turns -----
+  function startGame(n, kinds) {
+    stopCpu();
+    const st = C.setup(n);
+    G = {
+      st, kinds: kinds.slice(0, n), names: namesFor(kinds.slice(0, n)),
+      moves: new Array(n).fill(0), last: new Array(n).fill(null), trail: null,
+      over: false, winner: -1, passes: 0, token: Math.random(),
+    };
+    try { localStorage.setItem(CFG_KEY, JSON.stringify({ n, kinds: setupKinds })); } catch (_) {}
+    enterGame();
+    save();
+    beginTurn();
+  }
+  function enterGame() {
+    menuEl.hidden = true;
+    overlay.hidden = true; overlay.classList.remove('show');
+    busy = false; sel = -1; destMap = new Map(); hotDest = -1;
+    buildTints();
+    buildMarbles();
+    gFx.textContent = '';
+    drawTrail(G.trail);
+    layout();
+    gameEl.classList.add('ready');
+  }
+  function beginTurn() {
+    if (!G || G.over) return;
+    const p = G.st.turn;
+    renderPlayers(); renderStatus(); showTarget();
+    boardEl.classList.toggle('mine', G.kinds[p] === 'h');
+    if (!C.movesFor(G.st, p).length) {
+      G.passes++;
+      renderStatus(G.names[p] === 'You' ? 'You pass' : G.names[p] + ' passes');
+      statusEl.classList.add('flash');
+      const tok = G.token;
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => {
+        statusEl.classList.remove('flash');
+        if (!G || G.token !== tok || G.over) return;
+        if (G.passes >= G.st.n) { finish(-1); return; }
+        G.st.turn = (p + 1) % G.st.n;
+        save();
+        beginTurn();
+      }, 900);
+      return;
+    }
+    G.passes = 0;
+    if (G.kinds[p] === 'c') scheduleCpu();
+  }
+  function scheduleCpu() {
+    if (paused || !menuEl.hidden) { cpuPending = true; return; }
+    cpuPending = false;
+    const tok = G.token, p = G.st.turn;
+    clearTimeout(cpuTimer);
+    cpuTimer = setTimeout(() => {
+      if (!G || G.token !== tok || G.over || busy || G.st.turn !== p) return;
+      if (paused) { cpuPending = true; return; }
+      const m = C.choose(G.st, p, G.last[p], Math.random);
+      if (m) doMove(m);
+    }, reduce ? 150 : 260);
+  }
+  function stopCpu() { clearTimeout(cpuTimer); clearTimeout(flashTimer); cpuPending = false; }
+
+  async function doMove(m) {
+    const tok = G.token, p = G.st.turn;
+    busy = true;
+    clearSel();
+    boardEl.classList.remove('mine');
+    C.apply(G.st, m);
+    G.moves[p]++;
+    G.last[p] = { f: m.f, t: m.t };
+    G.trail = [m.f].concat(m.path);
+    const e = elAt[m.f];
+    elAt[m.f] = null; elAt[m.t] = e;
+    const win = C.won(G.st, p);
+    if (win) { G.over = true; G.winner = p; clearSave(); }
+    else { G.st.turn = (p + 1) % G.st.n; G.st.ply++; save(); }
+    gTrail.textContent = '';
+    await animatePath(e, G.trail, m.jump);
+    if (!G || G.token !== tok) return;
+    drawTrail(G.trail);
+    busy = false;
+    if (win) { finish(p); return; }
+    beginTurn();
+  }
+
+  function finish(w) {
+    stopCpu();
+    G.over = true; G.winner = w;
+    boardEl.classList.remove('mine');
+    clearSave();
+    showTarget();
+    if (w < 0) { statusEl.innerHTML = '<span>Draw</span>'; showResult(); return; }
+    renderPlayers(); renderStatus();
+    const tok = G.token;
+    let k = 0;
+    if (!reduce) {
+      for (let i = 0; i < N; i++) {
+        if (G.st.board[i] === w + 1 && elAt[i]) {
+          const e = elAt[i];
+          setTimeout(() => { e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop'); }, k++ * 45);
+        }
+      }
+    }
+    setTimeout(() => { if (G && G.token === tok) showResult(); }, reduce ? 200 : 750);
+  }
+  function showResult() {
+    const w = G.winner, humans = G.kinds.filter((k) => k === 'h').length;
+    let title;
+    if (w < 0) title = 'Draw';
+    else if (humans === 1) title = G.kinds[w] === 'h' ? 'You win' : 'You lose';
+    else title = G.names[w] + ' wins';
+    $('ovTitle').textContent = title;
+    let rows = '';
+    if (w >= 0) {
+      rows += '<div class="rw"><span>Winner</span><b>' + chip(w) + G.names[w] + '</b></div>';
+      rows += '<div class="rw"><span>Moves</span><b>' + G.moves[w] + '</b></div>';
+      if (humans === 1 && G.kinds[w] !== 'h') {
+        const me = G.kinds.indexOf('h');
+        rows += '<div class="rw"><span>Your marbles home</span><b>' + C.homeCount(G.st, me) + '</b></div>';
+      }
+    }
+    $('ovRows').innerHTML = rows;
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add('show'));
+    setTimeout(() => overlay.classList.add('show'), 30);
+  }
+
+  // ----- save -----
+  function save() {
+    if (!G || G.over) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        v: 1, n: G.st.n, kinds: G.kinds, board: Array.from(G.st.board), turn: G.st.turn, ply: G.st.ply,
+        moves: G.moves, last: G.last, trail: G.trail,
+      }));
+    } catch (_) {}
+  }
+  function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (_) {} }
+  function readSave() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (!s || s.v !== 1 || !C.LAYOUTS[s.n] || !Array.isArray(s.board) || s.board.length !== N) return null;
+      const counts = new Array(s.n + 1).fill(0);
+      for (const v of s.board) { if (v < 0 || v > s.n) return null; counts[v]++; }
+      for (let p = 1; p <= s.n; p++) if (counts[p] !== 10) return null;
+      if (!(s.turn >= 0 && s.turn < s.n)) return null;
+      return s;
+    } catch (_) { return null; }
+  }
+  function resume(s) {
+    stopCpu();
+    const st = C.setup(s.n);
+    st.board.set(s.board);
+    st.turn = s.turn; st.ply = s.ply || 0;
+    const kinds = s.kinds.slice(0, s.n).map((k) => (k === 'c' ? 'c' : 'h'));
+    G = {
+      st, kinds, names: namesFor(kinds),
+      moves: Array.isArray(s.moves) ? s.moves.slice(0, s.n) : new Array(s.n).fill(0),
+      last: Array.isArray(s.last) ? s.last.slice(0, s.n) : new Array(s.n).fill(null),
+      trail: Array.isArray(s.trail) && s.trail.every((i) => i >= 0 && i < N) ? s.trail : null,
+      over: false, winner: -1, passes: 0, token: Math.random(),
+    };
+    enterGame();
+    beginTurn();
+  }
+
+  // ----- menu -----
+  function renderSetup() {
+    document.querySelectorAll('#segCount button').forEach((b) => b.classList.toggle('on', +b.dataset.v === setupN));
+    let h = '';
+    for (let p = 0; p < setupN; p++) {
+      h += '<div class="seat">' + chip(p) + '<span class="nm">Player ' + (p + 1) + '</span><div class="seg" data-p="' + p + '">' +
+        '<button type="button" data-k="h"' + (setupKinds[p] === 'h' ? ' class="on"' : '') + '>Human</button>' +
+        '<button type="button" data-k="c"' + (setupKinds[p] === 'c' ? ' class="on"' : '') + '>Computer</button></div></div>';
+    }
+    $('seats').innerHTML = h;
+  }
+  $('segCount').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    setupN = +b.dataset.v;
+    renderSetup();
+  });
+  $('seats').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const p = +b.parentElement.dataset.p;
+    setupKinds[p] = b.dataset.k;
+    renderSetup();
+  });
+  $('startBtn').addEventListener('click', () => startGame(setupN, setupKinds));
+  $('contBtn').addEventListener('click', () => { const s = readSave(); if (s) resume(s); else showMenu(); });
+  function showMenu() {
+    stopCpu();
+    if (G) G.token = Math.random();
+    busy = false;
+    const s = readSave();
+    const cont = $('contBtn');
+    cont.hidden = !s;
+    if (s) {
+      const humans = s.kinds.slice(0, s.n).filter((k) => k !== 'c').length;
+      $('contInfo').textContent = s.n + ' players, ' + humans + (humans === 1 ? ' human' : ' humans');
+    }
+    renderSetup();
+    menuEl.hidden = false;
+    overlay.hidden = true; overlay.classList.remove('show');
+  }
+  $('menuBtn').addEventListener('click', showMenu);
+  $('ovMenu').addEventListener('click', showMenu);
+  $('ovAgain').addEventListener('click', () => {
+    const n = G.st.n, kinds = G.kinds.slice();
+    setupN = n;
+    kinds.forEach((k, i) => { setupKinds[i] = k; });
+    startGame(n, setupKinds);
+  });
+
+  // ----- page plumbing -----
+  for (const ev of ['touchmove', 'gesturestart']) {
+    document.addEventListener(ev, (e) => { if (e.target.closest && !e.target.closest('.menu')) e.preventDefault(); }, { passive: false });
+  }
+  window.addEventListener('resize', layout);
+  V.onPause((p) => {
+    paused = !!p;
+    if (!paused && cpuPending && G && !G.over && menuEl.hidden) scheduleCpu();
+  });
+
+  layout();
+  showMenu();
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { gameEl.classList.add('ready'); V.ready(); });
+})();
+</script>
+</body>
+</html>

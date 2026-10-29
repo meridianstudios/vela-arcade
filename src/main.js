@@ -149,6 +149,23 @@ document.addEventListener('keydown', (e) => {
 // page, so an ad inside one cannot send the whole site somewhere else.
 const THIRD_PARTY_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-orientation-lock allow-modals'
 
+/* ── leaderboards ────────────────────────────────────────────────
+   Every scored game of ours has one. Entries come from accounts only. */
+
+const hasBoard = (g) => g.scores && !g.via
+
+async function showBoard(g) {
+  const list = document.getElementById('board-list')
+  if (!list) return
+  const data = await Account.leaderboard(g.slug)
+  if (document.getElementById('board-list') !== list) return // left the page meanwhile
+  if (!data) { list.innerHTML = '<li class="board-note">&ndash;</li>'; return }
+  if (!data.top.length) { list.innerHTML = '<li class="board-note">No scores yet</li>'; return }
+  list.innerHTML = data.top.map((r, i) => `
+    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span><span class="who">${esc(r.name)}</span><span class="pts">${fmt(r.score)}</span></li>`).join('')
+    + (data.you ? `<li class="you sep"><span class="rank"></span><span class="who">${esc(Account.current().name)}</span><span class="pts">${fmt(data.you.score)}</span></li>` : '')
+}
+
 function renderPlay(slug) {
   const g = bySlug(slug)
   if (!g || !playable(g)) return renderMissing()
@@ -207,6 +224,11 @@ function renderPlay(slug) {
         </dl>
       </div>
       <div>
+        ${hasBoard(g) ? `
+        <div class="board">
+          <span class="label">Leaderboard</span>
+          <ol class="board-list" id="board-list"></ol>
+        </div>` : ''}
         <span class="label">More games</span>
         <div class="more">${more.map((x) => `
           <a href="/play/${x.slug}" data-link>
@@ -237,6 +259,8 @@ function renderPlay(slug) {
     frame.focus()
   }
   stage.addEventListener('pointerdown', focusFrame)
+
+  if (hasBoard(g)) showBoard(g)
 
   document.getElementById('restart').addEventListener('click', () => {
     loader.classList.remove('gone')
@@ -379,12 +403,11 @@ window.addEventListener('popstate', route)
 
 const accountEl = document.getElementById('account')
 const personIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>'
-let signingIn = false
 
 function renderAccount({ user }) {
   if (!user) {
     accountEl.innerHTML = `
-      <button class="account-btn" id="sign-in" ${signingIn ? 'disabled' : ''} aria-label="Sign in">
+      <button class="account-btn" id="sign-in" aria-label="Sign in">
         ${personIcon}<span>Sign in</span>
       </button>`
     return
@@ -411,24 +434,92 @@ function refreshBests() {
   })
 }
 
+// The leaderboard on the open game page, if it shows one of the changed games.
+function refreshBoard(slugs) {
+  const m = location.pathname.match(/^\/play\/([\w-]+)/)
+  const g = m && bySlug(m[1])
+  if (g && hasBoard(g) && (!slugs || slugs.includes(g.slug))) showBoard(g)
+}
+
+let lastUser = null
 Account.onChange((state) => {
   renderAccount(state)
   if (state.bestsChanged) refreshBests()
+  if (state.boardsChanged) refreshBoard(state.boardsChanged)
+  const uid = state.user && state.user.uid
+  if (uid !== lastUser) { lastUser = uid; refreshBoard() }
+})
+
+/* The sign-in form: a username and a password. Opened only from the button. */
+const dialog = document.createElement('div')
+dialog.className = 'dialog-back'
+dialog.hidden = true
+dialog.innerHTML = `
+  <form class="dialog" id="auth-form" novalidate>
+    <div class="dialog-tabs" role="tablist">
+      <button type="button" class="dialog-tab on" data-mode="in" role="tab">Sign in</button>
+      <button type="button" class="dialog-tab" data-mode="new" role="tab">Create account</button>
+      <button type="button" class="icon-btn dialog-close" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+    </div>
+    <label class="field"><span class="label">Username</span>
+      <input name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="16" required />
+    </label>
+    <label class="field"><span class="label">Password</span>
+      <input name="password" type="password" autocomplete="current-password" required />
+    </label>
+    <p class="dialog-error" id="auth-error" role="alert"></p>
+    <button class="btn primary" id="auth-go" type="submit">Sign in</button>
+  </form>`
+document.body.append(dialog)
+const form = dialog.querySelector('form')
+let mode = 'in'
+
+function setMode(m) {
+  mode = m
+  dialog.querySelectorAll('.dialog-tab').forEach((t) => t.classList.toggle('on', t.dataset.mode === m))
+  form.password.autocomplete = m === 'in' ? 'current-password' : 'new-password'
+  document.getElementById('auth-go').textContent = m === 'in' ? 'Sign in' : 'Create account'
+  document.getElementById('auth-error').textContent = ''
+}
+function openDialog() {
+  setMode('in')
+  form.reset()
+  dialog.hidden = false
+  form.username.focus()
+}
+const closeDialog = () => { dialog.hidden = true }
+
+dialog.addEventListener('click', (e) => {
+  if (e.target === dialog || e.target.closest('.dialog-close')) closeDialog()
+  const tab = e.target.closest('.dialog-tab')
+  if (tab) setMode(tab.dataset.mode)
+})
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !dialog.hidden) closeDialog() })
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const go = document.getElementById('auth-go')
+  const err = document.getElementById('auth-error')
+  const name = form.username.value.trim()
+  const password = form.password.value
+  go.disabled = true
+  err.textContent = ''
+  try {
+    if (mode === 'in') await Account.signIn(name, password)
+    else await Account.createAccount(name, password)
+    closeDialog()
+  } catch (x) {
+    err.textContent = x.message
+  }
+  go.disabled = false
 })
 
 accountEl.addEventListener('click', async (e) => {
   const menu = document.getElementById('account-menu')
-  if (e.target.closest('#sign-in')) {
-    signingIn = true
-    e.target.closest('#sign-in').disabled = true
-    try { await Account.signIn() } catch (err) {
-      // Closing the popup is not an error worth showing.
-      if (!/popup-closed|cancelled-popup/.test(String(err && err.code))) console.warn('sign in failed', err)
-    }
-    signingIn = false
-    const btn = document.getElementById('sign-in')
-    if (btn) btn.disabled = false
-  } else if (e.target.closest('#account-open')) {
+  if (e.target.closest('#sign-in')) openDialog()
+  else if (e.target.closest('#account-open')) {
     menu.hidden = !menu.hidden
     e.target.closest('#account-open').setAttribute('aria-expanded', String(!menu.hidden))
   } else if (e.target.closest('#sign-out')) {

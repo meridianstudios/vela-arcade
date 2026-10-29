@@ -477,11 +477,11 @@ export const CATALOGUE = [
     slug: 'blackjack',
     title: 'Blackjack',
     description:
-      "Beat the dealer's hand without going over 21, playing from a six-deck shoe with a bankroll that carries over between visits. The dealer stands on soft 17 and blackjack pays 3 to 2. Double on any first two cards, split pairs up to three hands, and take insurance when the dealer shows an ace.",
+      "Beat the dealer's hand without going over 21, playing from a six-deck shoe with a bankroll that carries over between visits. The dealer stands on soft 17 and blackjack pays 3 to 2. Double on any first two cards, split pairs up to three hands, and take insurance when the dealer shows an ace. Play solo, or online at a table of up to five against one dealer.",
     kind: 'inhouse',
     src: '/games/blackjack/index.html',
-    tags: ['Solo', 'Cards', 'Casino'],
-    players: '1 player',
+    tags: ['Solo', 'Multiplayer', 'Cards', 'Casino'],
+    players: '1 to 5 players, online',
     controls: 'Tap chips to bet, then Deal. H hit, S stand, D double, P split. 1 to 4 add chips, Enter deals.',
     scores: true,
     bestLabel: 'Best bankroll',
@@ -644,6 +644,68 @@ export const CATALOGUE = [
     scores: true,
     bestLabel: 'Best bankroll',
     art: `<g fill="currentColor"><rect x="5" y="8" width="43" height="8" opacity=".35"/><rect x="49" y="8" width="10" height="8"/><rect x="5" y="22" width="10" height="22"/><rect x="16" y="22" width="10" height="22"/><rect x="27" y="22" width="10" height="22" opacity=".45"/><rect x="38" y="22" width="10" height="22"/><rect x="49" y="22" width="10" height="22" opacity=".45"/><rect x="5" y="48" width="10" height="5"/><rect x="16" y="48" width="10" height="5"/><rect x="38" y="48" width="10" height="5"/></g>`,
+  },
+  {
+    slug: 'chinese-checkers',
+    title: 'Chinese Checkers',
+    description:
+      'The six-pointed star board with 10 marbles to a point, for 2, 3, 4 or 6 players. Step to a neighbouring hole or chain jumps over single marbles of any colour, and the first to fill the opposite point wins. Any seat can be a computer player or another person passing the device.',
+    kind: 'inhouse',
+    src: '/games/chinese-checkers/index.html',
+    tags: ['Strategy', 'Solo', 'Multiplayer'],
+    players: '1 to 6 players',
+    controls: 'Tap or click a marble to see where it can go, then tap a hole. Esc to deselect.',
+    art: `<g fill="currentColor"><path d="M32 6L39.5 19H54.5L47 32L54.5 45H39.5L32 58L24.5 45H9.5L17 32L9.5 19H24.5Z" opacity=".45"/><circle cx="32" cy="50" r="4.5"/><circle cx="27" cy="41.5" r="4.5"/><circle cx="37" cy="41.5" r="4.5"/><circle cx="32" cy="16" r="4.5"/><circle cx="32" cy="16" r="2" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'dominoes',
+    title: 'Dominoes',
+    description:
+      'Double-six dominoes against one to three computer players, or pass and play for two on one device. Match a tile to an open end of the line: in the Draw game you take from the boneyard when you cannot play, in the Block game you pass. Going out scores every pip left in the other hands, a blocked round goes to the lowest hand, and the first to 100 or 150 wins.',
+    kind: 'inhouse',
+    src: '/games/dominoes/index.html',
+    tags: ['Solo', 'Multiplayer', 'Strategy'],
+    players: '1 or 2 players',
+    controls: 'Tap a tile to play it, then tap an end if it fits both. Arrows and Enter also work, D draws, P passes.',
+    art: `<g fill="currentColor"><rect x="6" y="30" width="40" height="20" opacity=".45"/><rect x="25" y="33" width="2" height="14" style="fill:var(--tile)"/><circle cx="15.5" cy="40" r="2.8" style="fill:var(--tile)"/><rect x="29" y="5" width="30" height="54" style="fill:var(--tile)"/><rect x="32" y="8" width="24" height="48"/><rect x="35" y="31" width="18" height="2" style="fill:var(--tile)"/><circle cx="38.5" cy="14.5" r="2.8" style="fill:var(--tile)"/><circle cx="49.5" cy="25.5" r="2.8" style="fill:var(--tile)"/><circle cx="38.5" cy="38.5" r="2.8" style="fill:var(--tile)"/><circle cx="44" cy="44" r="2.8" style="fill:var(--tile)"/><circle cx="49.5" cy="49.5" r="2.8" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'nine-mens-morris',
+    title: "Nine Men's Morris",
+    description:
+      'The mill game on the three-square board: place nine pieces each, then move them along the lines, and every three in a row takes an opposing piece. A player down to three pieces may jump anywhere, two pieces left or no legal move loses, and the same position three times or 50 moves each without a capture is a draw. Play the computer on Easy, Normal or Hard, pass and play on one device, or play a friend online with a room code.',
+    kind: 'inhouse',
+    src: '/games/nine-mens-morris/index.html',
+    tags: ['Strategy', 'Multiplayer', 'Solo'],
+    players: '1 or 2 players, online',
+    controls: 'Click or tap a point to place. Drag a piece, or click it and then a point. U to undo.',
+    scores: true,
+    bestLabel: 'Best Hard streak',
+    art: `<g fill="currentColor"><g opacity=".45"><rect x="6" y="6" width="52" height="3"/><rect x="6" y="55" width="52" height="3"/><rect x="6" y="6" width="3" height="52"/><rect x="55" y="6" width="3" height="52"/><rect x="16" y="16" width="32" height="3"/><rect x="16" y="45" width="32" height="3"/><rect x="16" y="16" width="3" height="32"/><rect x="45" y="16" width="3" height="32"/><rect x="26" y="26" width="12" height="3"/><rect x="26" y="35" width="12" height="3"/><rect x="26" y="26" width="3" height="12"/><rect x="35" y="26" width="3" height="12"/><rect x="6" y="30.5" width="20" height="3"/><rect x="38" y="30.5" width="20" height="3"/><rect x="30.5" y="6" width="3" height="20"/><rect x="30.5" y="38" width="3" height="20"/></g><circle cx="7.5" cy="7.5" r="6.5"/><circle cx="32" cy="7.5" r="6.5"/><circle cx="56.5" cy="7.5" r="6.5"/><circle cx="17.5" cy="46.5" r="6"/><circle cx="17.5" cy="46.5" r="2.6" style="fill:var(--tile)"/><circle cx="46.5" cy="32" r="6"/><circle cx="46.5" cy="32" r="2.6" style="fill:var(--tile)"/></g>`,
+  },
+  {
+    slug: 'snakes-and-ladders',
+    title: 'Snakes and Ladders',
+    description:
+      'The classic race to 100 on a 10 by 10 board for 2 to 4 players, any mix of people on one device and computer players. A 6 rolls again, and it takes the exact roll to land on 100. Play the Classic, Quick or Long board.',
+    kind: 'inhouse',
+    src: '/games/snakes-and-ladders/index.html',
+    tags: ['Solo', 'Multiplayer'],
+    players: '1 to 4 players',
+    controls: 'Tap Roll or the die, or press Space. Esc opens the menu.',
+    art: `<g fill="currentColor" opacity=".45"><rect x="12" y="10" width="4" height="44"/><rect x="28" y="10" width="4" height="44"/><rect x="16" y="15" width="12" height="3"/><rect x="16" y="24" width="12" height="3"/><rect x="16" y="33" width="12" height="3"/><rect x="16" y="42" width="12" height="3"/></g><path d="M46 16 C56 24 36 29 44 39 C50 47 46 53 36 54" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><ellipse cx="46" cy="14" rx="7" ry="6" fill="currentColor"/><rect x="42.5" y="11.5" width="2.5" height="2.5" style="fill:var(--tile)"/><rect x="47.5" y="11.5" width="2.5" height="2.5" style="fill:var(--tile)"/>`,
+  },
+  {
+    slug: 'spades',
+    title: 'Spades',
+    description:
+      'Classic partnership Spades: you and North against West and East. Bid your tricks, including nil and an optional blind nil, follow suit and use spades as trumps. Every ten bags costs 100, and the first side to 500 or 250 wins.',
+    kind: 'inhouse',
+    src: '/games/spades/index.html',
+    tags: ['Solo', 'Cards', 'Strategy'],
+    players: '1 player',
+    controls: 'Tap or click a bid, then a card to play it. Arrow keys and Enter also work.',
+    art: `<g fill="currentColor"><rect x="28" y="16" width="24" height="34" transform="rotate(12 40 33)" opacity=".45"/><rect x="12" y="12" width="24" height="34" transform="rotate(-8 24 29)"/><path transform="rotate(-8 24 29) translate(16 21) scale(.16)" d="M50 5C57 17 94 39 94 62 94 76 84 84 72 84 63 84 56 79 53 73 54 82 58 89 66 95H34C42 89 46 82 47 73 44 79 37 84 28 84 16 84 6 76 6 62 6 39 43 17 50 5Z" style="fill:var(--tile)"/></g>`,
   },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {
@@ -1095,7 +1157,7 @@ export const CATALOGUE = [
     <path d="M32 50 L44 30" stroke="currentColor" stroke-width="2" stroke-dasharray="3 3"/>`,
   },
   {
-    slug: 'spades',
+    slug: 'gd-spades',
     title: 'Spades',
     via: 'GameDistribution',
     description:
@@ -1138,7 +1200,7 @@ export const CATALOGUE = [
     </g>`,
   },
   {
-    slug: 'dominoes',
+    slug: 'gd-dominoes',
     title: 'Dominoes',
     via: 'GameDistribution',
     description:

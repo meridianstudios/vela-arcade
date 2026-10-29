@@ -1,15 +1,20 @@
-/* Optional sign-in that keeps bests across devices.
+/* Optional accounts: a username and a password, nothing else.
  *
  * Nothing here is ever needed to play. Bests always live in localStorage
- * (bridge.js writes them); signing in with Google just mirrors them to
- * Firestore at players/<uid> and pulls them back on another device, keeping
- * the higher of the two for every game.
+ * (bridge.js writes them); an account mirrors them to Firestore at
+ * players/<uid>, pulls them back on another device (the higher wins), and puts
+ * them on the global leaderboards at boards/<game>/scores/<uid>.
  *
- * The Firebase SDK is only downloaded when someone presses Sign in, or on a
- * later visit by someone who signed in before, so everyone else pays nothing.
+ * Under the hood it is Firebase email/password auth with a made-up address
+ * built from the username, so Firebase keeps usernames unique and no email is
+ * ever asked for or sent. The flip side: a forgotten password cannot be reset.
  *
- * Firestore cost: one read when a signed-in visitor opens the site, and one
- * write per new best.
+ * The Firebase SDK is only downloaded when someone opens the sign-in form,
+ * views a leaderboard, or on a later visit by someone who signed in before.
+ *
+ * Firestore cost: one read when a signed-in visitor opens the site, a write
+ * per new best (two with the leaderboard), and up to 10 reads per leaderboard
+ * shown.
  *
  * On localhost this uses the auth and Firestore emulators (`npm run emulators`).
  */
@@ -20,8 +25,11 @@ const CONFIG = location.origin + '/games/_shared/firebase-config.js'
 const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
 const FLAG = 'vela:signed-in'
 const BEST = 'vela:best:'
+const MAIL = '@players.invalid'
+export const BOARD_SIZE = 10
 
 let fb = null      // loaded SDK pieces
+let loading = null
 let user = null    // { uid, name }
 let cloud = {}     // bests as stored in Firestore
 const listeners = new Set()
@@ -43,44 +51,70 @@ function localBests() {
   return out
 }
 
-async function load() {
-  if (fb) return fb
-  const [{ initializeApp }, auth, store, { firebaseConfig }] = await Promise.all([
-    import(/* @vite-ignore */ SDK + 'firebase-app.js'),
-    import(/* @vite-ignore */ SDK + 'firebase-auth.js'),
-    import(/* @vite-ignore */ SDK + 'firebase-firestore.js'),
-    import(/* @vite-ignore */ CONFIG),
-  ])
-  const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, 'vela-account')
-  const a = auth.getAuth(app)
-  const db = store.getFirestore(app)
-  if (local) {
-    auth.connectAuthEmulator(a, 'http://127.0.0.1:9199', { disableWarnings: true })
-    store.connectFirestoreEmulator(db, '127.0.0.1', 8181)
-  }
-  fb = { auth, store, a, db }
-  auth.onAuthStateChanged(a, (u) => {
-    if (u && !u.isAnonymous) {
-      user = { uid: u.uid, name: u.displayName || u.email || 'Player' }
-      storage.set(FLAG, '1')
-      sync()
-    } else {
-      user = null
-      cloud = {}
-      storage.del(FLAG)
-    }
-    emit()
-  })
-  return fb
+/* ── usernames ─────────────────────────────────────────────────── */
+
+// Names show on public leaderboards, so the obvious slurs and swears are out.
+const BLOCKED = ['fuck', 'shit', 'cunt', 'nigg', 'fag', 'bitch', 'whore', 'slut', 'rape', 'nazi', 'hitler', 'penis', 'vagina', 'porn', 'dick', 'cock', 'pussy', 'retard', 'kys']
+
+export function checkName(name) {
+  if (!/^[A-Za-z0-9_]{3,16}$/.test(name)) return '3 to 16 letters, numbers or _'
+  const flat = name.toLowerCase().replace(/_/g, '').replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's')
+  if (BLOCKED.some((w) => flat.includes(w))) return 'Pick another username'
+  return null
 }
 
-const ref = () => fb.store.doc(fb.db, 'players', user.uid)
+const emailFor = (name) => name.toLowerCase() + MAIL
+
+/* ── firebase ──────────────────────────────────────────────────── */
+
+function load() {
+  if (fb) return Promise.resolve(fb)
+  if (loading) return loading
+  loading = (async () => {
+    const [{ initializeApp }, auth, store, { firebaseConfig }] = await Promise.all([
+      import(/* @vite-ignore */ SDK + 'firebase-app.js'),
+      import(/* @vite-ignore */ SDK + 'firebase-auth.js'),
+      import(/* @vite-ignore */ SDK + 'firebase-firestore.js'),
+      import(/* @vite-ignore */ CONFIG),
+    ])
+    const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, 'vela-account')
+    const a = auth.getAuth(app)
+    const db = store.getFirestore(app)
+    if (local) {
+      auth.connectAuthEmulator(a, 'http://127.0.0.1:9199', { disableWarnings: true })
+      store.connectFirestoreEmulator(db, '127.0.0.1', 8181)
+    }
+    fb = { auth, store, a, db }
+    auth.onAuthStateChanged(a, (u) => {
+      if (u && u.email && u.email.endsWith(MAIL)) {
+        user = { uid: u.uid, name: u.displayName || u.email.slice(0, -MAIL.length) }
+        storage.set(FLAG, '1')
+        // A brand-new account has no display name for a moment; createAccount
+        // syncs once it is set, so leaderboard entries get the right case.
+        if (u.displayName) sync()
+      } else {
+        // Anything else (an old Google session) is signed out quietly.
+        if (u) auth.signOut(a)
+        user = null
+        cloud = {}
+        storage.del(FLAG)
+      }
+      emit()
+    })
+    return fb
+  })()
+  loading.catch(() => { loading = null })
+  return loading
+}
+
+const playerRef = () => fb.store.doc(fb.db, 'players', user.uid)
+const boardRef = (slug) => fb.store.doc(fb.db, 'boards', slug, 'scores', user.uid)
 
 // Higher wins both ways: the device gets any better cloud best, the cloud gets
 // any better device best.
 async function sync() {
   try {
-    const snap = await fb.store.getDoc(ref())
+    const snap = await fb.store.getDoc(playerRef())
     cloud = (snap.exists() && snap.data().bests) || {}
     const mine = localBests()
     const up = {}
@@ -94,8 +128,13 @@ async function sync() {
 }
 
 async function save(bests) {
-  await fb.store.setDoc(ref(), { bests, updatedAt: fb.store.serverTimestamp() }, { merge: true })
+  await fb.store.setDoc(playerRef(), { bests, updatedAt: fb.store.serverTimestamp() }, { merge: true })
   Object.assign(cloud, bests)
+  // Leaderboard entries; one failing (say, a game with no board) never blocks the rest.
+  await Promise.all(Object.entries(bests).map(([slug, score]) =>
+    fb.store.setDoc(boardRef(slug), { name: user.name, score, at: fb.store.serverTimestamp() })
+      .catch((e) => console.warn('leaderboard save failed', slug, e))))
+  emit({ boardsChanged: Object.keys(bests) })
 }
 
 // Games report a new best through bridge.js; mirror it while signed in.
@@ -110,19 +149,88 @@ function emit(extra = {}) {
   listeners.forEach((fn) => fn({ user, ...extra }))
 }
 
+/* ── public ────────────────────────────────────────────────────── */
+
 export function onChange(fn) {
   listeners.add(fn)
   fn({ user })
 }
 
-export async function signIn() {
-  const { auth, a } = await load()
-  await auth.signInWithPopup(a, new auth.GoogleAuthProvider())
+export const current = () => user
+
+// Errors come back as short labels for the form, never raw Firebase text.
+function message(err) {
+  const code = String((err && err.code) || '')
+  if (/email-already-in-use/.test(code)) return 'That username is taken'
+  if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(code)) return 'Wrong username or password'
+  if (/weak-password/.test(code)) return 'Password needs 6 or more characters'
+  if (/too-many-requests/.test(code)) return 'Too many tries. Wait a minute'
+  if (/network/.test(code)) return 'No connection'
+  return 'Something went wrong. Try again'
+}
+
+export async function signIn(name, password) {
+  const bad = /^[A-Za-z0-9_]{3,16}$/.test(name) ? null : 'Wrong username or password'
+  if (bad) throw new Error(bad)
+  try {
+    const { auth, a } = await load()
+    await auth.signInWithEmailAndPassword(a, emailFor(name), password)
+  } catch (e) { throw new Error(message(e)) }
+}
+
+export async function createAccount(name, password) {
+  const bad = checkName(name) || (password.length < 6 ? 'Password needs 6 or more characters' : null)
+  if (bad) throw new Error(bad)
+  try {
+    const { auth, a } = await load()
+    const cred = await auth.createUserWithEmailAndPassword(a, emailFor(name), password)
+    await auth.updateProfile(cred.user, { displayName: name })
+    user = { uid: cred.user.uid, name }
+    emit()
+    sync()
+  } catch (e) { throw new Error(message(e)) }
 }
 
 export async function signOut() {
   if (!fb) return
   await fb.auth.signOut(fb.a)
+}
+
+/* Top scores for a game, plus your own best if it is not among them (the
+ * rules cap queries, so there is no rank count beyond the top).
+ * Resolves to { top: [{ name, score, you }], you: { score } | null },
+ * or null if it cannot be reached. */
+// Read through Firestore's REST API: boards are public, so viewers who never
+// sign in don't download the SDK just to see one.
+const REST = local
+  ? 'http://127.0.0.1:8181/v1/projects/vela-arcade/databases/(default)/documents'
+  : 'https://firestore.googleapis.com/v1/projects/vela-arcade/databases/(default)/documents'
+
+export async function leaderboard(slug) {
+  try {
+    const res = await fetch(`${REST}/boards/${encodeURIComponent(slug)}:runQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: 'scores' }],
+        orderBy: [{ field: { fieldPath: 'score' }, direction: 'DESCENDING' }],
+        limit: BOARD_SIZE,
+      } }),
+    })
+    if (!res.ok) throw new Error(res.status)
+    const num = (v) => Number(v && (v.integerValue ?? v.doubleValue)) || 0
+    const top = (await res.json()).filter((r) => r.document).map(({ document: d }) => ({
+      name: (d.fields.name && d.fields.name.stringValue) || '',
+      score: num(d.fields.score),
+      you: !!user && d.name.endsWith('/' + user.uid),
+    }))
+    const mine = user && cloud[slug]
+    const you = mine && !top.some((r) => r.you) ? { score: mine } : null
+    return { top, you }
+  } catch (e) {
+    console.warn('leaderboard failed', e)
+    return null
+  }
 }
 
 // Someone who signed in before gets their session (and a sync) back quietly.

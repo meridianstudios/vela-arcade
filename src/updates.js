@@ -6,6 +6,18 @@
  */
 export const UPDATES = [
   {
+    version: '1.3',
+    date: '2026-10-29',
+    games: ['spades', 'dominoes', 'nine-mens-morris', 'chinese-checkers', 'snakes-and-ladders'],
+    changes: [
+      'Accounts: a username and a password, no email. Google sign-in is gone.',
+      'Global leaderboards on every game with a score.',
+      'Blackjack has online tables for up to 5 players.',
+      'Online games no longer report a room as closed while the tab is in the background.',
+      'New addresses: arcade.novalabsos.com and play.novalabsos.com.',
+    ],
+  },
+  {
     version: '1.2',
     date: '2026-10-28',
     games: ['roulette', 'slots', 'video-poker', 'mines', 'basketball-manager', 'racing-manager', 'checkers'],
@@ -53,7 +65,7 @@ export const UPDATES = [
       'basketball-legends', 'football-legends', 'air-hockey-cup', 'cannon-basketball-4',
       '8-ball-pool', 'drift-boss', 'bike-mania', 'highway-racer-3d', 'parking-fury-3d',
       'parking-fury-3d-night-city', 'parking-fury-3d-beach-city', 'parking-fury-3d-bounty-hunter',
-      'stack-ball', 'asteroids', 'ballistic', 'spades', 'gd-hearts', 'gd-yatzy', 'dominoes',
+      'stack-ball', 'asteroids', 'ballistic', 'gd-spades', 'gd-hearts', 'gd-yatzy', 'gd-dominoes',
     ],
     changes: [
       'Racing filter.',

@@ -135,10 +135,21 @@ export function watch(code, cb, onError) {
   let stop = null
   let closed = false
   let retry = 0
+  let last
   const listen = () => {
-    stop = onSnapshot(ref, (snap) => {
+    stop = onSnapshot(ref, { includeMetadataChanges: true }, (snap) => {
       retry = 0
-      cb(snap.exists() ? snap.data({ serverTimestamps: 'estimate' }) : null)
+      // A missing room straight from the local cache (a throttled background
+      // tab, a slow first connection) is not proof it was deleted; wait for
+      // the server to say so before reporting null.
+      if (!snap.exists() && snap.metadata.fromCache) return
+      // Metadata changes are only listened to for that; games still get a
+      // call only when the room itself changed.
+      const room = snap.exists() ? snap.data({ serverTimestamps: 'estimate' }) : null
+      const key = JSON.stringify(room)
+      if (key === last) return
+      last = key
+      cb(room)
     }, (err) => {
       // A failed listener is finished; reconnect with backoff instead of
       // reporting the room as gone.

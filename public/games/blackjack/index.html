@@ -451,6 +451,101 @@
   .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; }
   .card .btns .btn { flex: 1 1 8em; min-height: 3.3em; }
 
+  /* ---------- online ---------- */
+  .app[hidden] { display: none; }
+  #nBetPanel { grid-template-columns: repeat(4, 1fr) 1fr 1.3fr; }
+  #nPlayPanel { grid-template-columns: repeat(4, 1fr); }
+  #nInsPanel { grid-template-columns: 1fr 1fr; }
+  .app.narrow #nBetPanel { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr 1fr; }
+  .app.narrow #nBetPanel .b2 { grid-column: span 2; }
+  .app.narrow #nPlayPanel { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .app.side #nBetPanel { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr); }
+  .app.side #nBetPanel .b2 { grid-column: span 2; }
+  .app.side #nPlayPanel { grid-template-columns: 1fr; grid-template-rows: repeat(4, 1fr); }
+  .app.side #nInsPanel { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  button.stat { text-align: left; cursor: pointer; font: inherit; color: inherit; }
+  button.stat:hover { border-color: var(--outline); }
+  button.stat:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .head .btn.leave { flex: none; padding: 0 0.9em; }
+  #napp.side .head { flex-wrap: wrap; }
+  #napp.side .head .btn.leave { flex: 1 1 100%; min-height: 2.6em; }
+
+  .clock { display: flex; flex-direction: column; gap: 0.15em; max-width: var(--cw-r, 6em); }
+  .clock .lab { overflow: hidden; text-overflow: ellipsis; }
+  .clock .num { margin: 0; font-weight: 300; font-size: 1.5em; }
+  .clock.low .num { color: var(--brand-hover); }
+
+  .sname {
+    display: flex; align-items: baseline; justify-content: center; gap: 0.45em;
+    max-width: var(--sw, 10em);
+    font: 600 clamp(10px, 0.72em, 12px)/1.2 var(--font);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted);
+    transition: color 180ms var(--ease);
+  }
+  .sname .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .sname b { color: #fff; font-weight: 600; letter-spacing: 0.04em; }
+  .sname.on { color: var(--brand-hover); }
+  .sname .tg { flex: none; padding: 0.15em 0.35em; background: var(--surface-3); color: var(--muted); }
+  .sname .tg[hidden] { display: none; }
+  .small .tot { font-size: 0.72em; min-width: 2.4em; padding: 0.3em 0.45em; }
+  .small .info { gap: 0.2em; }
+  .small .info .lab { font-size: clamp(10px, 0.62em, 11px); }
+  .small .res { font-size: 0.66em; letter-spacing: 0.06em; }
+  .bw[hidden] { display: none; }
+  .out { font: 600 clamp(10px, 0.62em, 11px)/1.2 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .anc.out[hidden], .spot[hidden] { display: none; }
+  .bar.tm { background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+  .bar .fill { position: absolute; inset: 0; background: var(--brand); transform-origin: 0 0; }
+
+  .field {
+    display: block; width: 100%;
+    height: 2.9em;
+    margin-top: 0.4em;
+    padding: 0 0.8em;
+    background: var(--bg-2);
+    border: 1px solid var(--outline);
+    border-radius: 0;
+    color: var(--text);
+    font: 400 1em var(--font);
+    outline: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  .field:focus { border-color: var(--brand); }
+  .field.code { text-transform: uppercase; letter-spacing: 0.24em; font-weight: 600; }
+  .field.link { font-size: 0.82em; color: var(--muted); }
+  .card .grp { margin-top: 1.1em; }
+  .card .rowj { display: flex; gap: 0.5em; margin-top: 0.4em; }
+  .card .rowj .field { margin-top: 0; flex: 1 1 auto; min-width: 0; }
+  .card .rowj .btn { flex: none; min-width: 6em; }
+  .card .err { color: var(--brand-hover); min-height: 1.45em; margin-top: 0.6em; }
+  .card .err:empty { min-height: 0; margin: 0; }
+  .card .note { margin: 0.8em 0 0; color: var(--muted); font-size: 0.85em; }
+  .card .note[hidden] { display: none; }
+  .bigcode { margin-top: 0.2em; font: 300 2.4em/1.1 var(--font-display); letter-spacing: 0.16em; }
+  .plist { list-style: none; margin: 1em 0 0; padding: 0; border: 1px solid var(--line); }
+  .plist li { display: flex; align-items: center; gap: 0.6em; min-height: 2.5em; padding: 0 0.85em; }
+  .plist li + li { border-top: 1px solid var(--line); }
+  .plist li span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist li.empty span { color: var(--muted); opacity: 0.5; }
+  .plist li em { font: 600 11px/1 var(--font); font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .plist li em.me { color: var(--brand-hover); }
+  .card .btns.wrap { flex-wrap: wrap; }
+
+  .toast {
+    position: fixed; left: 50%; top: 12px; z-index: 30;
+    padding: 0.6em 0.9em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    font: 600 12px/1.2 var(--font); letter-spacing: 0.08em; text-transform: uppercase;
+    transform: translate(-50%, -8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms var(--ease), transform 260ms var(--ease);
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
   @media (prefers-reduced-motion: reduce) {
     .cd, .cd .fl, .anc, .bar, .panel, .panel.on, .overlay, .card, .shoe-bar b { transition: none; }
     .msg.pop > div, .spot.bump, .res.res-in { animation: none; }
@@ -500,6 +595,44 @@
   </footer>
 </div>
 
+<div class="app" id="napp" hidden>
+  <header class="head" id="nhead">
+    <div class="brand"><h1>Blackjack</h1></div>
+    <div class="stat"><span class="lab">Chips</span><span class="num" id="nCash">1,000</span></div>
+    <button class="stat" id="nRoom" type="button" aria-label="Copy invite link"><span class="lab" id="nRoomLab">Room</span><span class="num" id="nRoomCode"></span></button>
+    <button class="btn leave" id="nLeave" type="button">Leave</button>
+  </header>
+  <main class="table" id="ntable">
+    <div class="shoe" id="nshoe"><i></i><i></i><div class="shoe-bar"><b id="nShoeFill"></b></div></div>
+    <div class="anc clock" id="nClock" hidden><span class="lab" id="nClockLab"></span><span class="num" id="nClockNum"></span></div>
+    <div class="spot off" id="nspot"><span class="lab">Bet</span><span class="num" id="nSpotNum">0</span></div>
+    <div class="anc" id="ndLab" hidden><div class="tl"><span class="lab">Dealer</span><span class="tot" id="ndTot"></span></div></div>
+    <div class="anc msg" id="nmsg"><div><span class="big" id="nMsgBig"></span><span class="lab sub" id="nMsgSub"></span></div></div>
+    <div id="nlayer"></div>
+  </main>
+  <footer class="ctrl" id="nctrl">
+    <div class="panel" id="nBetPanel">
+      <button class="chip c10" type="button" data-v="10">10</button>
+      <button class="chip c50" type="button" data-v="50">50</button>
+      <button class="chip c100" type="button" data-v="100">100</button>
+      <button class="chip c500" type="button" data-v="500">500</button>
+      <button class="btn b2" id="nClear" type="button">Clear</button>
+      <button class="btn primary b2" id="nBet" type="button">Bet</button>
+    </div>
+    <div class="panel" id="nInsPanel">
+      <button class="btn primary" id="nInsYes" type="button">Insurance</button>
+      <button class="btn" id="nInsNo" type="button">No insurance</button>
+    </div>
+    <div class="panel" id="nPlayPanel">
+      <button class="btn primary" id="nHit" type="button">Hit <kbd>H</kbd></button>
+      <button class="btn primary" id="nStand" type="button">Stand <kbd>S</kbd></button>
+      <button class="btn" id="nDouble" type="button">Double <kbd>D</kbd></button>
+      <button class="btn" id="nSplit" type="button">Split <kbd>P</kbd></button>
+    </div>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <div class="overlay" id="overlay" hidden>
   <div class="card" id="startCard" role="dialog" aria-labelledby="startTitle" hidden>
     <h2 id="startTitle">Blackjack</h2>
@@ -508,7 +641,47 @@
       <div><span class="lab">Bankroll</span><span class="num" id="stCash">1,000</span></div>
       <div><span class="lab">Best bankroll</span><span class="num" id="stBest">1,000</span></div>
     </div>
-    <div class="btns"><button class="btn primary" id="playBtn" type="button">Play</button></div>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" type="button">Solo</button>
+      <button class="btn" id="onlineBtn" type="button">Online</button>
+    </div>
+    <p class="note" id="onlineNote" hidden>Online play is not set up yet.</p>
+  </div>
+  <div class="card" id="netCard" role="dialog" aria-labelledby="netTitle" hidden>
+    <h2 id="netTitle">Online</h2>
+    <div class="grp">
+      <label class="lab" for="nameIn">Your name</label>
+      <input class="field" id="nameIn" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Player">
+    </div>
+    <div class="btns"><button class="btn primary" id="createBtn" type="button">Create table</button></div>
+    <div class="grp">
+      <label class="lab" for="codeIn">Join a table</label>
+      <div class="rowj">
+        <input class="field code" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="Code">
+        <button class="btn" id="joinBtn" type="button">Join</button>
+      </div>
+    </div>
+    <p class="line err" id="netErr" aria-live="polite"></p>
+    <div class="btns"><button class="btn" id="netBack" type="button">Back</button></div>
+  </div>
+  <div class="card" id="lobbyCard" role="dialog" aria-labelledby="lobbyTitle" hidden>
+    <h2 id="lobbyTitle">Table</h2>
+    <div class="grp">
+      <span class="lab">Room code</span>
+      <div class="bigcode" id="lobbyCode"></div>
+      <input class="field link" id="lobbyLink" readonly aria-label="Invite link">
+    </div>
+    <ul class="plist" id="lobbyList"></ul>
+    <p class="note" id="lobbyWait"></p>
+    <div class="btns wrap">
+      <button class="btn" id="lobbyLeave" type="button">Leave</button>
+      <button class="btn" id="copyBtn" type="button">Copy link</button>
+      <button class="btn primary" id="startBtn" type="button">Start</button>
+    </div>
+  </div>
+  <div class="card" id="joinCard" role="dialog" aria-labelledby="joinTitle" hidden>
+    <h2 id="joinTitle">Online</h2>
+    <p class="line" id="joinWait">Joining</p>
   </div>
   <div class="card" id="overCard" role="dialog" aria-labelledby="overTitle" aria-live="polite" hidden>
     <h2 id="overTitle">Game over</h2>
@@ -765,6 +938,271 @@
   })();
   /* ===== LOGIC END ===== */
 
+  /* ===== TABLE LOGIC START (online, pure, no DOM) =====
+   * One shared table in the room document: the shoe, every seat's hands, the
+   * dealer. Each function mutates a copy of room.state inside a transaction.
+   * ctx = { seats: [uid] in seat order, away: { uid: true }, now: server ms }.
+   * Whoever makes the last move of a round also plays the dealer and settles,
+   * from the shoe, so every client lands on the same cards. */
+  const TB = (function () {
+    const MAX_SEATS = 5, BET_MS = 15000, INS_MS = 10000, TURN_MS = 20000;
+    const { MIN_BET, START, CUT, MAX_HANDS, valOf, handValue, isNatural, ints, newShoe } = BJ;
+    const tot = (h) => handValue(ints(h.cards)).total;
+
+    function newTable(rnd) {
+      return {
+        v: 1, stage: 'lobby', n: 0, shoe: newShoe(rnd), pos: 0, seq: 0, shuffleQ: 0,
+        stacks: {}, bets: {}, hands: [], dealer: [], turn: -1,
+        ins: {}, insDone: {}, insRes: {}, revealQ: 0, insQ: 0, settleQ: 0, net: {}, deadline: 0,
+      };
+    }
+    const seated = (ctx, u) => ctx.seats.indexOf(u) >= 0;
+    const present = (ctx, u) => seated(ctx, u) && !ctx.away[u];
+    const stackOf = (T, u) => (Object.prototype.hasOwnProperty.call(T.stacks, u) ? T.stacks[u] : START);
+    const hasBet = (T, u) => Object.prototype.hasOwnProperty.call(T.bets, u);
+
+    function sync(T, ctx) { for (const u of ctx.seats) if (!Object.prototype.hasOwnProperty.call(T.stacks, u)) T.stacks[u] = START; }
+
+    function draw(T, rnd) {
+      if (T.pos >= T.shoe.length) { T.shoe = newShoe(rnd); T.pos = 0; T.shuffleQ = ++T.seq; }
+      return { c: T.shoe[T.pos++], q: ++T.seq };
+    }
+    function hand(u, bet) { return { u, cards: [], bet, doubled: false, split: false, aces: false, done: false, res: '', pay: 0 }; }
+
+    function start(T, ctx) {
+      if (T.stage !== 'lobby') return false;
+      sync(T, ctx);
+      T.stage = 'bet'; T.bets = {}; T.deadline = 0;
+      return true;
+    }
+
+    /* ---- betting ---- */
+    const canBet = (T, u, ctx) => T.stage === 'bet' && seated(ctx, u) && !hasBet(T, u);
+    // players the table waits for: here, and able to bet
+    const bettors = (T, ctx) => ctx.seats.filter((u) => !ctx.away[u] && (hasBet(T, u) || stackOf(T, u) >= MIN_BET));
+    function bet(T, u, amount, ctx, rnd) {
+      if (!canBet(T, u, ctx)) return false;
+      sync(T, ctx);
+      if (!Number.isInteger(amount) || amount < MIN_BET || amount % 5 || amount > T.stacks[u]) return false;
+      T.stacks[u] -= amount; T.bets[u] = amount;
+      if (!T.deadline) T.deadline = ctx.now + BET_MS;
+      maybeDeal(T, ctx, rnd);
+      return true;
+    }
+    function newStack(T, u, ctx) {
+      if (!canBet(T, u, ctx)) return false;
+      sync(T, ctx);
+      if (T.stacks[u] >= MIN_BET) return false;
+      T.stacks[u] = START;
+      return true;
+    }
+    function maybeDeal(T, ctx, rnd) {
+      if (T.stage !== 'bet') return false;
+      for (const u of Object.keys(T.bets)) if (!seated(ctx, u)) delete T.bets[u];
+      if (!Object.keys(T.bets).length) {
+        if (T.deadline && ctx.now >= T.deadline) T.deadline = 0;
+        return false;
+      }
+      if (bettors(T, ctx).every((u) => hasBet(T, u)) || ctx.now >= T.deadline) { deal(T, ctx, rnd); return true; }
+      return false;
+    }
+
+    function deal(T, ctx, rnd) {
+      const order = ctx.seats.filter((u) => hasBet(T, u));
+      for (const u of Object.keys(T.stacks)) if (!seated(ctx, u)) delete T.stacks[u];
+      if (T.shoe.length - T.pos < CUT) { T.shoe = newShoe(rnd); T.pos = 0; T.shuffleQ = ++T.seq; }
+      T.n++;
+      T.hands = order.map((u) => hand(u, T.bets[u]));
+      T.bets = {};
+      T.dealer = []; T.turn = -1; T.ins = {}; T.insDone = {}; T.insRes = {}; T.net = {};
+      T.revealQ = 0; T.insQ = 0; T.settleQ = 0; T.deadline = 0;
+      for (const h of T.hands) h.cards.push(draw(T, rnd));
+      T.dealer.push(draw(T, rnd));
+      for (const h of T.hands) h.cards.push(draw(T, rnd));
+      const hole = draw(T, rnd); hole.hole = true;
+      T.dealer.push(hole);
+      if (valOf(T.dealer[0].c) === 1 && insurers(T, ctx).length) {
+        T.stage = 'insurance'; T.deadline = ctx.now + INS_MS;
+        return;
+      }
+      peek(T, ctx, rnd);
+    }
+
+    /* ---- insurance ---- */
+    // Offered under an ace to every player still here who can cover half their bet.
+    function insurers(T, ctx) {
+      return T.hands.filter((h) => present(ctx, h.u) && (T.insDone[h.u] || T.stacks[h.u] >= h.bet / 2)).map((h) => h.u);
+    }
+    const canInsure = (T, u, ctx) => T.stage === 'insurance' && !T.insDone[u] && insurers(T, ctx).indexOf(u) >= 0;
+    function insure(T, u, take, ctx, rnd) {
+      if (!canInsure(T, u, ctx)) return false;
+      T.insDone[u] = true;
+      if (take) {
+        const a = T.hands.find((h) => h.u === u).bet / 2;
+        T.stacks[u] -= a; T.ins[u] = a;
+      }
+      if (insurers(T, ctx).every((x) => T.insDone[x])) peek(T, ctx, rnd);
+      return true;
+    }
+
+    // The dealer checks for blackjack under an ace or a ten before anyone acts.
+    function peek(T, ctx, rnd) {
+      T.stage = 'play';
+      const up = valOf(T.dealer[0].c);
+      if ((up === 1 || up === 10) && isNatural(ints(T.dealer))) { T.revealQ = ++T.seq; settle(T, ctx); return; }
+      if (Object.keys(T.ins).length) { for (const u in T.ins) T.insRes[u] = 'lost'; T.insQ = ++T.seq; }
+      for (const h of T.hands) if (isNatural(ints(h.cards))) h.done = true;
+      T.turn = 0;
+      advance(T, ctx, rnd);
+    }
+
+    /* ---- play ---- */
+    const cur = (T) => (T.stage === 'play' && T.turn >= 0 && T.turn < T.hands.length ? T.hands[T.turn] : null);
+    function mine(T, u) { const h = cur(T); return h && h.u === u && !h.done ? h : null; }
+    const handsOf = (T, u) => T.hands.filter((h) => h.u === u).length;
+    const canHit = (T, u) => !!mine(T, u);
+    function canDouble(T, u) { const h = mine(T, u); return !!h && h.cards.length === 2 && !h.aces && T.stacks[u] >= h.bet; }
+    function canSplit(T, u) {
+      const h = mine(T, u);
+      return !!h && h.cards.length === 2 && !h.aces && handsOf(T, u) < MAX_HANDS &&
+        valOf(h.cards[0].c) === valOf(h.cards[1].c) && T.stacks[u] >= h.bet;
+    }
+
+    function act(T, u, kind, ctx, rnd) {
+      const h = mine(T, u);
+      if (!h) return false;
+      if (kind === 'hit') {
+        h.cards.push(draw(T, rnd));
+        const t = tot(h);
+        if (t > 21) { h.done = true; h.res = 'bust'; } else if (t === 21) h.done = true;
+      } else if (kind === 'stand') {
+        h.done = true;
+      } else if (kind === 'double') {
+        if (!canDouble(T, u)) return false;
+        T.stacks[u] -= h.bet; h.bet *= 2; h.doubled = true;
+        h.cards.push(draw(T, rnd));
+        h.done = true;
+        if (tot(h) > 21) h.res = 'bust';
+      } else if (kind === 'split') {
+        if (!canSplit(T, u)) return false;
+        T.stacks[u] -= h.bet;
+        const aces = valOf(h.cards[0].c) === 1;
+        const nh = hand(u, h.bet);
+        nh.cards.push(h.cards.pop()); nh.split = true; nh.aces = aces;
+        h.split = true; h.aces = aces;
+        T.hands.splice(T.turn + 1, 0, nh);
+        h.cards.push(draw(T, rnd));
+        if (aces || tot(h) === 21) h.done = true;
+      } else return false;
+      T.deadline = ctx.now + TURN_MS;
+      if (h.done) advance(T, ctx, rnd);
+      return true;
+    }
+
+    // Move to the next hand that still needs play. A split hand gets its second
+    // card when it comes up; split aces take one card each. A player who is
+    // away or gone stands.
+    function advance(T, ctx, rnd) {
+      for (let i = Math.max(0, T.turn); i < T.hands.length; i++) {
+        const h = T.hands[i];
+        if (h.cards.length === 1) {
+          h.cards.push(draw(T, rnd));
+          if (h.aces || tot(h) === 21) h.done = true;
+        }
+        if (!h.done && !present(ctx, h.u)) h.done = true;
+        if (!h.done) { T.turn = i; T.deadline = ctx.now + TURN_MS; return; }
+      }
+      T.turn = -1;
+      dealerPlay(T, ctx, rnd);
+    }
+
+    // Dealer stands on all 17s. No draws if every hand is already settled.
+    function dealerPlay(T, ctx, rnd) {
+      T.revealQ = ++T.seq;
+      const live = T.hands.some((h) => h.res !== 'bust' && !(!h.split && isNatural(ints(h.cards))));
+      if (live) while (handValue(ints(T.dealer)).total < 17) T.dealer.push(draw(T, rnd));
+      settle(T, ctx);
+    }
+
+    // pay is what goes back to the stack: stake plus winnings. Betting opens again
+    // straight away; the finished round stays on the table until the next deal.
+    function settle(T) {
+      const dv = handValue(ints(T.dealer)).total, dbj = isNatural(ints(T.dealer));
+      T.net = {};
+      for (const h of T.hands) {
+        const v = tot(h), nat = !h.split && isNatural(ints(h.cards));
+        let res, pay;
+        if (v > 21) { res = 'bust'; pay = 0; }
+        else if (nat && dbj) { res = 'push'; pay = h.bet; }
+        else if (nat) { res = 'blackjack'; pay = h.bet * 2.5; }
+        else if (dbj) { res = 'lose'; pay = 0; }
+        else if (dv > 21 || v > dv) { res = 'win'; pay = h.bet * 2; }
+        else if (v === dv) { res = 'push'; pay = h.bet; }
+        else { res = 'lose'; pay = 0; }
+        h.res = res; h.pay = pay; h.done = true;
+        T.stacks[h.u] = stackOf(T, h.u) + pay;
+        T.net[h.u] = (T.net[h.u] || 0) + pay - h.bet;
+      }
+      for (const u in T.ins) {
+        if (dbj) { T.insRes[u] = 'won'; T.stacks[u] += T.ins[u] * 3; T.net[u] += T.ins[u] * 2; }
+        else { T.insRes[u] = 'lost'; T.net[u] -= T.ins[u]; }
+      }
+      T.settleQ = ++T.seq;
+      T.stage = 'bet'; T.bets = {}; T.turn = -1; T.deadline = 0;
+    }
+
+    /* ---- clocks, away players, leaving ---- */
+    function due(T, ctx) {
+      if (T.stage === 'bet') {
+        const placed = Object.keys(T.bets).some((u) => seated(ctx, u));
+        if (!placed) return !!T.deadline && ctx.now >= T.deadline || Object.keys(T.bets).length > 0;
+        return ctx.now >= T.deadline || bettors(T, ctx).every((u) => hasBet(T, u));
+      }
+      if (T.stage === 'insurance') return ctx.now >= T.deadline || insurers(T, ctx).every((u) => T.insDone[u]);
+      if (T.stage === 'play') { const h = cur(T); return !h || h.done || !present(ctx, h.u) || ctx.now >= T.deadline; }
+      return false;
+    }
+    // Whoever's clock it is, if anyone: their own client gets the first go at it.
+    function actor(T) { const h = cur(T); return h ? h.u : null; }
+    function tick(T, ctx, rnd) {
+      if (!due(T, ctx)) return false;
+      sync(T, ctx);
+      if (T.stage === 'bet') {
+        const before = JSON.stringify([T.bets, T.deadline, T.n]);
+        maybeDeal(T, ctx, rnd);
+        return JSON.stringify([T.bets, T.deadline, T.n]) !== before;
+      }
+      if (T.stage === 'insurance') {
+        for (const u of insurers(T, ctx)) T.insDone[u] = true;
+        peek(T, ctx, rnd);
+        return true;
+      }
+      const h = cur(T);
+      if (h) h.done = true;
+      advance(T, ctx, rnd);
+      return true;
+    }
+    // Run in the leaver's last transaction, with ctx.seats already without them.
+    function forfeit(T, u, ctx, rnd) {
+      let changed = false;
+      if (hasBet(T, u)) { delete T.bets[u]; changed = true; }
+      if (due(T, ctx)) changed = tick(T, ctx, rnd) || changed;
+      return changed;
+    }
+
+    function valid(T) {
+      return !!T && T.v === 1 && Array.isArray(T.shoe) && T.shoe.length === BJ.DECKS * 52 &&
+        ['lobby', 'bet', 'insurance', 'play'].indexOf(T.stage) >= 0 && Array.isArray(T.hands) && Array.isArray(T.dealer) &&
+        !!T.stacks && !!T.bets && Number.isInteger(T.seq);
+    }
+
+    return {
+      MAX_SEATS, BET_MS, INS_MS, TURN_MS, newTable, start, sync, stackOf, hasBet, canBet, bettors, bet, newStack,
+      insurers, canInsure, insure, cur, canHit, canDouble, canSplit, act, due, actor, tick, forfeit, valid, present,
+    };
+  })();
+  /* ===== TABLE LOGIC END ===== */
+
   /* ---------- storage ---------- */
   const KEY = 'vela:blackjack:state';
   function load() {
@@ -781,7 +1219,7 @@
   const shoeEl = $('shoe'), spot = $('spot'), dLab = $('dLab'), msg = $('msg');
   const overlay = $('overlay'), startCard = $('startCard'), overCard = $('overCard');
   const panels = { bet: $('betPanel'), insurance: $('insPanel'), play: $('playPanel') };
-  const chips = Array.from(document.querySelectorAll('.chip'));
+  const chips = Array.from(document.querySelectorAll('#betPanel .chip'));
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
@@ -796,6 +1234,7 @@
   let L = null;                // table geometry
   const els = new Map();       // card key -> element
   let curPanel = '';
+  let netView = false;         // the online menus or table are showing
 
   /* ---------- geometry ---------- */
   function layout() {
@@ -1191,8 +1630,7 @@
 
   /* ---------- overlay ---------- */
   function openOverlay(card) {
-    startCard.hidden = card !== startCard;
-    overCard.hidden = card !== overCard;
+    overlay.querySelectorAll('.card').forEach((c) => { c.hidden = c !== card; });
     overlayOpen = true;
     overlay.hidden = false;
     overlay.offsetWidth;
@@ -1246,6 +1684,7 @@
 
   window.addEventListener('keydown', (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+    if (netView) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (overlayOpen) {
       if ((k === 'Enter' || k === ' ') && !(e.target && e.target.tagName === 'BUTTON')) {
@@ -1289,11 +1728,906 @@
   window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(relayout); setTimeout(relayout, 120); });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout).catch(() => {});
 
+  /* ================= online table ================= */
+  const napp = $('napp'), nhead = $('nhead'), ntable = $('ntable'), nlayer = $('nlayer');
+  const nshoe = $('nshoe'), nspot = $('nspot'), ndLab = $('ndLab'), nmsg = $('nmsg'), nClock = $('nClock');
+  const netCard = $('netCard'), lobbyCard = $('lobbyCard'), joinCard = $('joinCard');
+  const npanels = { bet: $('nBetPanel'), insurance: $('nInsPanel'), play: $('nPlayPanel') };
+  const nchips = Array.from(document.querySelectorAll('#nBetPanel .chip'));
+  const ROOM_KEY = 'vela:blackjack:room', NAME_KEY = 'vela:blackjack:name';
+  const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+
+  let Rooms; // undefined while loading, null if it could not load
+  const NET = {
+    code: null, room: null, T: null, me: null, unsub: null, stopBeat: null, pending: false,
+    shown: 0, idleAt: 0, timer: 0, offset: 0, seenMine: -1, local: 0, lastBet: 0, autoBet: -1,
+    panel: '', dueKey: '', dueAt: 0, tickKey: '', tickAt: 0, barKey: '', L: null, cash: null,
+  };
+  const msOf = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : Number(v) || 0);
+  const sNow = () => Date.now() + NET.offset;
+  const nameOf = (u) => (NET.room && NET.room.names && NET.room.names[u]) || 'Player';
+
+  function ctxOf(room) {
+    const away = {};
+    for (const u of room.seats) if (Rooms.isAway(room, u)) away[u] = true;
+    return { seats: room.seats.slice(), away, now: sNow() };
+  }
+  function friendly(e) {
+    return Rooms && e instanceof Rooms.RoomError ? e.message : 'Could not reach the game server. Try again.';
+  }
+
+  let toastT = 0;
+  function toast(text) {
+    const t = $('toast');
+    t.textContent = text;
+    t.classList.add('on');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => t.classList.remove('on'), 2400);
+  }
+
+  // Every move is a transaction on a fresh copy of the room's table.
+  async function ntx(fn, quiet) {
+    const code = NET.code;
+    if (!code || (!quiet && NET.pending)) return false;
+    if (!quiet) { NET.pending = true; nControls(); }
+    let ok = false;
+    try {
+      const r = await Rooms.update(code, (room) => {
+        if (!TB.valid(room.state) || room.seats.indexOf(NET.me) < 0) return null;
+        const T = JSON.parse(JSON.stringify(room.state));
+        if (!fn(T, ctxOf(room), room)) return null;
+        return { state: T };
+      });
+      ok = !!r;
+    } catch (e) {
+      if (!quiet && NET.code === code) toast(friendly(e));
+    }
+    if (!quiet) NET.pending = false;
+    if (NET.code === code) nControls();
+    return ok;
+  }
+
+  /* ---------- menus ---------- */
+  function refreshOnlineBtn() {
+    const b = $('onlineBtn'), note = $('onlineNote');
+    if (Rooms === undefined) { b.disabled = true; note.hidden = true; }
+    else if (!Rooms || !Rooms.available) {
+      b.disabled = true; note.hidden = false;
+      note.textContent = Rooms ? 'Online play is not set up yet.' : 'Online play is not available right now.';
+    } else { b.disabled = false; note.hidden = true; }
+  }
+  function setNetErr(t) { $('netErr').textContent = t || ''; }
+  function openNet(errText) {
+    netView = true;
+    $('nameIn').value = lsGet(NAME_KEY) || '';
+    setNetErr(errText);
+    showSoloBehind();
+    openOverlay(netCard);
+  }
+  function showSoloBehind() {
+    if (!napp.hidden) { napp.hidden = true; app.hidden = false; relayout(); }
+  }
+  function backToStart() {
+    netView = false;
+    showSoloBehind();
+    if (BJ.isBroke(st)) showOver(); else showStart();
+  }
+  function myName() {
+    const v = $('nameIn').value.replace(/\s+/g, ' ').trim().slice(0, 20);
+    if (v) lsSet(NAME_KEY, v);
+    return v || lsGet(NAME_KEY) || 'Player';
+  }
+  function setBusy(on) { $('createBtn').disabled = on; $('joinBtn').disabled = on; }
+  function setUrlRoom(code) {
+    try {
+      const u = new URL(location.href);
+      if (code) u.searchParams.set('room', code); else u.searchParams.delete('room');
+      history.replaceState(null, '', u.toString());
+    } catch (_) {}
+  }
+
+  $('onlineBtn').addEventListener('click', () => { if (Rooms && Rooms.available) openNet(''); });
+  $('netBack').addEventListener('click', backToStart);
+  $('createBtn').addEventListener('click', async () => {
+    if (!Rooms || !Rooms.available) return;
+    setNetErr('');
+    setBusy(true);
+    try {
+      const code = await Rooms.create({ game: 'blackjack', maxSeats: TB.MAX_SEATS, name: myName(), state: TB.newTable() });
+      enterRoom(code);
+    } catch (e) { setNetErr(friendly(e)); }
+    setBusy(false);
+  });
+  async function joinRoom(code, how) {
+    code = Rooms.normaliseCode(code);
+    if (code.length !== 6) { setNetErr('Room codes are six letters and numbers.'); return; }
+    netView = true;
+    if (how !== 'typed') { $('joinWait').textContent = 'Joining'; openOverlay(joinCard); }
+    setNetErr('');
+    setBusy(true);
+    try {
+      await Rooms.join(code, { game: 'blackjack', name: how === 'typed' ? myName() : (lsGet(NAME_KEY) || 'Player') });
+      enterRoom(code);
+    } catch (e) {
+      lsSet(ROOM_KEY, null);
+      setUrlRoom(null);
+      if (how === 'saved') backToStart(); else openNet(friendly(e));
+    }
+    setBusy(false);
+  }
+  $('joinBtn').addEventListener('click', () => joinRoom($('codeIn').value, 'typed'));
+  $('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); joinRoom($('codeIn').value, 'typed'); } });
+  $('codeIn').addEventListener('input', (e) => {
+    const v = Rooms ? Rooms.normaliseCode(e.target.value) : e.target.value;
+    if (v !== e.target.value) e.target.value = v;
+  });
+
+  function enterRoom(code) {
+    stopWatching();
+    Object.assign(NET, { code, me: Rooms.uid(), room: null, T: null, seenMine: -1, local: 0, pending: false, panel: '', cash: null, autoBet: -1, barKey: '' });
+    lsSet(ROOM_KEY, { code, at: Date.now() });
+    setUrlRoom(code);
+    $('nRoomCode').textContent = code;
+    $('joinWait').textContent = 'Connecting';
+    openOverlay(joinCard);
+    NET.unsub = Rooms.watch(code, onRoom, () => toast('Connection lost. Reconnecting.'));
+    NET.stopBeat = Rooms.heartbeat(code);
+  }
+  function stopWatching() {
+    if (NET.unsub) { try { NET.unsub(); } catch (_) {} }
+    if (NET.stopBeat) NET.stopBeat();
+    clearTimeout(NET.timer);
+    Object.assign(NET, { unsub: null, stopBeat: null, code: null, room: null, T: null, timer: 0 });
+  }
+  function closeTable(text) {
+    stopWatching();
+    lsSet(ROOM_KEY, null);
+    setUrlRoom(null);
+    openNet(text);
+  }
+
+  function onRoom(room) {
+    if (!NET.code) return;
+    if (!room) { closeTable('The table has closed.'); return; }
+    if (room.seats.indexOf(NET.me) < 0) { closeTable('You are no longer at this table.'); return; }
+    // Server clock offset, from this player's own heartbeat. The first value seen
+    // may be old, so only changes count.
+    const s = msOf(room.seen && room.seen[NET.me]);
+    if (NET.seenMine < 0) NET.seenMine = s;
+    else if (s && s !== NET.seenMine) {
+      NET.seenMine = s;
+      const off = s - Date.now();
+      if (Math.abs(off) < 3600000) NET.offset = off;
+    }
+    NET.room = room;
+    if (!TB.valid(room.state)) return;
+    const prev = NET.T, T = room.state;
+    NET.T = T;
+    if (T.stage === 'lobby') { showLobby(); return; }
+    if (napp.hidden) { showTable(); return; }
+    // a new deal while the last round was still playing out: skip to it
+    if (prev && prev.n !== T.n && NET.shown < T.seq) {
+      let first = T.seq;
+      for (const c of T.dealer) first = Math.min(first, c.q);
+      for (const h of T.hands) for (const c of h.cards) first = Math.min(first, c.q);
+      if (T.shuffleQ > prev.seq) first = Math.min(first, T.shuffleQ);
+      NET.shown = Math.max(NET.shown, first - 1);
+      clearTimeout(NET.timer); NET.timer = 0;
+    }
+    if (NET.shown > T.seq) NET.shown = T.seq;
+    nRender(false);
+    nPump();
+  }
+
+  function showLobby() {
+    const room = NET.room, host = room.hostUid === NET.me;
+    $('lobbyCode').textContent = NET.code;
+    $('lobbyLink').value = Rooms.inviteUrl('blackjack', NET.code);
+    const list = $('lobbyList');
+    list.textContent = '';
+    for (let i = 0; i < room.maxSeats; i++) {
+      const u = room.seats[i];
+      const li = document.createElement('li');
+      const sp = document.createElement('span');
+      if (u) {
+        sp.textContent = nameOf(u);
+        li.appendChild(sp);
+        if (u === room.hostUid) { const em = document.createElement('em'); em.textContent = 'Host'; li.appendChild(em); }
+        if (u === NET.me) { const em = document.createElement('em'); em.className = 'me'; em.textContent = 'You'; li.appendChild(em); }
+      } else { li.className = 'empty'; sp.textContent = 'Open seat'; li.appendChild(sp); }
+      list.appendChild(li);
+    }
+    $('lobbyWait').textContent = host ? '' : 'Waiting for the host';
+    $('lobbyWait').hidden = host;
+    $('startBtn').hidden = !host;
+    $('lobbyLeave').textContent = host ? 'Close table' : 'Leave';
+    if (lobbyCard.hidden) openOverlay(lobbyCard);
+  }
+  $('startBtn').addEventListener('click', () => {
+    ntx((T, ctx, room) => room.hostUid === NET.me && TB.start(T, ctx));
+  });
+
+  async function copyInvite(btnLab, idle) {
+    if (!NET.code) return;
+    const url = Rooms.inviteUrl('blackjack', NET.code);
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (_) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        ok = document.execCommand('copy');
+        ta.remove();
+      } catch (_) {}
+    }
+    btnLab.textContent = ok ? 'Copied' : 'Not copied';
+    setTimeout(() => { btnLab.textContent = idle; }, 1600);
+  }
+  $('copyBtn').addEventListener('click', () => copyInvite($('copyBtn'), 'Copy link'));
+  $('nRoom').addEventListener('click', () => copyInvite($('nRoomLab'), 'Room'));
+  $('lobbyLink').addEventListener('focus', (e) => { try { e.target.select(); } catch (_) {} });
+
+  function leaveTable() {
+    const code = NET.code, room = NET.room, me = NET.me;
+    stopWatching();
+    lsSet(ROOM_KEY, null);
+    setUrlRoom(null);
+    backToStart();
+    if (!code) return;
+    (async () => {
+      try {
+        if (room && room.hostUid !== me) {
+          // stand anything still in play, then give up the seat
+          await Rooms.update(code, (r) => {
+            if (!TB.valid(r.state) || r.seats.indexOf(me) < 0) return null;
+            const T = JSON.parse(JSON.stringify(r.state));
+            const ctx = ctxOf(r);
+            ctx.seats = ctx.seats.filter((u) => u !== me);
+            return TB.forfeit(T, me, ctx, Math.random) ? { state: T } : null;
+          });
+        }
+      } catch (_) {}
+      await Rooms.leave(code);
+    })();
+  }
+  $('lobbyLeave').addEventListener('click', leaveTable);
+  $('nLeave').addEventListener('click', leaveTable);
+
+  /* ---------- table view ---------- */
+  function showTable() {
+    hideOverlay();
+    netView = true;
+    app.hidden = true;
+    napp.hidden = false;
+    napp.classList.add('ready');
+    NET.shown = NET.T.seq; NET.idleAt = NET.shown; NET.panel = ''; NET.cash = null;
+    const host = NET.room.hostUid === NET.me;
+    $('nLeave').textContent = host ? 'Close' : 'Leave';
+    nRelayout();
+  }
+
+  function nLayout() {
+    const vw = window.innerWidth, vh = window.innerHeight, m = Math.min(vw, vh);
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    napp.style.setProperty('--pad', Math.round(clamp(8, m * 0.025, 18)) + 'px');
+    napp.style.setProperty('--gap', Math.round(clamp(8, m * 0.018, 12)) + 'px');
+    const side = vh < 480 && vw >= vh * 1.45 && vw >= 560;
+    napp.classList.toggle('side', side);
+    napp.classList.toggle('narrow', !side && vw < 620);
+    nhead.classList.remove('nobrand');
+    if (!side && (nhead.scrollWidth > nhead.clientWidth + 1 || (V.embedded && vw < 620))) nhead.classList.add('nobrand');
+    const W = ntable.clientWidth, H = ntable.clientHeight;
+    NET.L = { W, H, fs, tp: Math.round(clamp(8, Math.min(W, H) * 0.03, 18)), labH: Math.round(fs * 2.1), infoH: Math.round(fs * 3.2) };
+  }
+  function nRelayout() {
+    if (napp.hidden) return;
+    ntable.classList.add('nt');
+    nLayout();
+    nRender(true);
+    ntable.offsetWidth;
+    ntable.classList.remove('nt');
+  }
+  window.addEventListener('resize', () => { requestAnimationFrame(nRelayout); setTimeout(nRelayout, 120); });
+
+  // Card sizes for a table with k other seats: mine biggest, dealer next, others compact.
+  function geo(k) {
+    const { W, H, tp, fs, labH, infoH } = NET.L;
+    const nameH = Math.round(fs * 1.5), oTot = Math.round(fs * 1.75), oInfo = Math.round(fs * 2.4), msgH = Math.round(fs * 4.2);
+    const band = k ? nameH + oTot + oInfo + Math.round(fs * 0.9) : 0;
+    const fixed = 2 * tp + labH + band + labH + infoH + msgH;
+    const sw = k ? Math.min((W - 2 * tp) / k, fs * 17) : 0;
+    const rD = 0.78;
+    let cwM = Math.min((H - fixed) / (1.4 * (rD + 1 + (k ? 0.56 : 0))), W * 0.24, 112);
+    let cwO = k ? Math.min(cwM * 0.56, sw * 0.44) : 0;
+    if (k && cwO < cwM * 0.56) cwM = Math.min((H - fixed - 1.4 * cwO) / (1.4 * (rD + 1)), W * 0.24, 112);
+    cwM = Math.max(30, Math.round(cwM));
+    cwO = Math.max(18, Math.round(cwO));
+    const cwD = Math.round(cwM * rD);
+    return { cwM, chM: Math.round(cwM * 1.4), cwD, chD: Math.round(cwD * 1.4), cwO, chO: Math.round(cwO * 1.4), sw, nameH, oTot, oInfo, msgH };
+  }
+  // Wide tables: the other seats sit in an arc either side of mine.
+  function geoWide(k) {
+    const { W, H, tp, fs, labH, infoH } = NET.L;
+    const nameH = Math.round(fs * 1.5), oTot = Math.round(fs * 1.75), oInfo = Math.round(fs * 2.4), msgH = Math.round(fs * 4.2);
+    const fixed = 2 * tp + labH + labH + infoH + msgH;
+    const rD = 0.78;
+    const cwM = Math.max(30, Math.round(Math.min((H - fixed) / (1.4 * (rD + 1)), W * 0.13, 112)));
+    const meW = Math.min(W * 0.34, cwM * 4);
+    const nL = Math.ceil(k / 2), nR = k - nL;
+    const sideW = (W - meW) / 2 - tp - fs;
+    const sw = sideW / Math.max(nL, 1);
+    const cwO = Math.max(18, Math.round(Math.min(cwM * 0.66, sw * 0.4)));
+    const cwD = Math.round(cwM * rD);
+    return { wide: true, cwM, chM: Math.round(cwM * 1.4), cwD, chD: Math.round(cwD * 1.4), cwO, chO: Math.round(cwO * 1.4), sw, meW, nL, nR, nameH, oTot, oInfo, msgH };
+  }
+
+  // rowGeom with the base card width as a parameter.
+  function nRow(counts, left, width, cw) {
+    const n = counts.length;
+    const natural = cw * 0.4, min = cw * 0.27;
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
+    const natW = counts.map((k) => cw + (k - 1) * natural);
+    let s = 1, gap = cw * 0.5;
+    if (sum(natW) + gap * (n - 1) > width) {
+      gap = cw * 0.2;
+      const need = sum(counts.map((k) => cw + (Math.max(k, 2) - 1) * min)) + gap * (n - 1);
+      s = Math.min(1, width / need);
+    }
+    const nat = natW.map((w) => w * s);
+    const lo = counts.map((k) => (cw + (k - 1) * min) * s);
+    const space = width - gap * s * (n - 1);
+    const natSum = sum(nat), loSum = sum(lo);
+    const t = natSum <= space ? 1 : clamp(0, (space - loSum) / Math.max(1e-6, natSum - loSum), 1);
+    const widths = nat.map((w, i) => lo[i] + (w - lo[i]) * t);
+    let x = left + (width - sum(widths) - gap * s * (n - 1)) / 2;
+    const hands = counts.map((k, i) => {
+      const w = widths[i];
+      const h = { x, dx: k > 1 ? (w - cw * s) / (k - 1) : 0, w };
+      x += w + gap * s;
+      return h;
+    });
+    return { s, hands };
+  }
+
+  // Labels on the table come from a pool, keyed by what they belong to.
+  const pool = new Map();
+  function mk(cls, html) {
+    const d = document.createElement('div');
+    d.className = cls;
+    d.innerHTML = html;
+    ntable.insertBefore(d, nlayer);
+    return d;
+  }
+  function slot(key, make) {
+    let e = pool.get(key);
+    if (!e) { e = make(); pool.set(key, e); }
+    e.used = true;
+    return e;
+  }
+  function handSlot(key, small) {
+    return slot(key, () => {
+      const c = 'anc' + (small ? ' small' : '');
+      const top = mk(c, '<span class="tot"></span>');
+      const bot = mk(c, '<div class="info"><span class="lab"><span class="bw">Bet </span><b></b></span><span class="res"></span></div>');
+      return {
+        top, bot, tot: top.firstChild, bet: bot.querySelector('b'), bw: bot.querySelector('.bw'), res: bot.querySelector('.res'), resKey: '',
+        hide() { top.hidden = true; bot.hidden = true; this.resKey = ''; this.res.textContent = ''; },
+      };
+    });
+  }
+  const elSlot = (key, cls, html) => slot(key, () => {
+    const el = mk(cls, html);
+    return { el, hide() { el.hidden = true; } };
+  });
+
+  // What a seat's stack shows: payouts land when the settle is on screen.
+  function dispStack(u) {
+    const T = NET.T;
+    let c = TB.stackOf(T, u);
+    if (T.settleQ && NET.shown < T.settleQ) {
+      for (const h of T.hands) if (h.u === u) c -= h.pay;
+      if (T.insRes[u] === 'won') c -= T.ins[u] * 3;
+    }
+    return c;
+  }
+  const placedBet = (u) => NET.T.stage === 'bet' && TB.hasBet(NET.T, u);
+
+  const nEls = new Map();
+  let activeBar = null;
+  function nRender(instant) {
+    const T = NET.T, L = NET.L, room = NET.room;
+    if (!T || !L || !room || napp.hidden) return;
+    const me = NET.me, shown = NET.shown, idle = shown >= T.seq;
+    const settled = T.settleQ && shown >= T.settleQ;
+    const ctx = ctxOf(room);
+    for (const e of pool.values()) e.used = false;
+    const want = new Map();
+    let z = 1;
+    activeBar = null;
+
+    // seats: everyone seated, plus anyone who left with cards still on the table
+    const others = room.seats.filter((u) => u !== me);
+    for (const h of T.hands) if (h.u !== me && others.indexOf(h.u) < 0) others.push(h.u);
+    const k = others.length;
+    const G = k && L.W >= 760 && L.W >= L.H * 1.5 ? geoWide(k) : geo(k);
+    ntable.style.setProperty('--cw', G.cwM + 'px');
+    ntable.style.setProperty('--ch', G.chM + 'px');
+    ntable.style.setProperty('--cw-o', G.cwO + 'px');
+    const shoeW = G.cwM * 0.6;
+    const sx = L.W - L.tp - shoeW - 4, sy = L.tp;
+    nshoe.style.transform = 'translate(' + sx + 'px,' + sy + 'px)';
+    const reserve = L.tp + Math.max(shoeW + 4, L.fs * 6.2) + 8;
+    nClock.style.setProperty('--cw-r', (reserve - L.tp - 4) + 'px');
+
+    const vis = (h) => h.cards.filter((x) => x.q <= shown);
+
+    // a row of one player's hands; y given by where the row should sit
+    function handsRow(u, left, width, cw, small, yOf) {
+      const list = [];
+      T.hands.forEach((h, idx) => { if (h.u === u) { const cards = vis(h); if (cards.length) list.push({ h, idx, cards }); } });
+      if (!list.length) return null;
+      const g = nRow(list.map((x) => x.cards.length), left, width, cw);
+      const s = g.s * cw / G.cwM, ch = cw * 1.4 * g.s;
+      const y = yOf(ch);
+      list.forEach((x, j) => {
+        const hg = g.hands[j], h = x.h;
+        const allShown = x.cards.length === h.cards.length;
+        const result = settled ? h.res : (h.res === 'bust' && allShown ? 'bust' : '');
+        const dim = result === 'bust' || result === 'lose';
+        x.cards.forEach((card, m) => {
+          want.set(T.n + ':' + card.q, { c: card.c, q: card.q, x: hg.x + m * hg.dx, y, s, up: true, dim, z: z++ });
+        });
+        const active = idle && T.stage === 'play' && T.turn === x.idx;
+        const E = handSlot((small ? 'h:' + u : 'm') + ':' + j, small);
+        const cx = hg.x + hg.w / 2;
+        E.tot.textContent = BJ.totalText(x.cards.map((c) => c.c), h.done && allShown);
+        E.tot.className = 'tot' + (active ? ' on' : '') + (dim ? ' off' : '');
+        E.top.hidden = false;
+        anchor(E.top, cx, y - 5, -50, -100);
+        E.bet.textContent = fmt(h.bet);
+        E.bw.hidden = small && list.length > 1;
+        const rk = result ? result + ':' + h.pay : '';
+        if (rk !== E.resKey) {
+          E.resKey = rk;
+          let t = result ? RES_TEXT[result] : '';
+          if (!small && settled && h.pay > h.bet) t += ' +' + fmt(h.pay - h.bet);
+          E.res.textContent = t;
+          E.res.className = 'res' + (result === 'win' || result === 'blackjack' ? ' win' : result === 'push' ? '' : ' lose') + (result && !instant ? ' res-in' : '');
+        }
+        E.bot.hidden = false;
+        anchor(E.bot, cx, y + ch + (small ? 6 : 9), -50, 0);
+        if (active) activeBar = { x: hg.x, y: y + ch + 2, w: hg.w };
+      });
+      return { y, ch };
+    }
+
+    // dealer
+    let dealerBottom = L.tp + L.labH + G.chD;
+    const dc = T.dealer.filter((x) => x.q <= shown);
+    const revealed = T.revealQ && shown >= T.revealQ;
+    if (dc.length) {
+      const g = nRow([dc.length], reserve, L.W - 2 * reserve, G.cwD);
+      const hg = g.hands[0], y = L.tp + L.labH, s = g.s * G.cwD / G.cwM;
+      dc.forEach((card, j) => {
+        want.set(T.n + ':' + card.q, { c: card.c, q: card.q, x: hg.x + j * hg.dx, y, s, up: !card.hole || revealed, dim: false, z: z++ });
+      });
+      const up = dc.filter((x) => !x.hole || revealed).map((x) => x.c);
+      $('ndTot').textContent = up.length ? BJ.totalText(up, settled) : '';
+      ndLab.hidden = false;
+      anchor(ndLab, L.W / 2, y - 6, -50, -100);
+      dealerBottom = y + G.chD * g.s;
+    } else ndLab.hidden = true;
+
+    // The other seats in seat order: a band under the dealer, or on wide
+    // tables an arc either side of mine.
+    let bandBottom = dealerBottom;
+    const myBottom = (ch) => L.H - L.tp - L.infoH - ch;
+    const spots = [];
+    if (k && G.wide) {
+      const base = myBottom(G.chM) + G.chM - G.chO;
+      const minCards = L.tp + Math.round(L.fs * 3.8) + G.nameH + G.oTot;
+      const rise = Math.max(0, base - minCards);
+      const half = L.W / 2 - L.tp;
+      others.forEach((u, i) => {
+        const right = i >= G.nL, j = right ? i - G.nL : i;
+        const left = right ? L.W / 2 + G.meW / 2 + L.fs + j * G.sw : L.tp + j * G.sw;
+        const cx = left + G.sw / 2, d = Math.min(1, Math.abs(cx - L.W / 2) / half);
+        const cardsY = base - rise * d * d;
+        spots.push({ u, left, sw: G.sw, cx, top: cardsY - G.nameH - G.oTot, cardsY });
+      });
+    } else if (k) {
+      const top = dealerBottom + Math.round(L.fs * 0.9);
+      const total = Math.min(L.W - 2 * L.tp, G.sw * k), sw = total / k;
+      const x0 = (L.W - total) / 2;
+      const cardsY = top + G.nameH + G.oTot;
+      others.forEach((u, i) => { const left = x0 + i * sw; spots.push({ u, left, sw, cx: left + sw / 2, top, cardsY }); });
+      bandBottom = cardsY + G.chO + G.oInfo;
+    }
+    if (k) {
+      const actor = idle && T.stage === 'play' ? TB.actor(T) : null;
+      spots.forEach(({ u, left, sw, cx, top, cardsY }) => {
+        const N = slot('s:' + u, () => {
+          const el = mk('anc', '<div class="sname"><span class="nm"></span><b></b><span class="tg" hidden></span></div>');
+          return { el, box: el.firstChild, nm: el.querySelector('.nm'), b: el.querySelector('b'), tg: el.querySelector('.tg'), hide() { el.hidden = true; } };
+        });
+        N.el.hidden = false;
+        N.box.style.setProperty('--sw', Math.max(40, sw - 8) + 'px');
+        N.nm.textContent = nameOf(u);
+        const isSeated = room.seats.indexOf(u) >= 0;
+        N.b.textContent = isSeated ? fmt(dispStack(u)) : '';
+        const tag = !isSeated ? 'Left' : ctx.away[u] ? 'Away' : '';
+        N.tg.textContent = tag; N.tg.hidden = !tag;
+        N.box.classList.toggle('on', actor === u);
+        anchor(N.el, cx, top, -50, 0);
+        if (placedBet(u)) {
+          const P = elSlot('p:' + u, 'spot small has', '<span class="lab">Bet</span><span class="num"></span>');
+          P.el.hidden = false;
+          P.el.querySelector('.num').textContent = fmt(T.bets[u]);
+          P.el.style.transformOrigin = '0 0';
+          P.el.style.transform = tr(cx - G.cwO / 2, cardsY, G.cwO / G.cwM);
+          return;
+        }
+        const r = handsRow(u, left + sw * 0.05, sw * 0.9, G.cwO, true, () => cardsY);
+        if (!r && T.stage !== 'bet') {
+          const O = elSlot('o:' + u, 'anc out', 'Sitting out');
+          O.el.hidden = false;
+          anchor(O.el, cx, cardsY + G.chO / 2, -50, -50);
+        }
+      });
+    }
+
+    // my seat at the bottom
+    let meTop = myBottom(G.chM);
+    const mySpot = T.stage === 'bet' && (placedBet(me) || NET.local > 0 || !T.hands.some((h) => h.u === me && vis(h).length));
+    if (!mySpot) {
+      const r = G.wide ? handsRow(me, L.W / 2 - G.meW / 2, G.meW, G.cwM, false, myBottom) : handsRow(me, L.tp, L.W - 2 * L.tp, G.cwM, false, myBottom);
+      if (r) meTop = r.y;
+      else if (T.stage !== 'bet') {
+        const O = elSlot('o:me', 'anc out', 'Sitting out');
+        O.el.hidden = false;
+        anchor(O.el, L.W / 2, myBottom(G.chM) + G.chM / 2, -50, -50);
+      }
+    }
+    nspot.classList.toggle('off', !mySpot);
+    const spotAmt = placedBet(me) ? T.bets[me] : NET.local;
+    nspot.classList.toggle('has', spotAmt > 0);
+    $('nSpotNum').textContent = fmt(spotAmt);
+    nspot.style.transform = tr(L.W / 2 - G.cwM / 2, myBottom(G.chM));
+
+    for (const [key, e] of pool) if (!e.used) e.hide();
+
+    // cards
+    for (const [key, w] of want) {
+      let el = nEls.get(key);
+      const animate = !instant && !el && w.q === shown && !reduceMotion;
+      if (!el) {
+        el = cardEl(w.c);
+        nEls.set(key, el);
+        if (animate) {
+          el.style.transform = tr(sx, sy, 0.6);
+          el.style.zIndex = w.z;
+          nlayer.appendChild(el);
+          el.getBoundingClientRect();
+        } else {
+          el.classList.add('nt');
+          el.style.transform = tr(w.x, w.y, w.s);
+          el.classList.toggle('up', w.up);
+          el.classList.toggle('dim', w.dim);
+          nlayer.appendChild(el);
+          el.getBoundingClientRect();
+          el.classList.remove('nt');
+        }
+      }
+      el.style.zIndex = w.z;
+      el.style.transform = tr(w.x, w.y, w.s);
+      el.classList.toggle('up', w.up);
+      el.classList.toggle('dim', w.dim);
+    }
+    for (const [key, el] of nEls) {
+      if (want.has(key)) continue;
+      nEls.delete(key);
+      if (instant || reduceMotion) { el.remove(); continue; }
+      el.classList.add('gone');
+      el.style.transform = tr(-G.cwM * 1.4, L.tp, 0.8);
+      setTimeout(() => el.remove(), 380);
+    }
+
+    // turn timer under the active hand
+    nBar();
+
+    // the message sits in the gap above my seat, never over my totals
+    nMsg(instant);
+    const mh = nmsg.offsetHeight, lo = meTop - L.labH - 4;
+    let mid = (bandBottom + lo) / 2;
+    if (mid + mh / 2 > lo) mid = lo - mh / 2;
+    anchor(nmsg, L.W / 2, mid, -50, -50);
+    $('nShoeFill').style.width = (100 * (T.shoe.length - T.pos) / T.shoe.length).toFixed(1) + '%';
+    nHud();
+    nControls();
+    nClockRender();
+  }
+
+  let tbar = null;
+  function nBar() {
+    if (!tbar) {
+      tbar = mk('bar tm off', '<i class="fill"></i>');
+    }
+    const T = NET.T;
+    if (!activeBar) { tbar.classList.add('off'); NET.barKey = ''; return; }
+    const snap = tbar.classList.contains('off');
+    if (snap) tbar.style.transition = 'none';
+    tbar.style.width = activeBar.w.toFixed(1) + 'px';
+    tbar.style.transform = tr(activeBar.x, activeBar.y);
+    if (snap) { tbar.getBoundingClientRect(); tbar.style.transition = ''; }
+    tbar.classList.remove('off');
+    const key = T.seq + ':' + T.turn + ':' + T.deadline;
+    if (key === NET.barKey) return;
+    NET.barKey = key;
+    const fill = tbar.firstChild;
+    const left = Math.max(0, T.deadline - sNow());
+    fill.style.transition = 'none';
+    fill.style.transform = 'scaleX(' + clamp(0, left / TB.TURN_MS, 1).toFixed(4) + ')';
+    fill.getBoundingClientRect();
+    fill.style.transition = 'transform ' + Math.round(left) + 'ms linear';
+    fill.style.transform = 'scaleX(0)';
+  }
+
+  let nMsgKey = '';
+  function nMsg(instant) {
+    const T = NET.T, shown = NET.shown, me = NET.me;
+    const idle = shown >= T.seq;
+    let big = '', sub = '', cls = '';
+    if (T.shuffleQ && shown === T.shuffleQ) sub = 'Shuffling';
+    else if (T.settleQ && shown >= T.settleQ) {
+      const dbj = BJ.isNatural(BJ.ints(T.dealer));
+      const dv = BJ.handValue(BJ.ints(T.dealer)).total;
+      const mine = T.hands.filter((h) => h.u === me);
+      if (mine.length) {
+        const net = T.net[me] || 0;
+        if (net > 0) { big = '+' + fmt(net); cls = 'win'; }
+        else if (net < 0) { big = '-' + fmt(-net); cls = 'lose'; }
+        else big = 'Push';
+        if (dbj) sub = 'Dealer blackjack';
+        else if (mine.length === 1 && mine[0].res === 'blackjack') sub = 'Blackjack';
+        else if (mine.every((h) => h.res === 'bust')) sub = 'Bust';
+        else if (dv > 21) sub = 'Dealer busts';
+      } else sub = dbj ? 'Dealer blackjack' : dv > 21 ? 'Dealer busts' : 'Dealer ' + dv;
+    } else if (T.insQ && shown === T.insQ) sub = 'No dealer blackjack';
+    else if (idle && T.stage === 'play' && TB.actor(T) === me) sub = 'Your turn';
+    const key = big + '|' + sub + '|' + cls;
+    if (key === nMsgKey) return;
+    nMsgKey = key;
+    const b = $('nMsgBig');
+    b.textContent = big;
+    b.className = 'big ' + cls;
+    b.hidden = !big;
+    $('nMsgSub').textContent = sub;
+    nmsg.classList.remove('pop');
+    if ((big || sub) && !instant && !reduceMotion) { nmsg.offsetWidth; nmsg.classList.add('pop'); }
+  }
+
+  function nHud() {
+    const T = NET.T, me = NET.me;
+    let c = dispStack(me);
+    if (T.stage === 'bet' && !TB.hasBet(T, me)) c -= NET.local;
+    const el = $('nCash');
+    if (NET.cash !== null && c > NET.cash && !reduceMotion) {
+      el.classList.add('gain');
+      setTimeout(() => el.classList.remove('gain'), 450);
+    }
+    NET.cash = c;
+    el.textContent = fmt(c);
+  }
+
+  function nClockRender() {
+    const T = NET.T, L = NET.L;
+    if (!T || !L || napp.hidden) return;
+    const idle = NET.shown >= T.seq;
+    let lab = '', end = 0;
+    if (idle) {
+      if (T.stage === 'bet' && T.deadline) { lab = 'Bets'; end = T.deadline; }
+      else if (T.stage === 'insurance') { lab = 'Insurance'; end = T.deadline; }
+      else if (T.stage === 'play' && TB.actor(T)) { const a = TB.actor(T); lab = a === NET.me ? 'You' : nameOf(a); end = T.deadline; }
+    }
+    if (!lab) { nClock.hidden = true; return; }
+    const secs = Math.max(0, Math.ceil((end - sNow()) / 1000));
+    $('nClockLab').textContent = lab;
+    $('nClockNum').textContent = secs;
+    nClock.classList.toggle('low', secs <= 5);
+    nClock.hidden = false;
+    anchor(nClock, L.tp, L.tp, 0, 0);
+  }
+
+  function nControls() {
+    const T = NET.T, me = NET.me, room = NET.room;
+    let want = '';
+    const live = T && room && !napp.hidden && !overlayOpen;
+    const idle = T && NET.shown >= T.seq;
+    if (live) {
+      if (T.stage === 'bet') want = 'bet';
+      else if (T.stage === 'insurance') want = TB.canInsure(T, me, ctxOf(room)) ? 'insurance' : '';
+      else if (T.stage === 'play') want = T.hands.some((h) => h.u === me) ? 'play' : '';
+      if (!idle && want !== NET.panel) want = '';
+    }
+    if (want !== NET.panel) {
+      NET.panel = want;
+      for (const k in npanels) npanels[k].classList.toggle('on', k === want);
+    }
+    if (!T) return;
+    const placed = TB.hasBet(T, me);
+    const stack = TB.stackOf(T, me);
+    const open = T.stage === 'bet' && !placed && !NET.pending;
+    nchips.forEach((b) => { b.disabled = !open || NET.local + Number(b.dataset.v) > stack; });
+    $('nClear').disabled = !open || !NET.local;
+    const nb = $('nBet');
+    if (placed) { nb.textContent = 'Waiting'; nb.disabled = true; }
+    else if (!NET.local && stack < BJ.MIN_BET) { nb.textContent = 'New stack'; nb.disabled = !open; }
+    else if (!NET.local && NET.lastBet >= BJ.MIN_BET && NET.lastBet <= stack) { nb.textContent = 'Rebet ' + fmt(NET.lastBet); nb.disabled = !open; }
+    else { nb.textContent = 'Bet'; nb.disabled = !open || NET.local < BJ.MIN_BET; }
+    if (T.stage === 'insurance') {
+      const h = T.hands.find((x) => x.u === me);
+      if (h) $('nInsYes').textContent = 'Insurance ' + fmt(h.bet / 2);
+    }
+    $('nInsYes').disabled = NET.pending;
+    $('nInsNo').disabled = NET.pending;
+    const go = idle && !NET.pending && TB.canHit(T, me);
+    $('nHit').disabled = !go;
+    $('nStand').disabled = !go;
+    $('nDouble').disabled = !(go && TB.canDouble(T, me));
+    $('nSplit').disabled = !(go && TB.canSplit(T, me));
+  }
+
+  /* ---------- playback ---------- */
+  function nKind(q) {
+    const T = NET.T;
+    if (T.shuffleQ === q) return 'shuffle';
+    if (T.revealQ === q) return 'flip';
+    if (T.settleQ === q) return 'settle';
+    if (T.insQ === q) return 'ins';
+    return 'card';
+  }
+  function nPump() {
+    const T = NET.T;
+    if (NET.timer || !T || napp.hidden) return;
+    if (NET.shown >= T.seq) { NET.idleAt = NET.shown; nRender(false); return; }
+    // a hidden tab catches up at once
+    if (document.hidden) { NET.shown = T.seq; NET.idleAt = T.seq; nRender(true); return; }
+    const next = NET.shown + 1, k = nKind(next);
+    let d = DELAY[k] || 0;
+    const prev = nKind(NET.shown);
+    if (prev === 'shuffle') d = 800;
+    else if (prev === 'ins') d = 900;
+    if (NET.shown === NET.idleAt && prev !== 'shuffle') d = k === 'settle' ? 200 : 30;
+    if (reduceMotion) d = Math.min(d, 120);
+    NET.timer = setTimeout(() => {
+      NET.timer = 0;
+      if (!NET.T) return;
+      NET.shown = Math.min(next, NET.T.seq);
+      nRender(false);
+      nPump();
+    }, d);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && NET.T) { clearTimeout(NET.timer); NET.timer = 0; nPump(); } });
+
+  /* ---------- clocks: anyone can move a stalled table on ---------- */
+  function nTick() {
+    const T = NET.T, room = NET.room;
+    if (!T || !room || !NET.code || T.stage === 'lobby') return;
+    nClockRender();
+    const me = NET.me;
+    // chips on the spot when the betting clock runs out still count
+    if (T.stage === 'bet' && T.deadline && NET.local >= BJ.MIN_BET && !TB.hasBet(T, me) && !NET.pending &&
+        NET.autoBet !== T.n && T.deadline - sNow() < 1200) {
+      NET.autoBet = T.n;
+      placeBet();
+    }
+    const ctx = ctxOf(room);
+    if (!TB.due(T, ctx)) { NET.dueKey = ''; return; }
+    const key = [T.seq, T.stage, T.turn, T.deadline, Object.keys(T.bets).join(','), room.seats.join(',')].join('|');
+    if (key !== NET.dueKey) { NET.dueKey = key; NET.dueAt = Date.now(); }
+    // the player on the clock goes first, then the others in seat order
+    const rank = TB.actor(T) === me ? 0 : room.seats.indexOf(me) + 1;
+    if (Date.now() - NET.dueAt < rank * 700) return;
+    if (NET.tickKey === key && Date.now() - NET.tickAt < 4000) return;
+    NET.tickKey = key; NET.tickAt = Date.now();
+    ntx((T2, c2) => TB.tick(T2, c2, Math.random), true);
+  }
+  setInterval(nTick, 400);
+
+  /* ---------- input ---------- */
+  function nFly(btn) {
+    if (reduceMotion) return;
+    const a = btn.getBoundingClientRect(), b = nspot.getBoundingClientRect();
+    const f = document.createElement('div');
+    f.className = 'fly ' + btn.classList[1];
+    f.textContent = btn.dataset.v;
+    f.style.transform = tr(a.left + a.width / 2 - 20, a.top + a.height / 2 - 20);
+    document.body.appendChild(f);
+    f.getBoundingClientRect();
+    f.style.transform = tr(b.left + b.width / 2 - 20, b.top + b.height / 2 - 20, 0.9);
+    f.style.opacity = '0.2';
+    setTimeout(() => {
+      f.remove();
+      nspot.classList.remove('bump'); nspot.offsetWidth; nspot.classList.add('bump');
+    }, 250);
+  }
+  function nChip(btn) {
+    const T = NET.T;
+    if (!T || btn.disabled || T.stage !== 'bet' || TB.hasBet(T, NET.me)) return;
+    const v = Number(btn.dataset.v);
+    if (NET.local + v > TB.stackOf(T, NET.me)) return;
+    NET.local += v;
+    nRender(false);
+    nFly(btn);
+  }
+  async function placeBet() {
+    const T = NET.T, me = NET.me;
+    if (!T || T.stage !== 'bet' || TB.hasBet(T, me)) return;
+    const stack = TB.stackOf(T, me);
+    if (!NET.local && stack < BJ.MIN_BET) { await ntx((T2, ctx) => TB.newStack(T2, me, ctx)); return; }
+    const amt = NET.local || (NET.lastBet >= BJ.MIN_BET && NET.lastBet <= stack ? NET.lastBet : 0);
+    if (amt < BJ.MIN_BET) return;
+    const ok = await ntx((T2, ctx) => TB.bet(T2, me, amt, ctx, Math.random));
+    if (ok) { NET.lastBet = amt; NET.local = 0; nRender(false); }
+  }
+  const nAct = (kind) => ntx((T, ctx) => TB.act(T, NET.me, kind, ctx, Math.random));
+  const nInsure = (take) => ntx((T, ctx) => TB.insure(T, NET.me, take, ctx, Math.random));
+
+  nchips.forEach((b) => b.addEventListener('click', () => nChip(b)));
+  $('nClear').addEventListener('click', () => { NET.local = 0; nRender(false); });
+  $('nBet').addEventListener('click', placeBet);
+  $('nInsYes').addEventListener('click', () => nInsure(true));
+  $('nInsNo').addEventListener('click', () => nInsure(false));
+  $('nHit').addEventListener('click', () => nAct('hit'));
+  $('nStand').addEventListener('click', () => nAct('stand'));
+  $('nDouble').addEventListener('click', () => nAct('double'));
+  $('nSplit').addEventListener('click', () => nAct('split'));
+
+  window.addEventListener('keydown', (e) => {
+    if (!netView || e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || overlayOpen || napp.hidden) return;
+    const T = NET.T;
+    if (!T) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (T.stage === 'bet' && NET.panel === 'bet') {
+      const i = ['1', '2', '3', '4'].indexOf(k);
+      if (i >= 0) { e.preventDefault(); nChip(nchips[i]); return; }
+      if (k === 'Backspace' || k === 'Delete' || k === 'c') { e.preventDefault(); if (!$('nClear').disabled) { NET.local = 0; nRender(false); } return; }
+      if ((k === 'Enter' || k === ' ') && tag !== 'BUTTON') { e.preventDefault(); if (!$('nBet').disabled) placeBet(); }
+    } else if (T.stage === 'insurance' && NET.panel === 'insurance') {
+      if (k === 'y' || k === 'i') { e.preventDefault(); nInsure(true); return; }
+      if (k === 'n' || k === 'Escape') { e.preventDefault(); nInsure(false); }
+    } else if (T.stage === 'play' && NET.panel === 'play') {
+      const map = { h: 'hit', s: 'stand', d: 'double', p: 'split' };
+      if (map[k]) { e.preventDefault(); nAct(map[k]); }
+    }
+  });
+
   /* ---------- boot ---------- */
   relayout();
   app.classList.add('ready');
-  if (BJ.isBroke(st)) showOver(); else showStart();
+  const urlRoom = new URLSearchParams(location.search).get('room');
+  if (urlRoom) { netView = true; openOverlay(joinCard); }
+  else if (BJ.isBroke(st)) showOver(); else showStart();
+  refreshOnlineBtn();
   V.ready();
+
+  import('../_shared/rooms.js').then((mod) => {
+    Rooms = mod;
+    refreshOnlineBtn();
+    if (!Rooms.available) { if (urlRoom) backToStart(); return; }
+    const code = Rooms.codeFromUrl();
+    const saved = lsGet(ROOM_KEY);
+    if (code) joinRoom(code, 'url');
+    else if (saved && saved.code && Date.now() - (saved.at || 0) < 1000 * 60 * 60 * 24) joinRoom(saved.code, 'saved');
+  }).catch(() => {
+    Rooms = null;
+    refreshOnlineBtn();
+    if (urlRoom) backToStart();
+  });
 
 })();
 </script>
