@@ -54,9 +54,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 }
 .brand { display: inline-flex; align-items: center; gap: 14px; flex-shrink: 0; }
 /* The Vela mark (open hexagon around a V) and the lowercase wordmark. */
-.brand .wm { display: inline-flex; align-items: center; gap: 9px; }
-.brand .mark { width: 21px; height: 24px; flex-shrink: 0; }
-.brand .wm-text { font-family: var(--font-display); font-weight: 600; font-size: 21px; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
+/* Sized in em off the wordmark, and nudged down so the mark centres on the
+   lowercase letters rather than on the top of the l. */
+.brand .wm { display: inline-flex; align-items: center; gap: 0.45em; font-size: 21px; }
+.brand .mark { height: 1.05em; width: auto; aspect-ratio: 79.68 / 86.23; flex-shrink: 0; transform: translateY(0.12em); }
+.brand .wm-text { font-family: var(--font-display); font-weight: 600; font-size: 1em; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
 .brand-sub {
   font-weight: 600; font-size: 14px; line-height: 20px; color: var(--text-2);
   padding-left: 14px; border-left: 1px solid var(--line-2);
