@@ -158,12 +158,41 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* leaderboard on a game page */
 .board { margin-bottom: 28px; }
-.board .label { display: block; margin-bottom: 12px; }
+.board-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.board-top a.label { transition: color 0.15s var(--ease); }
+.board-top a.label:hover { color: var(--vela-2); }
 .board-list { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--line); }
 .board-list li {
-  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
   height: 36px; border-bottom: 1px solid var(--line); font-size: 14px;
 }
+.mod-tools { display: flex; gap: 6px; }
+.mod-btn {
+  height: 24px; padding: 0 8px; border: 1px solid var(--line-2); background: none; cursor: pointer;
+  font: 600 11px var(--font); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3);
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.mod-btn:hover { color: var(--vela-2); border-color: var(--vela); }
+.mod-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Leaderboards tab */
+.lb { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 32px; padding: 24px 0 56px; }
+.lb-games { display: flex; flex-direction: column; gap: 2px; }
+.lb-games a {
+  display: flex; align-items: center; gap: 10px; padding: 6px; font-size: 14px; font-weight: 600; color: var(--text-2);
+  transition: background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.lb-games a:hover { background: var(--bg-2); color: var(--text); }
+.lb-games a.on { background: var(--bg-2); color: var(--text); box-shadow: inset 2px 0 0 var(--vela); }
+.lb-games .art.mini { width: 28px; height: 28px; }
+.lb-games .art.mini svg { width: 18px; }
+.lb-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.lb-head .art.mini { width: 48px; height: 48px; }
+.lb-head .art.mini svg { width: 30px; }
+.lb-head h2 { font-family: var(--font-display); font-weight: 300; font-size: 34px; line-height: 1.05; }
+.lb-head .label { display: block; margin-top: 6px; }
+.lb-head .btn { margin-left: auto; }
+.lb-board .board-list li { height: 44px; font-size: 15px; }
 .board-list .rank { font-weight: 600; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .board-list .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
 .board-list .pts { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -390,6 +419,13 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .online-totals { margin-bottom: 48px; }
   .online-totals div { padding: 16px; }
   .online-totals strong { font-size: 40px; }
+  /* The footer links to Updates, so the bar keeps room for Leaderboards. */
+  .nav-link[href="/updates"] { display: none; }
+  .lb { grid-template-columns: 1fr; gap: 16px; padding-top: 16px; }
+  .lb-games { flex-direction: row; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .lb-games a { flex-shrink: 0; white-space: nowrap; }
+  .lb-games a.on { box-shadow: inset 0 -2px 0 var(--vela); }
+  .lb-head h2 { font-size: 26px; }
   .tabs { overflow-x: auto; scrollbar-width: none; gap: 20px; margin: 0 -16px; padding: 0 16px; }
   .tab { flex-shrink: 0; }
   .shelf { padding-top: 24px; }

@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.3.3',
+    date: '2026-10-29',
+    games: [],
+    changes: [
+      'Leaderboards tab in the top bar: the top 10 for every game with a score, in one place.',
+      'Leaderboards are moderated. Inappropriate names and scores get removed.',
+    ],
+  },
+  {
     version: '1.3.2',
     date: '2026-10-29',
     games: [],

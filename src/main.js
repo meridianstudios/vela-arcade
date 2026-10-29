@@ -155,6 +155,10 @@ const THIRD_PARTY_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-p
 
 const hasBoard = (g) => g.scores && !g.via
 
+const boardGames = () => GAMES.filter((g) => hasBoard(g) && playable(g))
+
+// Fills whichever #board-list is on the page (game page or Leaderboards tab).
+// A moderator also gets Remove and Ban on every row but their own.
 async function showBoard(g) {
   const list = document.getElementById('board-list')
   if (!list) return
@@ -162,9 +166,63 @@ async function showBoard(g) {
   if (document.getElementById('board-list') !== list) return // left the page meanwhile
   if (!data) { list.innerHTML = '<li class="board-note">&ndash;</li>'; return }
   if (!data.top.length) { list.innerHTML = '<li class="board-note">No scores yet</li>'; return }
+  const me = Account.current()
+  const mod = me && me.mod
   list.innerHTML = data.top.map((r, i) => `
-    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span><span class="who">${esc(r.name)}</span><span class="pts">${fmt(r.score)}</span></li>`).join('')
-    + (data.you ? `<li class="you sep"><span class="rank"></span><span class="who">${esc(Account.current().name)}</span><span class="pts">${fmt(data.you.score)}</span></li>` : '')
+    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span><span class="who">${esc(r.name)}</span><span class="pts">${fmt(r.score)}</span>${mod && !r.you ? `
+      <span class="mod-tools"><button class="mod-btn" data-act="remove" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Remove</button><button class="mod-btn" data-act="ban" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Ban</button></span>` : ''}</li>`).join('')
+    + (data.you ? `<li class="you sep"><span class="rank"></span><span class="who">${esc(me.name)}</span><span class="pts">${fmt(data.you.score)}</span></li>` : '')
+}
+
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('.mod-btn')
+  if (!b) return
+  const { act, slug, id, name } = b.dataset
+  const ask = act === 'ban'
+    ? `Ban ${name}? They are removed from every leaderboard and cannot post again.`
+    : `Remove ${name} from this leaderboard?`
+  if (!confirm(ask)) return
+  b.disabled = true
+  try {
+    if (act === 'ban') await Account.ban(id, name, boardGames().map((g) => g.slug))
+    else await Account.removeEntry(slug, id)
+  } catch (err) {
+    console.warn('moderation failed', err)
+    alert('That did not go through. Try again.')
+  }
+  refreshBoard()
+})
+
+/* The Leaderboards tab: every scored game down the side, one board at a time,
+   so viewing it costs one board's worth of reads, not all of them. */
+function renderLeaderboards(slug) {
+  const games = boardGames()
+  const fromRecent = recents().map(bySlug).find((g) => g && hasBoard(g))
+  const g = (slug && games.find((x) => x.slug === slug)) || fromRecent || games[0]
+  document.title = `Leaderboards · Vela Arcade`
+  document.body.classList.remove('is-playing')
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="toolbar">
+        <h1>Leaderboards</h1>
+      </div>
+      <div class="lb">
+        <nav class="lb-games" aria-label="Games">${games.map((x) => `
+          <a href="/leaderboards/${x.slug}" data-link class="${x === g ? 'on' : ''}">${art(x, 'mini')}<span>${esc(x.title)}</span></a>`).join('')}
+        </nav>
+        <section class="lb-board">
+          <div class="lb-head">
+            ${art(g, 'mini')}
+            <div><h2>${esc(g.title)}</h2><span class="label">${esc(g.bestLabel || 'Best score')}</span></div>
+            <a class="btn" href="/play/${g.slug}" data-link>Play</a>
+          </div>
+          <ol class="board-list" id="board-list" data-slug="${g.slug}"></ol>
+        </section>
+      </div>
+    </div>`
+  const on = app.querySelector('.lb-games a.on')
+  if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' })
+  showBoard(g)
 }
 
 function renderPlay(slug) {
@@ -236,8 +294,8 @@ function renderPlay(slug) {
       <div>
         ${hasBoard(g) ? `
         <div class="board">
-          <span class="label">Leaderboard</span>
-          <ol class="board-list" id="board-list"></ol>
+          <div class="board-top"><span class="label">Leaderboard</span><a class="label" href="/leaderboards/${g.slug}" data-link>All leaderboards</a></div>
+          <ol class="board-list" id="board-list" data-slug="${g.slug}"></ol>
         </div>` : ''}
         <span class="label">More games</span>
         <div class="more">${more.map((x) => `
@@ -386,8 +444,10 @@ function route() {
   else if (location.pathname === '/' || location.pathname === '/index.html') renderHome()
   else if (location.pathname.replace(/\/$/, '') === '/updates') renderUpdates()
   else if (location.pathname.replace(/\/$/, '') === '/online') renderOnline()
+  else if (/^\/leaderboards(\/[\w-]+)?\/?$/.test(location.pathname)) renderLeaderboards(location.pathname.split('/')[2])
   else renderMissing()
-  document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === location.pathname.replace(/\/$/, '')))
+  const here = '/' + (location.pathname.split('/')[1] || '')
+  document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))
   // Tiles stagger in on their own; everything else eases up as one page.
   const first = app.firstElementChild
   if (first && !app.querySelector('.grid')) first.classList.add('page-in')
@@ -427,7 +487,7 @@ function renderAccount({ user }) {
       <span class="avatar">${esc((user.name.trim()[0] || 'P').toUpperCase())}</span>
     </button>
     <div class="account-menu" id="account-menu" hidden>
-      <span class="label">${esc(user.name)}</span>
+      <span class="label">${esc(user.name)}${user.mod ? ' &middot; Moderator' : ''}</span>
       <button class="account-item" id="sign-out">Sign out</button>
     </div>`
 }
@@ -444,11 +504,12 @@ function refreshBests() {
   })
 }
 
-// The leaderboard on the open game page, if it shows one of the changed games.
+// The leaderboard on screen (game page or Leaderboards tab), if it shows one of
+// the changed games.
 function refreshBoard(slugs) {
-  const m = location.pathname.match(/^\/play\/([\w-]+)/)
-  const g = m && bySlug(m[1])
-  if (g && hasBoard(g) && (!slugs || slugs.includes(g.slug))) showBoard(g)
+  const list = document.getElementById('board-list')
+  const g = list && bySlug(list.dataset.slug)
+  if (g && (!slugs || slugs.includes(g.slug))) showBoard(g)
 }
 
 let lastUser = null
@@ -456,8 +517,9 @@ Account.onChange((state) => {
   renderAccount(state)
   if (state.bestsChanged) refreshBests()
   if (state.boardsChanged) refreshBoard(state.boardsChanged)
-  const uid = state.user && state.user.uid
-  if (uid !== lastUser) { lastUser = uid; refreshBoard() }
+  // Redraw on sign-in, sign-out, and when moderator status arrives.
+  const who = state.user ? state.user.uid + (state.user.mod ? ':mod' : '') : null
+  if (who !== lastUser) { lastUser = who; refreshBoard() }
 })
 
 /* The sign-in form: a username and a password. Opened only from the button. */

@@ -92,6 +92,7 @@ function load() {
         // A brand-new account has no display name for a moment; createAccount
         // syncs once it is set, so leaderboard entries get the right case.
         if (u.displayName) sync()
+        checkMod()
       } else {
         // Anything else (an old Google session) is signed out quietly.
         if (u) auth.signOut(a)
@@ -105,6 +106,16 @@ function load() {
   })()
   loading.catch(() => { loading = null })
   return loading
+}
+
+// Moderator status lives in mods/<uid>, which only an admin can write; the
+// rules let an account read its own entry and nothing else.
+async function checkMod() {
+  const me = user
+  try {
+    const snap = await fb.store.getDoc(fb.store.doc(fb.db, 'mods', me.uid))
+    if (user === me && snap.exists()) { user = { ...user, mod: true }; emit() }
+  } catch {}
 }
 
 const playerRef = () => fb.store.doc(fb.db, 'players', user.uid)
@@ -220,6 +231,7 @@ export async function leaderboard(slug) {
     if (!res.ok) throw new Error(res.status)
     const num = (v) => Number(v && (v.integerValue ?? v.doubleValue)) || 0
     const top = (await res.json()).filter((r) => r.document).map(({ document: d }) => ({
+      id: d.name.split('/').pop(),
       name: (d.fields.name && d.fields.name.stringValue) || '',
       score: num(d.fields.score),
       you: !!user && d.name.endsWith('/' + user.uid),
@@ -231,6 +243,21 @@ export async function leaderboard(slug) {
     console.warn('leaderboard failed', e)
     return null
   }
+}
+
+/* ── moderation ────────────────────────────────────────────────
+   Only work for an account listed in mods/; the rules refuse everyone else. */
+
+export async function removeEntry(slug, uid) {
+  if (!user || !user.mod) throw new Error('Not a moderator')
+  await fb.store.deleteDoc(fb.store.doc(fb.db, 'boards', slug, 'scores', uid))
+}
+
+// Bans an account from posting again and clears it off every board.
+export async function ban(uid, name, slugs) {
+  if (!user || !user.mod) throw new Error('Not a moderator')
+  await fb.store.setDoc(fb.store.doc(fb.db, 'bans', uid), { name, by: user.uid, at: fb.store.serverTimestamp() })
+  await Promise.all(slugs.map((slug) => fb.store.deleteDoc(fb.store.doc(fb.db, 'boards', slug, 'scores', uid)).catch(() => {})))
 }
 
 // Someone who signed in before gets their session (and a sync) back quietly.

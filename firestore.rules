@@ -21,6 +21,32 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Moderators are listed in mods/{uid}, written only from the Firebase
+    // console or an admin token, never from the site. These exists() checks
+    // are billed reads, so they only guard rare actions: a new best and a
+    // moderator removing something.
+    function isMod() {
+      return signedIn() && exists(/databases/$(database)/documents/mods/$(request.auth.uid));
+    }
+    function notBanned() {
+      return !exists(/databases/$(database)/documents/bans/$(request.auth.uid));
+    }
+
+    // Lets an account see whether it is a moderator, and nothing else.
+    match /mods/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+    }
+
+    // A banned account can no longer post to leaderboards or save bests.
+    match /bans/{uid} {
+      allow get: if isMod();
+      allow create: if isMod()
+        && request.resource.data.keys().hasOnly(['name', 'at', 'by'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.at == request.time;
+      allow delete: if isMod();
+    }
+
     match /rooms/{code} {
       // get, not read: read would also allow listing the collection, which
       // hands out every open room code and bills a read per room.
@@ -68,7 +94,7 @@ service cloud.firestore {
           && request.auth.token.firebase.sign_in_provider != 'anonymous';
       }
       allow get: if owner();
-      allow create, update: if owner()
+      allow create, update: if owner() && notBanned()
         && request.resource.data.keys().hasOnly(['bests', 'updatedAt'])
         && request.resource.data.bests is map
         && request.resource.data.bests.size() <= 500;
@@ -95,8 +121,10 @@ service cloud.firestore {
       }
       allow get: if true;
       allow list: if request.query.limit <= 25;
-      allow create: if account() && validEntry();
-      allow update: if account() && validEntry() && request.resource.data.score > resource.data.score;
+      allow create: if account() && validEntry() && notBanned();
+      allow update: if account() && validEntry() && request.resource.data.score > resource.data.score && notBanned();
+      // Moderators remove entries (an inappropriate name, an impossible score).
+      allow delete: if isMod();
     }
 
     match /{document=**} {
