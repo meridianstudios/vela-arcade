@@ -53,9 +53,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
 }
 .brand { display: inline-flex; align-items: center; gap: 14px; flex-shrink: 0; }
-/* wordmark PNG is a 2000x2000 square with the mark centred; crop to it */
-.brand .wm { display: block; overflow: hidden; width: 80px; height: 21px; }
-.brand .wm img { display: block; width: 175px; height: 175px; margin: -77px 0 0 -47.5px; }
+/* The Vela mark (open hexagon around a V) and the lowercase wordmark. */
+.brand .wm { display: inline-flex; align-items: center; gap: 9px; }
+.brand .mark { width: 21px; height: 24px; flex-shrink: 0; }
+.brand .wm-text { font-family: var(--font-display); font-weight: 600; font-size: 21px; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
 .brand-sub {
   font-weight: 600; font-size: 14px; line-height: 20px; color: var(--text-2);
   padding-left: 14px; border-left: 1px solid var(--line-2);

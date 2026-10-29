@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.3.1',
+    date: '2026-10-29',
+    games: [],
+    changes: [
+      'New Vela logo.',
+    ],
+  },
+  {
     version: '1.3',
     date: '2026-10-29',
     games: ['spades', 'dominoes', 'nine-mens-morris', 'chinese-checkers', 'snakes-and-ladders'],
