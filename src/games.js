@@ -1207,7 +1207,23 @@ export const CATALOGUE = [
   },
 ]
 
-export const GAMES = CATALOGUE.filter((g) => SHOW_GAMEDISTRIBUTION || g.via !== 'GameDistribution')
+/* Lobby order: the games most people already know first, the ones they will
+ * have to learn last. A game missing from this list goes to the end. */
+export const ORDER = [
+  'chess', 'blackjack', 'falling-blocks', 'snake', '2048', 'minesweeper',
+  'four-in-a-row', 'checkers', 'sea-battle', 'word-guess', 'holdem', 'pong',
+  'block-puzzle', 'slots', 'roulette', 'plinko', 'mines', 'crash', 'hangman',
+  'yatzy', 'brick-breaker', 'space-shooter', 'memory-match', 'pinball',
+  'air-hockey', 'dominoes', 'spades', 'hearts', 'road-crossing', 'word-search',
+  'tower-stack', 'typing-test', 'sliding-puzzle', 'video-poker', 'dots-and-boxes',
+  'chinese-checkers', 'code-breaker', 'world-cup', 'basketball-manager',
+  'racing-manager', 'wildcard', 'ultimate-tic-tac-toe', 'nine-mens-morris', 'onitama',
+]
+const rank = (g) => { const i = ORDER.indexOf(g.slug); return i < 0 ? ORDER.length : i }
+
+export const GAMES = CATALOGUE
+  .filter((g) => SHOW_GAMEDISTRIBUTION || g.via !== 'GameDistribution')
+  .sort((a, b) => rank(a) - rank(b))
 // Filters with nothing behind them are left out.
 export const TAGS = ALL_TAGS.filter((t) => GAMES.some((g) => g.tags.includes(t)))
 
