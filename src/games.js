@@ -724,6 +724,20 @@ export const CATALOGUE = [
     bestLabel: 'Best bankroll',
     art: `<g fill="currentColor"><rect x="10" y="10" width="3" height="44" opacity=".35"/><rect x="10" y="51" width="44" height="3" opacity=".35"/><path d="M13 51Q36 49 47 17V51Z" opacity=".3"/><path d="M13 51Q36 49 47 17" fill="none" stroke="currentColor" stroke-width="5"/><rect x="42" y="10" width="12" height="12"/></g>`,
   },
+  {
+    slug: 'holdem',
+    title: "Texas Hold'em",
+    description:
+      "No-limit Texas Hold'em at a six-seat table with blinds of 10 and 20. Play solo against five computer players, each with its own style, with a bankroll that carries over between visits, or open an online table for 2 to 6 friends with a room code and fill the empty seats with bots. Side pots, split pots and the showdown follow the full rules, and online chips are separate from your bankroll.",
+    kind: 'inhouse',
+    src: '/games/holdem/index.html',
+    tags: ['Solo', 'Multiplayer', 'Cards', 'Casino'],
+    players: '1 player, or 2 to 6 online',
+    controls: 'Tap Fold, Check or Call, and Raise; size a raise with the slider or Min, 1/2 pot, Pot and All in. Keys: F fold, C check or call, R raise, arrow keys set the raise, A all in.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><rect x="9" y="12" width="24" height="34" transform="rotate(-12 21 29)" opacity=".45"/><rect x="23" y="9" width="24" height="34" transform="rotate(7 35 26)"/><path transform="rotate(7 35 26) translate(28 17) scale(.14)" d="M50 5C64 24 94 40 94 62C94 76 83 84 71 84C63 84 57 80 53 74C54 82 58 89 65 95H35C42 89 46 82 47 74C43 80 37 84 29 84C17 84 6 76 6 62C6 40 36 24 50 5Z" style="fill:var(--tile)"/><circle cx="45" cy="47" r="14" style="fill:var(--tile)"/><circle cx="45" cy="47" r="11"/><circle cx="45" cy="47" r="7" style="fill:var(--tile)"/><circle cx="45" cy="47" r="4"/></g>`,
+  },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {
     slug: 'basketball-stars',

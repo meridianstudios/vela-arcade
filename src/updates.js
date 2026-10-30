@@ -8,7 +8,7 @@ export const UPDATES = [
   {
     version: '1.4',
     date: '2026-10-30',
-    games: ['plinko', 'crash'],
+    games: ['holdem', 'plinko', 'crash'],
     changes: [
       'The lobby lists the games most people know first.',
     ],
