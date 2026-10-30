@@ -11,6 +11,7 @@ export const UPDATES = [
     games: [],
     changes: [
       'Rules tab in the top bar: every rulebook in one place.',
+      'Players today now counts everyone online, including tabs left open past midnight.',
     ],
   },
   {

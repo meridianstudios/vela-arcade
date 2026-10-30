@@ -11,7 +11,9 @@
  * stats/days/<date> counts browsers seen on that day (US Eastern date). Each
  * browser adds one the first time, remembered in localStorage; the rules only
  * accept a write that is exactly the current value plus one, so two visitors
- * racing just means one retries.
+ * racing just means one retries. The check runs with every heartbeat, not just
+ * on load, so a tab left open past midnight counts for the new day and a count
+ * that failed gets another go a minute later: anyone online is counted today.
  *
  * This lives in the Realtime Database rather than Firestore on purpose: its
  * free tier bills by bandwidth, not per write, so heartbeats never eat into
@@ -27,15 +29,22 @@ const BEAT_MS = 60000
 const WINDOW_MS = 150000
 const MAX = 5000
 
+// localStorage when the browser allows it. Without it, this page load is all
+// there is: the id and the counts last until a reload, which gives a new id,
+// so the totals and the online count still describe the same browsers.
+const store = (() => {
+  try { localStorage.setItem('vela:probe', '1'); return localStorage } catch {}
+  const memory = new Map()
+  return { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) }
+})()
+
 function myId() {
   const key = 'vela:online-id'
-  try {
-    const have = localStorage.getItem(key)
-    if (have && /^[A-Za-z0-9]{20}$/.test(have)) return have
-  } catch {}
+  const have = store.getItem(key)
+  if (have && /^[A-Za-z0-9]{20}$/.test(have)) return have
   const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
   const id = Array.from(crypto.getRandomValues(new Uint8Array(20)), (b) => abc[b % abc.length]).join('')
-  try { localStorage.setItem(key, id) } catch {}
+  store.setItem(key, id)
   return id
 }
 
@@ -80,14 +89,19 @@ async function addOne(path) {
   return false
 }
 
-// Each browser counts once ever and once a day. Without working storage there
-// is no way to tell a return visit from a new one, so those are not counted.
+// Each browser counts once ever and once a day. Once both are done this is
+// two storage reads and no network.
+let counting = false
 async function countVisit() {
-  let store
-  try { store = window.localStorage; store.setItem('vela:probe', '1') } catch { return }
-  if (!store.getItem('vela:counted') && await addOne('stats/allTime')) store.setItem('vela:counted', '1')
-  const day = today()
-  if (store.getItem('vela:counted-day') !== day && await addOne(`stats/days/${day}`)) store.setItem('vela:counted-day', day)
+  if (counting) return
+  counting = true
+  try {
+    if (!store.getItem('vela:counted') && await addOne('stats/allTime')) store.setItem('vela:counted', '1')
+    const day = today()
+    if (store.getItem('vela:counted-day') !== day && await addOne(`stats/days/${day}`)) store.setItem('vela:counted-day', day)
+  } finally {
+    counting = false
+  }
 }
 
 let started = false
@@ -95,9 +109,10 @@ export function startHeartbeat() {
   if (started) return
   started = true
   const id = myId()
-  beat(id).then(countVisit)
-  setInterval(() => beat(id), BEAT_MS)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(id) })
+  const tick = () => beat(id).then(countVisit)
+  tick()
+  setInterval(tick, BEAT_MS)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick() })
 }
 
 /* Resolves to the number of players online, or null if it cannot be reached. */
