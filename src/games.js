@@ -710,6 +710,20 @@ export const CATALOGUE = [
     bestLabel: 'Best bankroll',
     art: `<g fill="currentColor"><circle cx="32" cy="12" r="2.5" opacity=".45"/><circle cx="25" cy="21" r="2.5" opacity=".45"/><circle cx="39" cy="21" r="2.5" opacity=".45"/><circle cx="18" cy="30" r="2.5" opacity=".45"/><circle cx="32" cy="30" r="2.5" opacity=".45"/><circle cx="46" cy="30" r="2.5" opacity=".45"/><circle cx="11" cy="39" r="2.5" opacity=".45"/><circle cx="25" cy="39" r="2.5" opacity=".45"/><circle cx="39" cy="39" r="2.5" opacity=".45"/><circle cx="53" cy="39" r="2.5" opacity=".45"/><circle cx="32" cy="21" r="4.5"/><rect x="1" y="47" width="11" height="10"/><rect x="14" y="47" width="11" height="10" opacity=".65"/><rect x="27" y="47" width="10" height="10" opacity=".35"/><rect x="39" y="47" width="11" height="10" opacity=".65"/><rect x="52" y="47" width="11" height="10"/></g>`,
   },
+  {
+    slug: 'crash',
+    title: 'Crash',
+    description:
+      'Bet before the round starts, then watch the multiplier climb from 1.00x until it crashes at a random point. Cash out any time before the crash to win your bet times the multiplier, or set an auto cash out target. Rounds run back to back with a 1% house edge, and your bankroll carries over between visits.',
+    kind: 'inhouse',
+    src: '/games/crash/index.html',
+    tags: ['Casino', 'Solo'],
+    players: '1 player',
+    controls: 'Tap Bet, then Cash out before the crash. Space bets and cashes out.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><rect x="10" y="10" width="3" height="44" opacity=".35"/><rect x="10" y="51" width="44" height="3" opacity=".35"/><path d="M13 51Q36 49 47 17V51Z" opacity=".3"/><path d="M13 51Q36 49 47 17" fill="none" stroke="currentColor" stroke-width="5"/><rect x="42" y="10" width="12" height="12"/></g>`,
+  },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {
     slug: 'basketball-stars',

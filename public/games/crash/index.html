@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Crash</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --gap: 10px;
+    --pad: 12px;
+    --rvs: 64px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    margin: 0 auto;
+    max-width: 1120px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "head" "stage" "panel";
+    gap: var(--gap);
+    padding: var(--pad);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.side {
+    grid-template-columns: minmax(0, 1fr) clamp(16em, 28vw, 20em);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "stage head" "stage panel";
+  }
+  .app.side.short { grid-template-columns: minmax(0, 1fr) clamp(16em, 34vw, 20em); }
+  .app.short .field { display: grid; grid-template-columns: 3.8em minmax(0, 1fr); align-items: center; }
+  .app.short .field .lab { margin: 0; white-space: normal; }
+
+  .head { grid-area: head; display: flex; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .brand { flex: 1 1 auto; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .head.nobrand .brand { display: none; }
+  .head.nobrand .stat { flex: 1 1 0; }
+
+  .stat {
+    position: relative;
+    min-width: 7.2em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .num {
+    display: block;
+    font: 600 1.4em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: color 300ms var(--ease);
+  }
+  .num.gain { color: var(--brand-hover); transition: none; }
+  .num.bump { animation: bump 260ms var(--ease); }
+  @keyframes bump { 35% { transform: scale(1.12); color: var(--brand-hover); } }
+  .num { transform-origin: 0 60%; }
+
+  /* ---------- stage ---------- */
+  .stage {
+    grid-area: stage;
+    position: relative;
+    min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+    gap: var(--gap);
+  }
+
+  .hrow {
+    flex: none;
+    display: flex; gap: 4px;
+    height: 1.9em;
+    overflow: hidden;
+  }
+  .h {
+    flex: none;
+    height: 1.9em;
+    padding: 0 0.55em;
+    display: grid; place-items: center;
+    border-radius: 2px;
+    font: 600 0.8em/1 var(--font);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .h.lo { box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); }
+  .h.mid { background: var(--brand); color: #fff; }
+  .h.hi { background: #fff; color: #000; }
+  .h.in { animation: hin 300ms var(--ease) both; }
+  @keyframes hin { from { opacity: 0; transform: translateX(-10px); } }
+
+  .chart {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .chart canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  .chart.shake { animation: shake 440ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+  @keyframes shake {
+    10% { transform: translate(-7px, 2px); }
+    25% { transform: translate(8px, -3px); }
+    40% { transform: translate(-6px, 2px); }
+    55% { transform: translate(5px, -1px); }
+    70% { transform: translate(-3px, 1px); }
+    85% { transform: translate(2px, 0); }
+  }
+
+  .readout {
+    position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    pointer-events: none;
+  }
+  .rl { min-height: 1.2em; }
+  .rl.crashed { color: var(--brand-hover); }
+  .rv {
+    display: block;
+    margin-top: 0.08em;
+    font: 300 var(--rvs)/1.05 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    transition: color 220ms var(--ease);
+  }
+  .rv.wait { color: var(--muted); }
+  .rv.crashed { color: var(--brand); }
+  .rv.pop { animation: rpop 420ms var(--ease); }
+  @keyframes rpop { 0% { transform: scale(1.16); } 100% { transform: scale(1); } }
+  .rbar {
+    width: 9em; height: 3px;
+    margin-top: 0.7em;
+    background: var(--line);
+  }
+  .rbar i { display: block; height: 100%; background: var(--brand); transform-origin: 0 50%; }
+  .rbar.off { visibility: hidden; }
+  .you {
+    min-height: 1.2em;
+    margin-top: 0.7em;
+    font: 600 12px/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .you.w { color: var(--brand-hover); }
+  .you.in { animation: hin 300ms var(--ease) both; }
+  .tag {
+    display: inline-block;
+    margin-top: 0.6em;
+    padding: 0.45em 0.6em;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .tag[hidden] { display: none; }
+
+  /* ---------- panel ---------- */
+  .panel {
+    grid-area: panel;
+    min-width: 0;
+    display: grid;
+    gap: var(--gap);
+    align-content: start;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .stats > div { background: var(--surface); padding: 0.5em 0.7em 0.55em; min-width: 0; }
+  .stats .num { font-size: 1.25em; }
+  .stats .num.off { color: var(--muted); }
+  .app.side .stats { grid-template-columns: 1fr 1fr; }
+  .app.narrow .stats { grid-template-columns: 1fr 1fr; }
+  .app.narrow .stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6em; padding: 0.5em 0.7em; }
+  .app.narrow .stats .num { margin-top: 0; font-size: 1.15em; text-align: right; min-width: 0; transform-origin: 100% 60%; }
+  .app.side .stats .num { font-size: 1.4em; }
+  .app.side .stats .lab { white-space: normal; }
+
+  .fields { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--gap); }
+  .app.side .fields { grid-template-columns: minmax(0, 1fr); }
+  .field .lab { margin-bottom: 0.4em; }
+  .stp {
+    display: grid;
+    height: 2.9em;
+    border: 1px solid var(--outline);
+    border-radius: 2px;
+    transition: opacity 160ms var(--ease);
+  }
+  .stp.bet { grid-template-columns: 1fr 1fr 2.2fr 1fr 1fr; }
+  .stp.au { grid-template-columns: 1fr 2fr 1fr; }
+  .stp button {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 1.05em/1 var(--font);
+    cursor: pointer;
+    transition: background 140ms var(--ease), opacity 140ms var(--ease);
+  }
+  .stp button.small { font-size: 0.82em; letter-spacing: 0.04em; }
+  .stp > * + * { border-left: 1px solid var(--line); }
+  .stp button:hover { background: rgba(255, 255, 255, 0.08); }
+  .stp button:active { background: rgba(255, 255, 255, 0.14); }
+  .stp button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -2px; }
+  .stp button:disabled { opacity: 0.3; cursor: default; background: transparent; }
+  .stp .val {
+    display: grid; place-items: center;
+    min-width: 0;
+    font: 600 1.15em/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .stp .val.off { color: var(--muted); }
+  .stp.lock .val { color: var(--muted); }
+
+  .acts { display: grid; grid-template-columns: minmax(0, 1fr); height: 3.3em; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+    min-width: 0;
+    padding: 0 0.8em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.8rem, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease), opacity 160ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn:disabled, .btn:disabled:hover { opacity: 0.3; cursor: default; background: transparent; border-color: var(--outline); transform: none; }
+  .btn.primary:disabled { background: var(--brand); border-color: var(--brand); }
+  .btn kbd { font: inherit; opacity: 0.55; }
+  .app:not(.wide) .btn kbd { display: none; }
+  .btn.cash { background: #fff; border-color: #fff; color: #000; }
+  .btn.cash:hover { background: #e4e6ea; border-color: #e4e6ea; }
+  .btn.cash:active { background: #c9ccd2; border-color: #c9ccd2; }
+  .btn .amt { font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.72);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div + div { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; }
+  .card .btns .btn { flex: 1 1 8em; min-height: 3.3em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .card, .num, .rv, .stp, .btn { transition: none; }
+    .chart.shake, .num.bump, .h.in, .rv.pop, .you.in { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Crash</h1></div>
+    <div class="stat"><span class="lab">Bankroll</span><span class="num" id="cashNum">1,000</span></div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="hrow" id="hist" aria-label="Recent crash points"></div>
+    <div class="chart" id="chart">
+      <canvas id="cv" aria-hidden="true"></canvas>
+      <div class="readout" id="readout" aria-live="polite">
+        <span class="lab rl" id="rl">&nbsp;</span>
+        <span class="rv" id="rv">1.00x</span>
+        <div class="rbar off" id="rbar"><i id="rbarI"></i></div>
+        <span class="you" id="you"></span>
+        <span class="tag" id="tag" hidden>New best</span>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <div class="stats">
+      <div><span class="lab">In play</span><span class="num" id="sPlay">0</span></div>
+      <div><span class="lab">Win chance</span><span class="num" id="sChance">-</span></div>
+      <div><span class="lab">At target</span><span class="num" id="sTarget">-</span></div>
+      <div><span class="lab">Cash out</span><span class="num" id="sCash">0</span></div>
+    </div>
+    <div class="fields">
+      <div class="field">
+        <span class="lab">Bet</span>
+        <div class="stp bet" id="betStp">
+          <button type="button" class="small" id="betHalf" aria-label="Half bet">1/2</button>
+          <button type="button" id="betDown" aria-label="Lower bet">-</button>
+          <span class="val" id="betVal">10</span>
+          <button type="button" id="betUp" aria-label="Raise bet">+</button>
+          <button type="button" class="small" id="betDouble" aria-label="Double bet">2x</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="lab">Auto cash out</span>
+        <div class="stp au" id="auStp">
+          <button type="button" id="auDown" aria-label="Lower auto cash out">-</button>
+          <span class="val" id="auVal">Off</span>
+          <button type="button" id="auUp" aria-label="Raise auto cash out">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn primary" id="mainBtn" type="button">Bet</button>
+    </div>
+  </aside>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="startCard" role="dialog" aria-labelledby="startTitle" hidden>
+    <h2 id="startTitle">Crash</h2>
+    <p class="line">Bet before the round starts and cash out before it crashes. Space bets and cashes out.</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="stCash">1,000</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="stBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="playBtn" type="button">Play</button></div>
+  </div>
+  <div class="card" id="overCard" role="dialog" aria-labelledby="overTitle" aria-live="polite" hidden>
+    <h2 id="overTitle">Game over</h2>
+    <p class="line">Out of chips</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="ovCash">0</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="ovBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="againBtn" type="button">New bankroll</button></div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="crash"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {} };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const CR = (function () {
+    // Money is kept in whole cents, bets are whole chips, multipliers in hundredths (200 = 2.00x).
+    const START = 100000, MAX_BET = 1000000, HIST = 20;
+    const K = 0.0001;              // growth per ms: e^(t/10s), 2.00x at 6.9s, 10.00x at 23.0s
+    const WAIT_MS = 5000;          // betting phase
+    const END_MS = 2500;           // crash shown before the next betting phase
+    const MAX_C = 100000000;       // crash points are capped at 1,000,000.00x
+    const MIN_AUTO = 101, MAX_AUTO = 1000000;
+
+    // 1% house edge: crash = max(1.00, floor(99 / (1 - U)) / 100), U uniform in [0, 1).
+    // P(crash >= x) = 0.99 / x.
+    function crashFromU(u) {
+      if (!(u >= 0 && u < 1)) u = 0;
+      return Math.min(MAX_C, Math.max(100, Math.floor(99 / (1 - u))));
+    }
+    // The multiplier shown after ms of a round, floored to hundredths.
+    function m100At(ms) { return ms <= 0 ? 100 : Math.floor(100 * Math.exp(K * ms) * (1 + 1e-12)); }
+    // The moment the multiplier reaches m100.
+    function msFor(m100) { return m100 <= 100 ? 0 : Math.log(m100 / 100) / K; }
+    // Auto cash out at a100 wins when the crash point is a100 or higher.
+    function winChance(a100) { return a100 >= MIN_AUTO ? Math.min(1, 99 / a100) : 0; }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const okAuto = (a) => a === 0 || (Number.isInteger(a) && a >= MIN_AUTO && a <= MAX_AUTO);
+
+    function stake(bet, auto) { return { bet, auto, done: false, out100: 0, payout: 0, tOut: 0, best: false }; }
+    function newRound(S) {
+      const s = S.pend;
+      S.pend = null;
+      S.round = { id: ++S.rid, phase: 'wait', t: 0, c100: 0, stake: s };
+    }
+    function newState() {
+      const S = { v: 1, cash: START, bet: 10, auto: 0, lastAuto: 200, peak: START, rid: 0, round: null, pend: null, hist: [] };
+      newRound(S);
+      return S;
+    }
+
+    function live(S) { const s = S.round.stake; return !!s && !s.done; }
+    function locked(S) { return live(S) || !!S.pend; }
+    function maxBet(S) { return Math.min(MAX_BET, Math.floor(S.cash / 100)); }
+    function isBroke(S) { return !locked(S) && S.cash < 100; }
+
+    function setBet(S, v) {
+      if (locked(S)) return false;
+      v = clamp(Math.floor(v) || 1, 1, Math.max(1, maxBet(S)));
+      if (v === S.bet) return false;
+      S.bet = v;
+      return true;
+    }
+    function fitBet(S) {
+      if (!locked(S) && S.bet > maxBet(S) && S.cash >= 100) { S.bet = maxBet(S); return true; }
+      return false;
+    }
+    function setAuto(S, a) {
+      if (locked(S)) return false;
+      a = Math.floor(a) || 0;
+      if (a !== 0) a = clamp(a, MIN_AUTO, MAX_AUTO);
+      if (a === S.auto) return false;
+      if (S.auto) S.lastAuto = S.auto;
+      if (a) S.lastAuto = a;
+      S.auto = a;
+      return true;
+    }
+
+    // Where a bet placed now would go: this round while it is taking bets, otherwise the next one.
+    function slot(S) {
+      const R = S.round;
+      if (R.phase === 'wait') return R.stake ? '' : 'round';
+      return S.pend ? '' : 'next';
+    }
+    function canBet(S) { return !!slot(S) && Number.isInteger(S.bet) && S.bet >= 1 && S.bet * 100 <= S.cash && okAuto(S.auto); }
+    function placeBet(S) {
+      if (!canBet(S)) return false;
+      const where = slot(S), s = stake(S.bet, S.auto);
+      S.cash -= S.bet * 100;
+      if (where === 'round') S.round.stake = s; else S.pend = s;
+      return true;
+    }
+    function canCancel(S) { return (S.round.phase === 'wait' && !!S.round.stake) || !!S.pend; }
+    function cancelBet(S) {
+      const R = S.round;
+      if (R.phase === 'wait' && R.stake) { S.cash += R.stake.bet * 100; R.stake = null; return true; }
+      if (S.pend) { S.cash += S.pend.bet * 100; S.pend = null; return true; }
+      return false;
+    }
+
+    function win(S, m100, t) {
+      const s = S.round.stake;
+      s.done = true; s.out100 = m100; s.tOut = t;
+      s.payout = s.bet * m100;
+      S.cash += s.payout;
+      if (S.cash > S.peak) S.peak = S.cash;
+    }
+    // Manual cash out at the round's current time. The crash wins a tie: once the
+    // multiplier has reached the crash point the round is over.
+    function canCashOut(S) { const R = S.round; return R.phase === 'run' && live(S) && m100At(R.t) < R.c100; }
+    function cashOut(S) {
+      if (!canCashOut(S)) return false;
+      win(S, m100At(S.round.t), S.round.t);
+      return true;
+    }
+
+    function crash(S, ev) {
+      const R = S.round, s = R.stake;
+      R.phase = 'end';
+      ev.push({ type: 'crash', R });
+      if (s && !s.done) { s.done = true; s.out100 = 0; s.payout = 0; ev.push({ type: 'lost', R }); }
+      S.hist.unshift({ id: R.id, c100: R.c100, bet: s ? s.bet : 0, out100: s ? s.out100 : 0 });
+      if (S.hist.length > HIST) S.hist.length = HIST;
+    }
+
+    // Move the clock on by dt ms. gen() returns the next crash point in hundredths.
+    // Returns the events that happened, in order.
+    function advance(S, dt, gen) {
+      const ev = [];
+      if (!(dt >= 0)) return ev;
+      for (let guard = 0; guard < 64; guard++) {
+        const R = S.round;
+        if (R.phase === 'wait') {
+          const left = WAIT_MS - R.t;
+          if (dt < left) { R.t += dt; break; }
+          dt -= left;
+          R.phase = 'run'; R.t = 0; R.c100 = gen();
+          ev.push({ type: 'run', R });
+          continue;
+        }
+        if (R.phase === 'run') {
+          const end = R.t + dt, mEnd = m100At(end), s = R.stake;
+          // Auto cash out pays exactly the target, which is reached before (or at) the crash point.
+          if (s && !s.done && s.auto && s.auto <= R.c100 && mEnd >= s.auto) {
+            win(S, s.auto, msFor(s.auto));
+            ev.push({ type: 'cash', R });
+          }
+          if (mEnd >= R.c100) {
+            const tc = msFor(R.c100);
+            dt = Math.max(0, end - tc);
+            R.t = tc;
+            crash(S, ev);
+            R.t = 0;
+            continue;
+          }
+          R.t = end;
+          break;
+        }
+        // end
+        const left = END_MS - R.t;
+        if (dt < left) { R.t += dt; break; }
+        dt -= left;
+        newRound(S);
+        ev.push({ type: 'wait', R: S.round });
+      }
+      return ev;
+    }
+
+    // A round left running when the page closed plays out without the player.
+    function finishAway(S, gen) {
+      const R = S.round;
+      if (R.phase !== 'run') return [];
+      return advance(S, Math.max(0, msFor(R.c100) - R.t) + 1, gen);
+    }
+
+    function fresh(S) {
+      if (!isBroke(S)) return false;
+      S.cash = START;
+      S.bet = 10;
+      return true;
+    }
+
+    function okStake(s) {
+      return s === null || (!!s && typeof s === 'object' && Number.isInteger(s.bet) && s.bet >= 1 && okAuto(s.auto) &&
+        typeof s.done === 'boolean' && Number.isInteger(s.out100) && s.out100 >= 0 && Number.isInteger(s.payout) && s.payout >= 0);
+    }
+    function valid(S) {
+      if (!S || S.v !== 1) return false;
+      if (!Number.isInteger(S.cash) || S.cash < 0 || !Number.isInteger(S.bet) || S.bet < 1) return false;
+      if (!okAuto(S.auto) || !okAuto(S.lastAuto) || !Number.isInteger(S.peak) || !Number.isInteger(S.rid)) return false;
+      if (!Array.isArray(S.hist) || !okStake(S.pend)) return false;
+      if (S.pend && S.pend.done) return false;
+      const R = S.round;
+      if (!R || ['wait', 'run', 'end'].indexOf(R.phase) < 0 || !(R.t >= 0) || !Number.isInteger(R.id)) return false;
+      if (R.phase !== 'wait' && !(Number.isInteger(R.c100) && R.c100 >= 100 && R.c100 <= MAX_C)) return false;
+      if (!okStake(R.stake)) return false;
+      if (R.phase === 'wait' && S.pend) return false;
+      return S.hist.every((h) => h && Number.isInteger(h.c100) && h.c100 >= 100 && Number.isInteger(h.out100));
+    }
+
+    return {
+      START, MAX_BET, HIST, K, WAIT_MS, END_MS, MAX_C, MIN_AUTO, MAX_AUTO,
+      crashFromU, m100At, msFor, winChance, newState, live, locked, maxBet, isBroke, setBet, fitBet, setAuto,
+      slot, canBet, placeBet, canCancel, cancelBet, canCashOut, cashOut, advance, finishAway, fresh, valid,
+    };
+  })();
+  /* ===== LOGIC END ===== */
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:crash:state';
+  function load() {
+    try {
+      const S = JSON.parse(localStorage.getItem(KEY));
+      return CR.valid(S) ? S : null;
+    } catch (_) { return null; }
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} }
+
+  /* ---------- helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 53 random bits per draw.
+  const rnd = (function () {
+    const c = window.crypto;
+    if (c && c.getRandomValues) {
+      const buf = new Uint32Array(2);
+      return () => { c.getRandomValues(buf); return (buf[0] * 2097152 + (buf[1] >>> 11)) / 9007199254740992; };
+    }
+    return Math.random;
+  })();
+  const gen = () => CR.crashFromU(rnd());
+
+  function fmtC(c) {
+    c = Math.round(c);
+    const whole = Math.floor(c / 100), f = c % 100;
+    const s = whole.toLocaleString('en-US');
+    return f ? s + '.' + String(f).padStart(2, '0') : s;
+  }
+  function fmtM(m100) {
+    return (m100 / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x';
+  }
+  function fmtPct(p) {
+    const v = p * 100;
+    return (v >= 1 ? v.toFixed(2) : String(Number(v.toPrecision(2)))) + '%';
+  }
+  const chips = (n) => n.toLocaleString('en-US');
+  function fit(el) {
+    el.style.fontSize = '';
+    if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+      const cur = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = Math.max(9, Math.floor(cur * el.clientWidth / el.scrollWidth)) + 'px';
+    }
+  }
+  function setText(el, s) {
+    if (el.textContent === s) return false;
+    const grew = el.textContent.length !== s.length;
+    el.textContent = s;
+    if (grew) fit(el);
+    return true;
+  }
+  function restart(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  /* ---------- DOM ---------- */
+  const app = $('app'), head = $('head'), chart = $('chart'), cv = $('cv'), ctx = cv.getContext('2d');
+  const readout = $('readout'), rl = $('rl'), rv = $('rv'), rbar = $('rbar'), rbarI = $('rbarI'), you = $('you'), tag = $('tag');
+  const overlay = $('overlay'), startCard = $('startCard'), overCard = $('overCard');
+  const mainBtn = $('mainBtn');
+
+  let st = load() || CR.newState();
+  let overlayOpen = false, paused = false;
+  let L = { fs: 14, dpr: 1, w: 1, h: 1, rvs: 64 };
+  let FONT = '"Segoe UI", system-ui, sans-serif';
+
+  /* ---------- clock ---------- */
+  let lastNow = performance.now();
+  function tick() {
+    const now = performance.now();
+    const dt = now - lastNow;
+    lastNow = now;
+    if (paused || overlayOpen || !(dt > 0)) return;
+    const ev = CR.advance(st, dt, gen);
+    if (ev.length) handle(ev);
+  }
+
+  function report(R) {
+    const whole = Math.floor(st.cash / 100);
+    R.stake.best = V.gameOver(whole) && st.cash > CR.START;
+    V.score(whole);
+  }
+
+  let brokeTimer = 0;
+  function checkBrokeSoon() {
+    clearTimeout(brokeTimer);
+    brokeTimer = setTimeout(() => { if (CR.isBroke(st) && !overlayOpen) showOver(); }, 1300);
+  }
+
+  function handle(ev) {
+    for (const e of ev) {
+      const cur = e.R === st.round;
+      if (e.type === 'cash') {
+        report(e.R);
+        if (cur) cashFx(e.R);
+      } else if (e.type === 'lost') {
+        report(e.R);
+        checkBrokeSoon();
+      } else if (e.type === 'crash') {
+        if (cur) crashFx(e.R);
+      } else if (e.type === 'wait') {
+        tag.hidden = true;
+      }
+    }
+    save();
+    render(true);
+  }
+
+  /* ---------- geometry ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight, m = Math.min(vw, vh);
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    app.style.setProperty('--pad', Math.round(clamp(8, m * 0.025, 18)) + 'px');
+    app.style.setProperty('--gap', Math.round(clamp(8, m * 0.018, 12)) + 'px');
+    const side = vw >= 600 && vw >= vh * 1.15;
+    app.classList.toggle('side', side);
+    app.classList.toggle('narrow', !side && vw < 560);
+    app.classList.toggle('short', side && vh < 460);
+    app.classList.toggle('wide', side && vw >= 900 && vh >= 460);
+    head.classList.remove('nobrand');
+    if (head.scrollWidth > head.clientWidth + 1) head.classList.add('nobrand');
+    L.fs = fs;
+    sizeCanvas();
+    ['cashNum', 'betVal', 'auVal', 'sPlay', 'sChance', 'sTarget', 'sCash'].forEach((id) => fit($(id)));
+  }
+
+  let plot = { x0: 0, x1: 1, y0: 1, y1: 0 };
+  function sizeCanvas() {
+    const r = chart.getBoundingClientRect();
+    const d = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== w) cv.width = w;
+    if (cv.height !== h) cv.height = h;
+    L.dpr = d; L.w = r.width; L.h = r.height;
+    const fs = L.fs;
+    // Plot area in CSS pixels.
+    plot = { x0: Math.round(fs * 3.6), x1: Math.round(r.width - fs * 1.1), y1: Math.round(fs * 1.2), y0: Math.round(r.height - fs * 2.1) };
+    readout.style.left = plot.x0 + 'px';
+    readout.style.right = (r.width - plot.x1) + 'px';
+    readout.style.top = plot.y1 + 'px';
+    readout.style.bottom = (r.height - plot.y0) + 'px';
+    const pw = plot.x1 - plot.x0, ph = plot.y0 - plot.y1;
+    L.rvs = Math.round(clamp(30, Math.min(pw * 0.16, ph * 0.27), 112));
+    rvLen = -1;
+    renderReadout();
+    draw(0);
+  }
+
+  /* ---------- view (axes) ---------- */
+  const X0 = 10000, Y0 = 2;      // smallest view: 10 seconds by 2.00x
+  let vx = X0, vy = Y0;
+  function headPoint() {
+    const R = st.round;
+    if (R.phase === 'wait') return null;
+    const t = R.phase === 'run' ? R.t : CR.msFor(R.c100);
+    return { t, m: R.phase === 'run' ? Math.exp(CR.K * t) : R.c100 / 100 };
+  }
+  function updateView(fdt) {
+    const hp = headPoint();
+    let tx = X0, ty = Y0;
+    if (hp) {
+      tx = Math.max(X0, hp.t / 0.86);
+      ty = Math.max(Y0, 1 + (hp.m - 1) / 0.8);
+    }
+    const k = reduceMotion ? 1 : 1 - Math.exp(-fdt / 240);
+    vx = tx >= vx ? tx : vx + (tx - vx) * k;
+    vy = ty >= vy ? ty : vy + (ty - vy) * k;
+    if (Math.abs(vx - tx) < 1) vx = tx;
+    if (Math.abs(vy - ty) < 1e-4) vy = ty;
+  }
+
+  function niceStep(range, maxCount) {
+    const raw = range / Math.max(1.5, maxCount);
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const f of [1, 2, 5, 10]) if (f * p >= raw * 0.999) return f * p;
+    return 10 * p;
+  }
+  // Grid lines fade in and out as the scale changes.
+  const gridX = new Map(), gridY = new Map();
+  // Lines at every multiple of step strictly above lo and up to hi.
+  function syncGrid(map, step, lo, hi, fdt) {
+    const want = new Set();
+    for (let i = Math.floor(lo / step + 1e-9) + 1, n = 0; i * step <= hi * 1.0001 && n < 80; i++, n++) want.add(Math.round(i * step * 1e6) / 1e6);
+    const first = map.size === 0;
+    want.forEach((v) => { if (!map.has(v)) map.set(v, first || reduceMotion ? 1 : 0); });
+    const k = reduceMotion ? 1 : 1 - Math.exp(-fdt / 160);
+    map.forEach((a, v) => {
+      const to = want.has(v) ? 1 : 0;
+      const na = a + (to - a) * k;
+      if (!to && na < 0.02) map.delete(v); else map.set(v, na);
+    });
+  }
+  function axisM(n) {
+    return n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 0 }) + 'x';
+  }
+  // Draw the strongest labels first and skip any that would crowd one already drawn.
+  function drawLabels(list, gap) {
+    list.sort((a, b) => b.a - a.a);
+    const done = [];
+    for (const l of list) {
+      if (done.some((p) => Math.abs(p - l.p) < gap)) continue;
+      done.push(l.p);
+      ctx.globalAlpha = l.a;
+      ctx.fillText(l.s, l.x, l.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function axisT(v) {
+    const s = v / 1000;
+    return (s >= 1 ? String(Math.round(s * 10) / 10) : s.toFixed(1)) + 's';
+  }
+
+  /* ---------- particles ---------- */
+  const parts = [];
+  function burst(px, py, n, colors, speed) {
+    if (reduceMotion) return;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.7;
+      const sp = speed * (0.45 + Math.random() * 0.75);
+      parts.push({ x: px, y: py, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - speed * 0.25, life: 1, s: 3 + Math.random() * 4, c: colors[i % colors.length], r: Math.random() * Math.PI });
+    }
+  }
+
+  /* ---------- drawing ---------- */
+  function draw(fdt) {
+    const d = L.dpr, W = cv.width, H = cv.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    const { x0, x1, y0, y1 } = plot;
+    const pw = x1 - x0, ph = y0 - y1;
+    if (pw < 10 || ph < 10) return;
+    const X = (t) => x0 + t / vx * pw;
+    const Y = (m) => y0 - (m - 1) / (vy - 1) * ph;
+    const fs = L.fs;
+
+    syncGrid(gridY, niceStep(vy - 1, ph / (fs * 3.4)), 1, vy, fdt);
+    syncGrid(gridX, niceStep(vx, pw / (fs * 5.5)), 0, vx, fdt);
+
+    ctx.font = '600 11px ' + FONT;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    // horizontal lines, labelled on the left; none crowding the 1x axis
+    const ly = [{ p: y0, a: 1, s: '1x', x: x0 - fs * 0.55, y: y0 }];
+    gridY.forEach((a, v) => {
+      const y = Math.round(Y(v)) + 0.5;
+      if (y < y1 - 1 || y > y0 - 2) return;
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+      ly.push({ p: y, a, s: axisM(v), x: x0 - fs * 0.55, y });
+    });
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    drawLabels(ly, fs * 1.25);
+    // vertical lines, labelled below
+    const lx = [];
+    gridX.forEach((a, v) => {
+      const x = Math.round(X(v)) + 0.5;
+      if (x > x1 + 1 || x < x0 + 2) return;
+      ctx.globalAlpha = a;
+      ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, y0); ctx.stroke();
+      lx.push({ p: x, a, s: axisT(v), x, y: y0 + fs * 0.55 });
+    });
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    drawLabels(lx, fs * 3.2);
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.moveTo(x0 + 0.5, y1); ctx.lineTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1, y0 + 0.5);
+    ctx.stroke();
+
+    const R = st.round, s = R.stake;
+    // auto cash out target
+    const a100 = s && !s.done ? s.auto : (s && s.done ? 0 : st.auto);
+    if (a100 && R.phase !== 'end') {
+      const ta = a100 / 100;
+      if (ta <= vy + 1e-9) {
+        const y = Math.round(Y(ta)) + 0.5;
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+        ctx.fillText(fmtM(a100), x1 - 4, y - 3);
+      }
+    }
+
+    const hp = headPoint();
+    if (hp) {
+      const crashed = R.phase === 'end';
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x0, y1 - 8, pw + 8, ph + 8); ctx.clip();
+      const n = 120;
+      ctx.beginPath();
+      ctx.moveTo(X(0), Y(1));
+      for (let i = 1; i <= n; i++) {
+        const t = hp.t * i / n;
+        ctx.lineTo(X(t), Y(i === n ? hp.m : Math.exp(CR.K * t)));
+      }
+      const hx = X(hp.t), hy = Y(hp.m);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'butt';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = crashed ? 'rgba(255,255,255,0.32)' : '#ea5426';
+      ctx.stroke();
+      ctx.lineTo(hx, y0); ctx.lineTo(x0, y0); ctx.closePath();
+      ctx.fillStyle = crashed ? 'rgba(255,255,255,0.04)' : 'rgba(234,84,38,0.13)';
+      ctx.fill();
+      ctx.restore();
+      if (!crashed) {
+        ctx.fillStyle = '#ff7a4d';
+        ctx.fillRect(Math.round(hx - 4.5), Math.round(hy - 4.5), 9, 9);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(Math.round(hx - 4), Math.round(hy - 4), 8, 8);
+      }
+      // the player's cash out point
+      if (s && s.done && s.out100 > 0) {
+        const cx = X(s.tOut), cy = Y(s.out100 / 100);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(Math.round(cx - 4), Math.round(cy - 4), 8, 8);
+        ctx.font = '600 12px ' + FONT;
+        ctx.textAlign = cx > x0 + pw * 0.6 ? 'right' : 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('+' + fmtC(s.payout - s.bet * 100), cx + (ctx.textAlign === 'left' ? 8 : -8), cy - 6);
+      }
+    }
+
+    // particles
+    if (parts.length) {
+      const dt = Math.min(fdt, 50) / 1000;
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i];
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vy += 420 * dt;
+        p.vx *= 1 - 1.8 * dt;
+        p.life -= dt / 0.75;
+        p.r += dt * 6;
+        if (p.life <= 0) { parts.splice(i, 1); continue; }
+        ctx.globalAlpha = Math.min(1, p.life * 1.4);
+        ctx.fillStyle = p.c;
+        ctx.save();
+        ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+    lastMap = { X, Y };
+  }
+  let lastMap = null;
+
+  function crashFx(R) {
+    if (!reduceMotion) { restart(chart, 'shake'); restart(rv, 'pop'); }
+    if (lastMap) {
+      const t = CR.msFor(R.c100);
+      burst(lastMap.X(t), lastMap.Y(R.c100 / 100), 22, ['#ffffff', '#ea5426', '#ff7a4d', '#ffffff', '#b83f19'], 260);
+    }
+  }
+  function cashFx(R) {
+    const s = R.stake;
+    if (lastMap) burst(lastMap.X(s.tOut), lastMap.Y(s.out100 / 100), 14, ['#ffffff', '#ff7a4d', '#ea5426'], 190);
+    restart($('sCash'), 'bump');
+    if (!reduceMotion) restart(you, 'in');
+  }
+
+  /* ---------- readout ---------- */
+  let rvLen = -1, rvKey = '';
+  function renderReadout() {
+    const R = st.round;
+    let label = ' ', val, cls = '';
+    if (R.phase === 'wait') {
+      label = 'Next round';
+      val = (Math.ceil(Math.max(0, CR.WAIT_MS - R.t) / 100) / 10).toFixed(1) + 's';
+      cls = 'wait';
+      rbarI.style.transform = 'scaleX(' + clamp(0, 1 - R.t / CR.WAIT_MS, 1).toFixed(4) + ')';
+    } else if (R.phase === 'run') {
+      val = fmtM(CR.m100At(R.t));
+    } else {
+      label = 'Crashed';
+      val = fmtM(R.c100);
+      cls = 'crashed';
+    }
+    const key = R.phase;
+    if (key !== rvKey) {
+      rvKey = key;
+      rv.classList.toggle('wait', cls === 'wait');
+      rv.classList.toggle('crashed', cls === 'crashed');
+      rl.classList.toggle('crashed', cls === 'crashed');
+      rbar.classList.toggle('off', R.phase !== 'wait');
+    }
+    if (rl.textContent !== label) rl.textContent = label;
+    if (rv.textContent !== val) {
+      rv.textContent = val;
+      if (val.length !== rvLen) {
+        rvLen = val.length;
+        const pw = plot.x1 - plot.x0;
+        rv.style.fontSize = Math.round(Math.min(L.rvs, pw * 0.92 / (val.length * 0.55))) + 'px';
+      }
+    }
+  }
+
+  function renderYou() {
+    const R = st.round, s = R.stake;
+    let text = '', w = false;
+    if (s) {
+      if (!s.done) text = 'Bet ' + chips(s.bet) + (s.auto ? ', auto ' + fmtM(s.auto) : '');
+      else if (s.out100) { text = 'Cashed out ' + fmtM(s.out100) + ' +' + fmtC(s.payout - s.bet * 100); w = true; }
+      else text = 'Lost ' + chips(s.bet);
+    } else if (st.pend) text = 'Next round bet ' + chips(st.pend.bet);
+    if (you.textContent !== text) you.textContent = text;
+    you.classList.toggle('w', w);
+    tag.hidden = !(s && s.done && s.best);
+  }
+
+  /* ---------- panel ---------- */
+  let cashShown = null, cashTween = 0, cashSnap = 0;
+  function renderCash() {
+    const el = $('cashNum'), v = st.cash;
+    if (cashShown === v) return;
+    cancelAnimationFrame(cashTween); clearTimeout(cashSnap);
+    const from = cashShown;
+    cashShown = v;
+    if (from === null || reduceMotion || v < from) { el.textContent = fmtC(v); el.classList.remove('gain'); fit(el); return; }
+    el.classList.add('gain');
+    const t0 = performance.now(), dur = 500;
+    const step = () => {
+      const p = Math.min(1, (performance.now() - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtC(Math.round(from + (v - from) * e));
+      if (p < 1) cashTween = requestAnimationFrame(step);
+      else { el.classList.remove('gain'); fit(el); }
+    };
+    cashTween = requestAnimationFrame(step);
+    cashSnap = setTimeout(() => { cancelAnimationFrame(cashTween); el.textContent = fmtC(v); el.classList.remove('gain'); fit(el); }, dur + 150);
+  }
+
+  function renderStats() {
+    const R = st.round, s = R.stake;
+    const open = s && !s.done ? s : null;           // a bet riding on this round
+    const bet = open ? open.bet : st.bet;
+    const a100 = open ? open.auto : st.auto;
+    const sp = $('sPlay'), sc = $('sChance'), stg = $('sTarget'), sk = $('sCash');
+    setText(sp, open ? chips(open.bet) : '0');
+    sp.classList.toggle('off', !open);
+    setText(sc, a100 ? fmtPct(CR.winChance(a100)) : '-');
+    sc.classList.toggle('off', !a100);
+    setText(stg, a100 ? fmtC(bet * a100) : '-');
+    stg.classList.toggle('off', !a100);
+    const live = open && R.phase === 'run';
+    setText(sk, live ? fmtC(open.bet * CR.m100At(R.t)) : (s && s.done && s.out100 ? fmtC(s.payout) : '0'));
+    sk.classList.toggle('off', !live && !(s && s.done && s.out100));
+  }
+
+  function renderControls() {
+    const lock = CR.locked(st);
+    CR.fitBet(st);
+    setText($('betVal'), chips(st.bet));
+    const av = $('auVal');
+    setText(av, st.auto ? fmtM(st.auto) : 'Off');
+    av.classList.toggle('off', !st.auto);
+    const mb = CR.maxBet(st);
+    $('betHalf').disabled = lock || st.bet <= 1;
+    $('betDown').disabled = lock || st.bet <= 1;
+    $('betUp').disabled = lock || st.bet >= mb;
+    $('betDouble').disabled = lock || st.bet >= mb;
+    $('auDown').disabled = lock || !st.auto;
+    $('auUp').disabled = lock || st.auto >= CR.MAX_AUTO;
+    $('betStp').classList.toggle('lock', lock);
+    $('auStp').classList.toggle('lock', lock);
+  }
+
+  function role() {
+    const R = st.round, s = R.stake;
+    if (R.phase === 'run' && s && !s.done) return 'cash';
+    if (CR.canCancel(st)) return R.phase === 'wait' ? 'cancel' : 'cancelNext';
+    return R.phase === 'wait' ? 'bet' : 'betNext';
+  }
+  const kind = (r) => (r === 'betNext' ? 'bet' : r === 'cancelNext' ? 'cancel' : r);
+  let btnKey = '', lastRole = '', roleAt = 0;
+  function renderMain() {
+    const r = role(), R = st.round;
+    if (r !== lastRole) {
+      // Only a change of kind (bet, cancel, cash out) arms the double-press guard.
+      if (kind(r) !== kind(lastRole)) roleAt = performance.now();
+      lastRole = r;
+      renderControls();
+    }
+    let html, cls = '', dis = false;
+    if (r === 'cash') {
+      html = 'Cash out <span class="amt">' + fmtC(R.stake.bet * CR.m100At(R.t)) + '</span>';
+      cls = 'cash';
+    } else if (r === 'cancel') html = 'Cancel bet';
+    else if (r === 'cancelNext') html = 'Cancel next bet';
+    else {
+      html = r === 'bet' ? 'Bet' : 'Bet next round';
+      cls = 'primary';
+      dis = !CR.canBet(st);
+    }
+    html += ' <kbd>Space</kbd>';
+    const key = html + '|' + cls + '|' + dis;
+    if (key === btnKey) return;
+    btnKey = key;
+    mainBtn.innerHTML = html;
+    mainBtn.classList.toggle('cash', cls === 'cash');
+    mainBtn.classList.toggle('primary', cls === 'primary');
+    mainBtn.disabled = dis;
+  }
+
+  let histTop = null;
+  function renderHist(animate) {
+    const row = $('hist');
+    const top = st.hist.length ? st.hist[0].id : null;
+    if (top === histTop && row.childElementCount === st.hist.length) return;
+    const fresh = animate && histTop !== null && top !== histTop;
+    histTop = top;
+    row.innerHTML = '';
+    st.hist.forEach((h, j) => {
+      const d = document.createElement('span');
+      d.className = 'h ' + (h.c100 >= 1000 ? 'hi' : h.c100 >= 200 ? 'mid' : 'lo') + (fresh && j === 0 && !reduceMotion ? ' in' : '');
+      d.textContent = fmtM(h.c100);
+      d.title = 'Crashed at ' + fmtM(h.c100) + (h.bet ? (h.out100 ? ', cashed out ' + fmtM(h.out100) : ', lost ' + chips(h.bet)) : '');
+      row.appendChild(d);
+    });
+  }
+
+  function renderLive() {
+    renderReadout();
+    renderStats();
+    renderMain();
+  }
+  function render(animate) {
+    renderCash();
+    renderControls();
+    renderYou();
+    renderHist(animate);
+    renderLive();
+  }
+
+  /* ---------- actions ---------- */
+  function mainAction() {
+    if (overlayOpen) return;
+    tick();
+    renderMain();
+    // Ignore presses right after the button changed meaning (a cash out pressed on the crash frame
+    // must not turn into a bet on the next round).
+    if (performance.now() - roleAt < 260) return;
+    const r = role();
+    if (r === 'cash') {
+      if (!CR.cashOut(st)) return;
+      const R = st.round;
+      report(R);
+      save();
+      render(true);
+      cashFx(R);
+      return;
+    }
+    if (r === 'cancel' || r === 'cancelNext') { if (CR.cancelBet(st)) { save(); render(false); } return; }
+    if (CR.placeBet(st)) { save(); render(false); }
+  }
+
+  const BET_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000, 200000, 250000, 500000, 1000000];
+  function betStep(dir) {
+    const b = st.bet;
+    let v;
+    if (dir > 0) { v = BET_STEPS.find((x) => x > b); if (v === undefined) v = CR.MAX_BET; }
+    else { v = 1; for (const x of BET_STEPS) if (x < b) v = x; }
+    return change(() => CR.setBet(st, Math.min(v, Math.max(1, CR.maxBet(st)))));
+  }
+  const TARGETS = (function () {
+    const T = [101];
+    const run = (a, b, s) => { for (let v = a; v <= b; v += s) T.push(v); };
+    run(105, 200, 5); run(210, 300, 10); run(325, 500, 25); run(550, 1000, 50); run(1100, 2000, 100);
+    run(2250, 5000, 250); run(5500, 10000, 500); run(11000, 20000, 1000); run(22500, 50000, 2500);
+    run(55000, 100000, 5000); run(125000, 200000, 25000); run(250000, 500000, 50000); run(600000, 1000000, 100000);
+    return T;
+  })();
+  function autoStep(dir) {
+    return change(() => {
+      const a = st.auto;
+      if (!a) return dir > 0 ? CR.setAuto(st, st.lastAuto || 200) : false;
+      if (dir > 0) { const n = TARGETS.find((x) => x > a); return n ? CR.setAuto(st, n) : false; }
+      let p = 0;
+      for (const x of TARGETS) if (x < a) p = x;
+      return CR.setAuto(st, p);
+    });
+  }
+  function change(fn) {
+    if (overlayOpen) return false;
+    const ok = fn();
+    if (ok) { save(); render(false); }
+    return ok;
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    startCard.hidden = card !== startCard;
+    overCard.hidden = card !== overCard;
+    overlayOpen = true;
+    overlay.hidden = false;
+    overlay.offsetWidth;
+    overlay.classList.add('show');
+    setTimeout(() => { try { card.querySelector('.btn.primary').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    lastNow = performance.now();
+    render(false);
+  }
+  const bestNow = () => fmtC(Math.max(V.best() * 100, st.peak, st.cash));
+  function showStart() {
+    const s = st.round.stake;
+    $('stCash').textContent = fmtC(st.cash + (s && !s.done ? s.bet * 100 : 0) + (st.pend ? st.pend.bet * 100 : 0));
+    $('stBest').textContent = bestNow();
+    openOverlay(startCard);
+  }
+  function showOver() {
+    $('ovCash').textContent = fmtC(st.cash);
+    $('ovBest').textContent = bestNow();
+    openOverlay(overCard);
+  }
+
+  /* ---------- input ---------- */
+  mainBtn.addEventListener('click', mainAction);
+
+  // Steppers repeat while held.
+  function holdable(btn, fn) {
+    let t = 0, fromPointer = false;
+    const stop = () => { clearTimeout(t); t = 0; };
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || btn.disabled) return;
+      fromPointer = true;
+      fn();
+      let delay = 380;
+      const again = () => { if (btn.disabled || !fn()) { stop(); return; } delay = Math.max(45, delay * 0.8); t = setTimeout(again, delay); };
+      t = setTimeout(again, delay);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((ev) => btn.addEventListener(ev, stop));
+    btn.addEventListener('click', () => { if (fromPointer) { fromPointer = false; return; } fn(); });
+  }
+  holdable($('betDown'), () => betStep(-1));
+  holdable($('betUp'), () => betStep(1));
+  holdable($('auDown'), () => autoStep(-1));
+  holdable($('auUp'), () => autoStep(1));
+  $('betHalf').addEventListener('click', () => change(() => CR.setBet(st, Math.max(1, Math.floor(st.bet / 2)))));
+  $('betDouble').addEventListener('click', () => change(() => CR.setBet(st, Math.min(st.bet * 2, Math.max(1, CR.maxBet(st))))));
+
+  $('playBtn').addEventListener('click', () => { hideOverlay(); });
+  $('againBtn').addEventListener('click', () => {
+    if (CR.fresh(st)) save();
+    hideOverlay();
+  });
+
+  document.addEventListener('pointerdown', () => { window.focus(); }, true);
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('contextmenu', (e) => { if (chart.contains(e.target)) e.preventDefault(); });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const k = e.key;
+    const onBtn = e.target && e.target.tagName === 'BUTTON';
+    if (overlayOpen) {
+      if ((k === 'Enter' || k === ' ') && !onBtn) {
+        e.preventDefault();
+        (startCard.hidden ? $('againBtn') : $('playBtn')).click();
+      }
+      return;
+    }
+    if (k === ' ') { e.preventDefault(); if (!e.repeat) mainAction(); return; }
+    if (k === 'Enter') {
+      if (onBtn) return;
+      e.preventDefault();
+      if (!e.repeat) mainAction();
+    }
+  });
+  window.addEventListener('keyup', (e) => { if (e.key === ' ' && !overlayOpen) e.preventDefault(); });
+
+  V.onPause((p) => { paused = p; lastNow = performance.now(); });
+
+  window.addEventListener('resize', () => { layout(); setTimeout(layout, 120); });
+  if (window.ResizeObserver) new ResizeObserver(() => sizeCanvas()).observe(chart);
+  function readFont() {
+    const f = getComputedStyle(document.documentElement).getPropertyValue('--font').trim();
+    if (f) FONT = f;
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { readFont(); layout(); }).catch(() => {});
+
+  /* ---------- loop ---------- */
+  let lastFrame = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    tick();
+    const fdt = clamp(0, now - lastFrame, 100);
+    lastFrame = now;
+    updateView(fdt);
+    draw(fdt);
+    renderLive();
+  }
+  // Keeps the rules moving if animation frames are throttled.
+  setInterval(() => { tick(); renderLive(); }, 100);
+
+  /* ---------- boot ---------- */
+  const away = CR.finishAway(st, gen);
+  away.forEach((e) => { if (e.type === 'cash' || e.type === 'lost') report(e.R); });
+  if (away.length) save();
+  readFont();
+  CR.fitBet(st);
+  layout();
+  updateView(1e6);
+  render(false);
+  app.classList.add('ready');
+  if (CR.isBroke(st)) showOver(); else showStart();
+  requestAnimationFrame(frame);
+  V.ready();
+})();
+</script>
+</body>
+</html>
