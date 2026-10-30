@@ -117,15 +117,43 @@ service cloud.firestore {
     }
 
     // How an account looks to everyone else: a display name, an avatar (a
-    // game's icon, or '' for the first letter), a colour, a featured record
-    // and a favourite game. The same checks guard the copy on leaderboard
-    // entries. Display names get the username blocklist, after the same
-    // flattening src/account.js does.
+    // game's icon, or '' for the first letter), a colour, up to three tags,
+    // a name colour and a favourite game. The same checks guard the copy on
+    // leaderboard entries. Display names get the username blocklist, after
+    // the same flattening src/account.js does. (badge is the single tag
+    // accounts had before tags; it is only ever removed now.)
     function okSlug(v) {
       return v is string && v.matches('^[a-z0-9-]{0,40}$');
     }
     function okColor(v) {
-      return v in ['#ea5426', '#2d89ef', '#00a300', '#b91d47', '#7e3878', '#e3a21a', '#00aba9', '#5e6066'];
+      return v in ['#ea5426', '#2d89ef', '#00a300', '#b91d47', '#7e3878', '#e3a21a', '#00aba9', '#5e6066', '#000000'];
+    }
+    // A tag is a game (a top 10 placing, checked where it is shown) or a
+    // staff tag.
+    function okTags(d) {
+      return !('tags' in d) || (d.tags is list && d.tags.size() <= 3
+        && (d.tags.size() < 1 || okTag(d.tags[0]))
+        && (d.tags.size() < 2 || okTag(d.tags[1]))
+        && (d.tags.size() < 3 || okTag(d.tags[2])));
+    }
+    function okTag(v) {
+      return v is string && v.matches('^[a-z0-9-]{1,40}$');
+    }
+    function okFlair(d) {
+      return !('flair' in d) || d.flair in ['', 'orange'];
+    }
+    // The owner's tags, the Vela picture, black and an orange name are the
+    // owner's alone; the Moderator tag is staff's. Checked only when one is
+    // used, so nobody else's saves pay for the exists() reads.
+    function ownerOnly(d) {
+      return ('tags' in d && d.tags.hasAny(['owner', 'founder', 'developer']))
+        || d.get('avatar', '') == 'vela' || d.get('color', '') == '#000000' || d.get('flair', '') != '';
+    }
+    function earned(d, uid) {
+      return (!ownerOnly(d) || exists(/databases/$(database)/documents/owners/$(uid)))
+        && (!('tags' in d) || !d.tags.hasAny(['mod'])
+          || exists(/databases/$(database)/documents/mods/$(uid))
+          || exists(/databases/$(database)/documents/owners/$(uid)));
     }
     function okDisplay(v) {
       return v is string && v.size() >= 2 && v.size() <= 20
@@ -143,15 +171,17 @@ service cloud.firestore {
           && request.auth.token.email == id + '@players.invalid';
       }
       function look(d) {
-        return okDisplay(d.display) && okSlug(d.avatar) && okColor(d.color) && okSlug(d.badge) && okSlug(d.fav)
+        return okDisplay(d.display) && okSlug(d.avatar) && okColor(d.color) && okSlug(d.get('badge', '')) && okSlug(d.fav)
+          && okTags(d) && okFlair(d)
           && d.bests is map && d.bests.size() <= 500
-          && d.updatedAt == request.time;
+          && d.updatedAt == request.time
+          && earned(d, d.uid);
       }
       // cleared: records an owner removed, by game, with the score removed;
       // the account's own device will not post that score again.
       function valid() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['uid', 'name', 'display', 'avatar', 'color', 'badge', 'fav', 'bests', 'cleared', 'joined', 'updatedAt'])
+        return d.keys().hasOnly(['uid', 'name', 'display', 'avatar', 'color', 'badge', 'tags', 'flair', 'fav', 'bests', 'cleared', 'joined', 'updatedAt'])
           && d.uid == request.auth.uid
           && d.name is string && d.name.lower() == id
           && look(d)
@@ -164,7 +194,7 @@ service cloud.firestore {
         && request.resource.data.get('cleared', {}) == resource.data.get('cleared', {});
       // An owner renames, restyles, or removes a record from anyone.
       allow update: if isOwner()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge', 'fav', 'bests', 'cleared', 'updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge', 'tags', 'flair', 'fav', 'bests', 'cleared', 'updatedAt'])
         && look(request.resource.data)
         && request.resource.data.get('cleared', {}) is map;
       allow delete: if me() || isMod();
@@ -184,7 +214,7 @@ service cloud.firestore {
       function validEntry() {
         let d = request.resource.data;
         return slug.matches('^[a-z0-9-]{1,40}$')
-          && d.keys().hasOnly(['name', 'score', 'at', 'display', 'avatar', 'color', 'badge'])
+          && d.keys().hasOnly(['name', 'score', 'at', 'display', 'avatar', 'color', 'badge', 'tags', 'flair'])
           && d.name is string
           && d.name.lower() + '@players.invalid' == request.auth.token.email
           && d.score is number && d.score > 0 && d.score < 1000000000000
@@ -192,7 +222,9 @@ service cloud.firestore {
           && (!('display' in d) || okDisplay(d.display))
           && (!('avatar' in d) || okSlug(d.avatar))
           && (!('color' in d) || okColor(d.color))
-          && (!('badge' in d) || okSlug(d.badge));
+          && (!('badge' in d) || okSlug(d.badge))
+          && okTags(d) && okFlair(d)
+          && earned(d, uid);
       }
       allow get: if true;
       allow list: if request.query.limit <= 25;
@@ -201,11 +233,13 @@ service cloud.firestore {
       allow update: if account() && validEntry() && request.resource.data.score >= resource.data.score && notBanned();
       // Moderators strip the look off an entry (an inappropriate display name).
       allow update: if isMod()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge', 'tags', 'flair'])
         && request.resource.data.keys().hasOnly(['name', 'score', 'at']);
-      // An owner can also set it, when renaming someone.
+      // An owner can also set it, when renaming someone or taking a tag away.
       allow update: if isOwner()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge', 'tags', 'flair'])
+        && okTags(request.resource.data) && okFlair(request.resource.data)
+        && earned(request.resource.data, uid)
         && (!('display' in request.resource.data) || okDisplay(request.resource.data.display))
         && (!('avatar' in request.resource.data) || okSlug(request.resource.data.avatar))
         && (!('color' in request.resource.data) || okColor(request.resource.data.color))

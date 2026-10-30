@@ -44,12 +44,19 @@ const DEFAULT_APP = 'vela-account'
 const BEST = 'vela:best:'
 const MAIL = '@players.invalid'
 export const BOARD_SIZE = 10
-// Avatar colours. firestore.rules lists the same ones.
+// Avatar colours. firestore.rules lists the same ones, plus the owner's.
 export const COLORS = ['#ea5426', '#2d89ef', '#00a300', '#b91d47', '#7e3878', '#e3a21a', '#00aba9', '#5e6066']
+export const OWNER_COLOR = '#000000'
+export const okColor = (c) => COLORS.includes(c) || c === OWNER_COLOR
+// Up to three tags next to a name: games the account is top 10 on, and staff
+// tags. The rules keep the owner's and staff's to them.
+export const MAX_TAGS = 3
+export const OWNER_TAGS = ['owner', 'founder', 'developer']
+export const MOD_TAG = 'mod'
 
 let fb = null      // loaded SDK pieces
 let loading = null
-let user = null    // { uid, name, display, avatar, color, badge, fav, joined, mod, owner }
+let user = null    // { uid, name, display, avatar, color, tags, flair, fav, joined, mod, owner }
 let cloud = {}     // bests as stored in Firestore
 let cleared = {}   // records an owner removed: never posted again at that score
 const listeners = new Set()
@@ -198,15 +205,18 @@ const boardRef = (slug) => fb.store.doc(fb.db, 'boards', slug, 'scores', user.ui
 const now = () => fb.store.serverTimestamp()
 
 // The part of the profile that rides along on leaderboard entries.
-const lookOf = (u) => ({ display: u.display, avatar: u.avatar, color: u.color, badge: u.badge })
+const lookOf = (u) => ({ display: u.display, avatar: u.avatar, color: u.color, tags: u.tags, flair: u.flair })
+// Accounts from before tags had one featured record, badge.
+const tagsOf = (d) => (Array.isArray(d.tags) ? d.tags : d.badge ? [d.badge] : []).filter((t) => typeof t === 'string').slice(0, MAX_TAGS)
 
 function setLook(d) {
   user = {
     ...user,
     display: d.display || user.name,
     avatar: d.avatar || '',
-    color: COLORS.includes(d.color) ? d.color : COLORS[0],
-    badge: d.badge || '',
+    color: okColor(d.color) ? d.color : COLORS[0],
+    tags: tagsOf(d),
+    flair: d.flair === 'orange' ? 'orange' : '',
     fav: d.fav || '',
     joined: d.joined && d.joined.toDate ? d.joined.toDate() : user.joined,
   }
@@ -227,7 +237,7 @@ async function createProfile() {
   const u = fb.a.currentUser
   const joined = u && u.metadata.creationTime ? new Date(u.metadata.creationTime) : new Date()
   const d = {
-    uid: user.uid, name: user.name, display: user.name, avatar: '', color: COLORS[0], badge: '', fav: '',
+    uid: user.uid, name: user.name, display: user.name, avatar: '', color: COLORS[0], tags: [], fav: '',
     bests, joined: fb.store.Timestamp.fromDate(joined),
   }
   await fb.store.setDoc(profileRef(), { ...d, updatedAt: now() })
@@ -378,22 +388,25 @@ export async function addAccount(mode, name, password) {
 
 /* ── settings ──────────────────────────────────────────────────── */
 
-// Saves any of display, avatar, color, badge, fav, then brings this account's
+// Saves any of display, avatar, color, tags, flair, fav, then brings this account's
 // leaderboard entries up to date. Entries a moderator removed stay removed.
 export async function saveProfile(changes) {
   if (!user || !user.display) throw new Error('Not signed in')
   const next = { ...lookOf(user), fav: user.fav, ...changes }
   const bad = checkDisplay(next.display)
   if (bad) throw new Error(bad)
-  if (!COLORS.includes(next.color)) next.color = COLORS[0]
+  if (!okColor(next.color)) next.color = COLORS[0]
+  next.tags = tagsOf(next)
+  next.flair = next.flair === 'orange' ? 'orange' : ''
+  const gone = { badge: fb.store.deleteField() }
   try {
-    await fb.store.setDoc(profileRef(), { ...next, updatedAt: now() }, { merge: true })
+    await fb.store.setDoc(profileRef(), { ...next, ...gone, updatedAt: now() }, { merge: true })
   } catch (e) { throw new Error(message(e)) }
   setLook(next)
   emit()
   const slugs = Object.keys(cloud)
   await Promise.all(slugs.map((slug) =>
-    fb.store.updateDoc(boardRef(slug), { ...lookOf(user), at: now() }).catch(() => {})))
+    fb.store.updateDoc(boardRef(slug), { ...lookOf(user), ...gone, at: now() }).catch(() => {})))
   emit({ boardsChanged: slugs })
 }
 
@@ -443,7 +456,9 @@ const REST = local
 const num = (v) => Number(v && (v.integerValue ?? v.doubleValue)) || 0
 const str = (v) => (v && v.stringValue) || ''
 const lookFrom = (f) => ({
-  display: str(f.display), avatar: str(f.avatar), color: COLORS.includes(str(f.color)) ? str(f.color) : COLORS[0], badge: str(f.badge),
+  display: str(f.display), avatar: str(f.avatar), color: okColor(str(f.color)) ? str(f.color) : COLORS[0],
+  tags: tagsOf({ tags: f.tags && f.tags.arrayValue ? (f.tags.arrayValue.values || []).map(str) : null, badge: str(f.badge) }),
+  flair: str(f.flair) === 'orange' ? 'orange' : '',
 })
 
 async function topOf(slug, limit) {
@@ -465,33 +480,33 @@ async function topOf(slug, limit) {
   }))
 }
 
-// Who holds No. 1 on each game, remembered for a few minutes, so badges on a
-// page cost one read per game rather than one per name.
+// Who is in the top 10 of each game, in order, remembered for a few minutes,
+// so tags on a page cost one query per game rather than one per name.
 const HOLD_MS = 5 * 60000
-const held = new Map() // slug -> { id, at }
+const held = new Map() // slug -> { ids, at }
 
-export async function holders(slugs) {
+export async function ranks(slugs) {
   const fresh = (s) => held.has(s) && Date.now() - held.get(s).at < HOLD_MS
   const need = [...new Set(slugs)].filter((s) => s && !fresh(s))
   await Promise.all(need.map(async (slug) => {
     try {
-      const top = await topOf(slug, 1)
-      held.set(slug, { id: top[0] ? top[0].id : '', at: Date.now() })
+      const top = await topOf(slug, BOARD_SIZE)
+      held.set(slug, { ids: top.map((r) => r.id), at: Date.now() })
     } catch {}
   }))
   const out = {}
-  for (const s of slugs) out[s] = held.has(s) ? held.get(s).id : ''
+  for (const s of slugs) out[s] = held.has(s) ? held.get(s).ids : []
   return out
 }
 
 /* Top scores for a game, plus your own best if it is not among them (the
  * rules cap queries, so there is no rank count beyond the top).
- * Resolves to { top: [{ id, name, display, avatar, color, badge, score, you }],
+ * Resolves to { top: [{ id, name, display, avatar, color, tags, flair, score, you }],
  * you: { score } | null }, or null if it cannot be reached. */
 export async function leaderboard(slug) {
   try {
     const top = (await topOf(slug, BOARD_SIZE)).map((r) => ({ ...r, you: !!user && r.id === user.uid }))
-    held.set(slug, { id: top[0] ? top[0].id : '', at: Date.now() })
+    held.set(slug, { ids: top.map((r) => r.id), at: Date.now() })
     const mine = user && cloud[slug]
     const you = mine && !top.some((r) => r.you) ? { score: mine } : null
     return { top, you }
@@ -536,7 +551,7 @@ export async function resetProfile(uid, name, slugs) {
   if (!user || !user.mod) throw new Error('Not a moderator')
   const { store, db } = fb
   await store.deleteDoc(store.doc(db, 'profiles', name.toLowerCase()))
-  const strip = { display: store.deleteField(), avatar: store.deleteField(), color: store.deleteField(), badge: store.deleteField() }
+  const strip = Object.fromEntries(['display', 'avatar', 'color', 'badge', 'tags', 'flair'].map((k) => [k, store.deleteField()]))
   await Promise.all(slugs.map((slug) => store.updateDoc(store.doc(db, 'boards', slug, 'scores', uid), strip).catch(() => {})))
 }
 
@@ -577,9 +592,16 @@ export async function promote(uid, name) {
   await fb.store.setDoc(fb.store.doc(fb.db, 'mods', uid), { name, by: user.uid, at: now() })
 }
 
-export async function demote(uid) {
+// Takes the Moderator tag off their profile and leaderboard entries too.
+export async function demote(uid, name) {
   own()
-  await fb.store.deleteDoc(fb.store.doc(fb.db, 'mods', uid))
+  const { store, db } = fb
+  await store.deleteDoc(store.doc(db, 'mods', uid))
+  const p = name && await profile(name)
+  if (!p || !p.tags.includes(MOD_TAG)) return
+  const tags = p.tags.filter((t) => t !== MOD_TAG)
+  await store.updateDoc(store.doc(db, 'profiles', name.toLowerCase()), { tags, updatedAt: now() }).catch(() => {})
+  await Promise.all(Object.keys(p.bests).map((slug) => store.updateDoc(store.doc(db, 'boards', slug, 'scores', uid), { tags }).catch(() => {})))
 }
 
 // Moderators can lift bans too. The account makes a fresh profile on its next visit.

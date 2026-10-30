@@ -6,6 +6,16 @@
  */
 export const UPDATES = [
   {
+    version: '1.7',
+    date: '2026-10-30',
+    games: [],
+    changes: [
+      'Tags: wear up to 3 next to your name. Every game you are in the top 10 of earns one, with your place.',
+      'Profiles count your top 10 placings.',
+      'Staff tags for the owner and moderators.',
+    ],
+  },
+  {
     version: '1.6',
     date: '2026-10-30',
     games: [],

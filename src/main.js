@@ -33,26 +33,39 @@ const fmt = (n) => Number(n).toLocaleString('en-US')
 const art = (g, cls = '') =>
   `<div class="art ${cls}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg></div>`
 
+// The Vela mark, the owner's own picture.
+const VELA_MARK = '<svg viewBox="10.16 9.77 79.68 86.23" aria-hidden="true"><polygon class="mk-o" points="40,9.77 10.16,27 10.16,73 50,96 89.84,73 89.84,27 60,9.77 60,21.32 79.84,32.78 79.84,67.22 50,84.45 20.16,67.22 20.16,32.78 40,21.32"/><polygon class="mk-i" points="30,38.65 40,32.9 40,55.1 50,60.9 60,55.1 60,32.9 70,38.65 70,60.9 50,72.4 30,60.9"/></svg>'
+
 // An account's picture: a game's icon (or the first letter) on its colour.
 function avatarHTML(p, cls = '') {
-  const g = p.avatar && bySlug(p.avatar)
-  const color = Account.COLORS.includes(p.color) ? p.color : Account.COLORS[0]
-  const inner = g
+  const g = p.avatar && p.avatar !== 'vela' && bySlug(p.avatar)
+  const color = Account.okColor(p.color) ? p.color : Account.COLORS[0]
+  const inner = p.avatar === 'vela' ? VELA_MARK : g
     ? `<svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>`
     : esc(((p.display || p.name || '?').trim()[0] || '?').toUpperCase())
-  return `<span class="av ${cls}" style="--av:${color}">${inner}</span>`
+  return `<span class="av ${cls}${color === Account.OWNER_COLOR ? ' dark' : ''}" style="--av:${color}">${inner}</span>`
 }
 
-// A featured No. 1 record, shown only while it still is one.
-function recordHTML(slug) {
-  const g = bySlug(slug)
-  return g ? `<span class="rec" title="No. 1 in ${esc(g.title)}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>#1</span>` : ''
+// Tags next to a name. Staff tags are the rules' to check; a game tag shows
+// only while the account is in that game's top 10, with its place.
+const STAFF_TAGS = { owner: 'Owner', founder: 'Founder', developer: 'Developer', mod: 'Moderator' }
+function tagHTML(t, place) {
+  if (STAFF_TAGS[t]) return `<span class="tag ${t}">${STAFF_TAGS[t]}</span>`
+  const g = bySlug(t)
+  return g && place ? `<span class="rec${place > 1 ? ' lo' : ''}" title="No. ${place} in ${esc(g.title)}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>#${place}</span>` : ''
 }
+const placeIn = (ranks, slug, id) => ((ranks && ranks[slug]) || []).indexOf(id) + 1
+function tagsHTML(p, ranks, cls = '') {
+  const id = p.id || p.uid
+  const html = (p.tags || []).map((t) => tagHTML(t, placeIn(ranks, t, id))).join('')
+  return html ? `<span class="tags${cls ? ' ' + cls : ''}">${html}</span>` : ''
+}
+// The games named in these accounts' tags, to look their places up.
+const tagGames = (rows) => [...new Set(rows.flatMap((r) => (r.tags || []).filter((t) => !STAFF_TAGS[t])))]
 
-// A name on a leaderboard, linking to the profile. `holder` is who is No. 1 on
-// the game this account features.
-function whoHTML(p, holder) {
-  return `<a class="who" href="/u/${esc(p.name)}" data-link>${avatarHTML(p, 'sm')}<span class="who-name">${esc(p.display || p.name)}</span>${p.badge && holder && holder === p.id ? recordHTML(p.badge) : ''}</a>`
+// A name on a leaderboard, linking to the profile.
+function whoHTML(p, ranks) {
+  return `<a class="who" href="/u/${esc(p.name)}" data-link>${avatarHTML(p, 'sm')}<span class="who-name${p.flair ? ' orange' : ''}">${esc(p.display || p.name)}</span>${tagsHTML(p, ranks)}</a>`
 }
 
 function card(g, i) {
@@ -188,14 +201,14 @@ async function showBoard(g) {
   if (document.getElementById('board-list') !== list) return // left the page meanwhile
   if (!data) { list.innerHTML = '<li class="board-note">&ndash;</li>'; return }
   if (!data.top.length) { list.innerHTML = '<li class="board-note">No scores yet</li>'; return }
-  const held = await Account.holders(data.top.map((r) => r.badge).filter(Boolean))
+  const ranks = await Account.ranks(tagGames(data.top))
   if (document.getElementById('board-list') !== list) return
   const me = Account.current()
   const mod = me && me.mod
   list.innerHTML = data.top.map((r, i) => `
-    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span>${whoHTML(r, held[r.badge])}<span class="pts">${fmt(r.score)}</span>${mod && !r.you ? `
+    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span>${whoHTML(r, ranks)}<span class="pts">${fmt(r.score)}</span>${mod && !r.you ? `
       <span class="mod-tools"><button class="mod-btn" data-act="remove" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Remove</button><button class="mod-btn" data-act="ban" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Ban</button></span>` : ''}</li>`).join('')
-    + (data.you && me ? `<li class="you sep"><span class="rank"></span>${whoHTML({ ...me, id: me.uid, badge: '' })}<span class="pts">${fmt(data.you.score)}</span></li>` : '')
+    + (data.you && me ? `<li class="you sep"><span class="rank"></span>${whoHTML({ ...me, id: me.uid, tags: [] })}<span class="pts">${fmt(data.you.score)}</span></li>` : '')
 }
 
 document.addEventListener('click', async (e) => {
@@ -228,7 +241,7 @@ document.addEventListener('click', async (e) => {
     else if (act === 'unban') await Account.unban(id)
     else if (act === 'reset') await Account.resetProfile(id, name, slugs)
     else if (act === 'promote') await Account.promote(id, name)
-    else if (act === 'demote') await Account.demote(id)
+    else if (act === 'demote') await Account.demote(id, name)
     else if (act === 'rename') await Account.rename(id, name, display, slugs)
     else if (act === 'record') await Account.removeRecord(id, name, slug, Number(b.dataset.score))
     else await Account.removeEntry(slug, id)
@@ -518,8 +531,8 @@ function renderMissing() {
 }
 
 /* ── settings ────────────────────────────────────────────────────
-   Signed-in only. The look (display name, picture, colour, featured record,
-   favourite game) is saved together; password and deletion each ask for the
+   Signed-in only. The look (display name, picture, colour, tags, favourite
+   game, and the owner's name colour) is saved together; password and deletion each ask for the
    current password. */
 
 function renderSettings() {
@@ -547,18 +560,23 @@ function renderSettings() {
           </label>
           <div class="field"><span class="label">Picture</span>
             <button type="button" class="btn ghost" id="pick-open" aria-expanded="false">Change picture</button>
-            <div class="av-grid" id="av-grid" hidden>${['', ...pickable.map((g) => g.slug)].map((slug) => `
-              <button type="button" class="av-pick${slug === me.avatar ? ' on' : ''}" data-avatar="${slug}" aria-label="${slug ? esc(bySlug(slug).title) : 'First letter'}" aria-pressed="${slug === me.avatar}">${avatarHTML({ ...me, avatar: slug }, 'pick')}</button>`).join('')}
+            <div class="av-grid" id="av-grid" hidden>${[...(me.owner ? ['vela'] : []), '', ...pickable.map((g) => g.slug)].map((slug) => `
+              <button type="button" class="av-pick${slug === me.avatar ? ' on' : ''}" data-avatar="${slug}" aria-label="${slug === 'vela' ? 'Vela' : slug ? esc(bySlug(slug).title) : 'First letter'}" aria-pressed="${slug === me.avatar}">${avatarHTML({ ...me, avatar: slug }, 'pick')}</button>`).join('')}
             </div>
           </div>
           <div class="field"><span class="label">Colour</span>
-            <div class="swatches">${Account.COLORS.map((c) => `
+            <div class="swatches">${[...Account.COLORS, ...(me.owner ? [Account.OWNER_COLOR] : [])].map((c) => `
               <button type="button" class="swatch${c === me.color ? ' on' : ''}" data-color="${c}" style="--av:${c}" aria-label="Colour ${c}" aria-pressed="${c === me.color}"></button>`).join('')}
             </div>
           </div>
-          <label class="field"><span class="label">Featured record</span>
-            <select name="badge" disabled><option value="">None</option></select>
-          </label>
+          ${me.owner ? `<div class="field"><span class="label">Name colour</span>
+            <div class="seg" id="flair">${[['', 'Default'], ['orange', 'Orange']].map(([v, label]) => `
+              <button type="button" class="${v === me.flair ? 'on' : ''}" data-flair="${v}" aria-pressed="${v === me.flair}">${label}</button>`).join('')}
+            </div>
+          </div>` : ''}
+          <div class="field"><span class="label">Tags <span class="tag-count" id="tag-count"></span></span>
+            <div class="tag-picks" id="tag-picks"></div>
+          </div>
           <label class="field"><span class="label">Favourite game</span>
             <select name="fav"><option value="">None</option>${pickable.map((g) => `<option value="${g.slug}"${g.slug === me.fav ? ' selected' : ''}>${esc(g.title)}</option>`).join('')}</select>
           </label>
@@ -604,27 +622,39 @@ function renderSettings() {
     </div>`
 
   // The look being edited, drawn live in the preview.
-  const draft = { display: me.display, avatar: me.avatar, color: me.color, badge: me.badge, fav: me.fav }
-  let held = {}
+  const draft = { display: me.display, avatar: me.avatar, color: me.color, tags: [...me.tags], flair: me.flair, fav: me.fav }
+  let ranks = {}
+  // Tags this account can wear: its staff tags now, its top 10 games once
+  // the boards answer.
+  const staffTags = me.owner ? Account.OWNER_TAGS : me.mod ? [Account.MOD_TAG] : []
+  let wearable = staffTags
   const form = document.getElementById('look-form')
+  const drawTags = () => {
+    const full = draft.tags.length >= Account.MAX_TAGS
+    document.getElementById('tag-count').textContent = `${draft.tags.length}/${Account.MAX_TAGS}`
+    document.getElementById('tag-picks').innerHTML = wearable.map((t) => {
+      const on = draft.tags.includes(t)
+      return `<button type="button" class="tag-pick${on ? ' on' : ''}" data-tag="${t}" aria-pressed="${on}"${!on && full ? ' disabled' : ''}>${tagHTML(t, placeIn(ranks, t, me.uid))}${STAFF_TAGS[t] ? '' : `<span>${esc(bySlug(t).title)}</span>`}</button>`
+    }).join('') || '<span class="board-note">None</span>'
+  }
   const preview = () => {
     const p = { ...me, ...draft, display: draft.display.trim() || me.name }
-    document.getElementById('set-preview').innerHTML = `${avatarHTML(p, 'lg')}<div class="set-id"><span><strong>${esc(p.display)}</strong>${p.badge && held[p.badge] === me.uid ? recordHTML(p.badge) : ''}</span><span class="pf-at">@${esc(me.name)}</span></div>`
+    document.getElementById('set-preview').innerHTML = `${avatarHTML(p, 'lg')}<div class="set-id"><span><strong class="${p.flair ? 'orange' : ''}">${esc(p.display)}</strong>${tagsHTML(p, ranks)}</span><span class="pf-at">@${esc(me.name)}</span></div>`
     form.querySelectorAll('.av-pick .av').forEach((el) => el.style.setProperty('--av', p.color))
     form.querySelectorAll('.av-pick[data-avatar=""] .av').forEach((el) => { el.textContent = (p.display[0] || '?').toUpperCase() })
   }
   preview()
+  drawTags()
 
-  // Only games this account is No. 1 on can be featured.
-  Account.holders(scored.map((g) => g.slug)).then((h) => {
-    held = h
-    const select = form.badge
-    if (!select) return
-    const firsts = scored.filter((g) => h[g.slug] === me.uid)
-    select.innerHTML = '<option value="">None</option>' + firsts.map((g) =>
-      `<option value="${g.slug}"${g.slug === draft.badge ? ' selected' : ''}>${esc(g.title)} &middot; ${fmt(mine[g.slug])}</option>`).join('')
-    select.disabled = !firsts.length
-    if (!firsts.some((g) => g.slug === draft.badge)) draft.badge = ''
+  // Game tags are for games this account is in the top 10 of, best place first.
+  Account.ranks(scored.map((g) => g.slug)).then((r) => {
+    if (!document.getElementById('tag-picks')) return
+    ranks = r
+    const placed = scored.map((g) => g.slug).filter((t) => placeIn(r, t, me.uid))
+      .sort((a, b) => placeIn(r, a, me.uid) - placeIn(r, b, me.uid))
+    wearable = [...staffTags, ...placed]
+    draft.tags = draft.tags.filter((t) => wearable.includes(t))
+    drawTags()
     preview()
   })
 
@@ -632,6 +662,8 @@ function renderSettings() {
     const open = e.target.closest('#pick-open')
     const pick = e.target.closest('.av-pick')
     const sw = e.target.closest('.swatch')
+    const tag = e.target.closest('.tag-pick')
+    const flair = e.target.closest('[data-flair]')
     if (open) {
       const grid = document.getElementById('av-grid')
       grid.hidden = !grid.hidden
@@ -645,12 +677,18 @@ function renderSettings() {
     } else if (sw) {
       draft.color = sw.dataset.color
       form.querySelectorAll('.swatch').forEach((b) => { b.classList.toggle('on', b === sw); b.setAttribute('aria-pressed', b === sw) })
+    } else if (tag) {
+      const t = tag.dataset.tag
+      draft.tags = draft.tags.includes(t) ? draft.tags.filter((x) => x !== t) : [...draft.tags, t].slice(0, Account.MAX_TAGS)
+      drawTags()
+    } else if (flair) {
+      draft.flair = flair.dataset.flair
+      form.querySelectorAll('[data-flair]').forEach((b) => { b.classList.toggle('on', b === flair); b.setAttribute('aria-pressed', b === flair) })
     } else return
     preview()
   })
   form.addEventListener('input', () => {
     draft.display = form.display.value
-    draft.badge = form.badge.value
     draft.fav = form.fav.value
     preview()
   })
@@ -741,15 +779,19 @@ async function renderProfile(name) {
   }
 
   const games = boardGames().filter((g) => p.bests[g.slug] > 0)
-  const [held, rank] = await Promise.all([
-    Account.holders([...games.map((g) => g.slug), p.badge].filter(Boolean)),
+  const [ranks, rank] = await Promise.all([
+    Account.ranks([...new Set([...games.map((g) => g.slug), ...tagGames([p])])]),
     Account.role(p.uid),
   ])
   if (location.pathname !== path) return
-  const first = (g) => held[g.slug] === p.uid
-  games.sort((a, b) => first(b) - first(a))
-  const firsts = games.filter(first)
-  const featured = p.badge && held[p.badge] === p.uid && bySlug(p.badge)
+  const place = (slug) => placeIn(ranks, slug, p.uid)
+  games.sort((a, b) => (place(a.slug) || 99) - (place(b.slug) || 99))
+  const firsts = games.filter((g) => place(g.slug) === 1)
+  const placed = games.filter((g) => place(g.slug))
+  // The first game tag still in its top 10 gets the big tile.
+  const featured = bySlug(p.tags.find((t) => !STAFF_TAGS[t] && place(t)) || '')
+  // The rank shows once: as a tag if they wear it, otherwise on its own.
+  const roleTag = rank === 'owner' ? 'owner' : rank === 'mod' ? Account.MOD_TAG : ''
   const fav = p.fav && bySlug(p.fav)
   const me = Account.current()
   const self = me && me.uid === p.uid
@@ -761,8 +803,9 @@ async function renderProfile(name) {
       <header class="pf-head">
         ${avatarHTML(p, 'xl')}
         <div class="pf-id">
-          <h1>${esc(shown)}</h1>
-          <span class="pf-at">${rank ? `<span class="role">${rank === 'owner' ? 'Owner' : 'Moderator'}</span>` : ''}@${esc(p.name)}${p.joined ? ` &middot; Joined ${p.joined.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}</span>
+          <h1 class="${p.flair ? 'orange' : ''}">${esc(shown)}</h1>
+          ${tagsHTML(p, ranks, 'pf-tags')}
+          <span class="pf-at">${roleTag && !p.tags.includes(roleTag) ? `<span class="role">${rank === 'owner' ? 'Owner' : 'Moderator'}</span>` : ''}@${esc(p.name)}${p.joined ? ` &middot; Joined ${p.joined.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}</span>
         </div>
         <div class="pf-actions">
           ${self ? '<a class="btn" href="/settings" data-link>Settings</a>' : ''}
@@ -779,9 +822,10 @@ async function renderProfile(name) {
           <span class="label">Featured record</span>
           <span class="pf-game">${art(featured, 'mini')}<strong>${esc(featured.title)}</strong></span>
           <span class="pf-num">${fmt(p.bests[featured.slug])}</span>
-          <span class="label">No. 1 &middot; ${esc(featured.bestLabel || 'Best score')}</span>
+          <span class="label">No. ${place(featured.slug)} &middot; ${esc(featured.bestLabel || 'Best score')}</span>
         </a>` : ''}
         <div class="pf-tile"><span class="label">No. 1 records</span><span class="pf-num">${firsts.length}</span></div>
+        <div class="pf-tile"><span class="label">Top 10 placings</span><span class="pf-num">${placed.length}</span></div>
         <div class="pf-tile"><span class="label">Games on the boards</span><span class="pf-num">${games.length}</span></div>
         ${fav ? `
         <a class="pf-tile" href="/play/${fav.slug}" data-link>
@@ -792,7 +836,7 @@ async function renderProfile(name) {
       <section>
         <h2 class="label pf-sub">Records</h2>
         ${games.length ? `<ol class="board-list pf-list">${games.map((g) => `
-          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${first(g) ? recordHTML(g.slug) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span>${me && me.owner ? `<button class="mod-btn" data-act="record" data-id="${esc(p.uid)}" data-name="${esc(p.name)}" data-slug="${g.slug}" data-score="${p.bests[g.slug]}">Remove</button>` : ''}</li>`).join('')}
+          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${place(g.slug) ? tagHTML(g.slug, place(g.slug)) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span>${me && me.owner ? `<button class="mod-btn" data-act="record" data-id="${esc(p.uid)}" data-name="${esc(p.name)}" data-slug="${g.slug}" data-score="${p.bests[g.slug]}">Remove</button>` : ''}</li>`).join('')}
         </ol>` : '<p class="board-note">No scores yet</p>'}
       </section>
     </div>`
