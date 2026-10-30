@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.5',
+    date: '2026-10-30',
+    games: [],
+    changes: [
+      'Profiles: tap any name on a leaderboard to see that player\'s records, No. 1s and favourite game.',
+      'Settings: a display name, a picture and colour, a featured No. 1 record that shows next to your name, a new password, and deleting your account.',
+    ],
+  },
+  {
     version: '1.4',
     date: '2026-10-30',
     games: ['holdem', 'plinko', 'crash'],

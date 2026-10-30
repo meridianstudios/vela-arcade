@@ -33,6 +33,28 @@ const fmt = (n) => Number(n).toLocaleString('en-US')
 const art = (g, cls = '') =>
   `<div class="art ${cls}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg></div>`
 
+// An account's picture: a game's icon (or the first letter) on its colour.
+function avatarHTML(p, cls = '') {
+  const g = p.avatar && bySlug(p.avatar)
+  const color = Account.COLORS.includes(p.color) ? p.color : Account.COLORS[0]
+  const inner = g
+    ? `<svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>`
+    : esc(((p.display || p.name || '?').trim()[0] || '?').toUpperCase())
+  return `<span class="av ${cls}" style="--av:${color}">${inner}</span>`
+}
+
+// A featured No. 1 record, shown only while it still is one.
+function recordHTML(slug) {
+  const g = bySlug(slug)
+  return g ? `<span class="rec" title="No. 1 in ${esc(g.title)}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>#1</span>` : ''
+}
+
+// A name on a leaderboard, linking to the profile. `holder` is who is No. 1 on
+// the game this account features.
+function whoHTML(p, holder) {
+  return `<a class="who" href="/u/${esc(p.name)}" data-link>${avatarHTML(p, 'sm')}<span class="who-name">${esc(p.display || p.name)}</span>${p.badge && holder && holder === p.id ? recordHTML(p.badge) : ''}</a>`
+}
+
 function card(g, i) {
   const best = g.scores ? bestFor(g.slug) : 0
   const soon = !playable(g)
@@ -166,12 +188,14 @@ async function showBoard(g) {
   if (document.getElementById('board-list') !== list) return // left the page meanwhile
   if (!data) { list.innerHTML = '<li class="board-note">&ndash;</li>'; return }
   if (!data.top.length) { list.innerHTML = '<li class="board-note">No scores yet</li>'; return }
+  const held = await Account.holders(data.top.map((r) => r.badge).filter(Boolean))
+  if (document.getElementById('board-list') !== list) return
   const me = Account.current()
   const mod = me && me.mod
   list.innerHTML = data.top.map((r, i) => `
-    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span><span class="who">${esc(r.name)}</span><span class="pts">${fmt(r.score)}</span>${mod && !r.you ? `
+    <li class="${r.you ? 'you' : ''}"><span class="rank">${i + 1}</span>${whoHTML(r, held[r.badge])}<span class="pts">${fmt(r.score)}</span>${mod && !r.you ? `
       <span class="mod-tools"><button class="mod-btn" data-act="remove" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Remove</button><button class="mod-btn" data-act="ban" data-slug="${g.slug}" data-id="${esc(r.id)}" data-name="${esc(r.name)}">Ban</button></span>` : ''}</li>`).join('')
-    + (data.you ? `<li class="you sep"><span class="rank"></span><span class="who">${esc(me.name)}</span><span class="pts">${fmt(data.you.score)}</span></li>` : '')
+    + (data.you && me ? `<li class="you sep"><span class="rank"></span>${whoHTML({ ...me, id: me.uid, badge: '' })}<span class="pts">${fmt(data.you.score)}</span></li>` : '')
 }
 
 document.addEventListener('click', async (e) => {
@@ -180,17 +204,22 @@ document.addEventListener('click', async (e) => {
   const { act, slug, id, name } = b.dataset
   const ask = act === 'ban'
     ? `Ban ${name}? They are removed from every leaderboard and cannot post again.`
-    : `Remove ${name} from this leaderboard?`
+    : act === 'reset'
+      ? `Reset ${name}? Their display name, picture and featured record go back to the defaults.`
+      : `Remove ${name} from this leaderboard?`
   if (!confirm(ask)) return
   b.disabled = true
+  const slugs = boardGames().map((g) => g.slug)
   try {
-    if (act === 'ban') await Account.ban(id, name, boardGames().map((g) => g.slug))
+    if (act === 'ban') await Account.ban(id, name, slugs)
+    else if (act === 'reset') await Account.resetProfile(id, name, slugs)
     else await Account.removeEntry(slug, id)
   } catch (err) {
     console.warn('moderation failed', err)
     alert('That did not go through. Try again.')
   }
-  refreshBoard()
+  if (location.pathname.startsWith('/u/')) route()
+  else refreshBoard()
 })
 
 /* The Leaderboards tab: every scored game down the side, one board at a time,
@@ -470,6 +499,246 @@ function renderMissing() {
     </section>`
 }
 
+/* ── settings ────────────────────────────────────────────────────
+   Signed-in only. The look (display name, picture, colour, featured record,
+   favourite game) is saved together; password and deletion each ask for the
+   current password. */
+
+function renderSettings() {
+  document.title = 'Settings · Vela Arcade'
+  document.body.classList.remove('is-playing')
+  const me = Account.current()
+  const head = '<div class="toolbar"><h1>Settings</h1></div>'
+  if (!me) {
+    app.innerHTML = `<div class="wrap">${head}<div class="set-out"><button class="btn" id="settings-sign-in">Sign in</button></div></div>`
+    return
+  }
+  if (!me.display) { app.innerHTML = `<div class="wrap">${head}</div>`; return } // profile still loading
+
+  const pickable = GAMES.filter(playable)
+  const mine = Account.savedBests()
+  const scored = boardGames().filter((g) => mine[g.slug] > 0)
+  app.innerHTML = `
+    <div class="wrap">
+      ${head}
+      <div class="settings">
+        <form class="set" id="look-form" novalidate>
+          <h2 class="label">Profile</h2>
+          <div class="set-preview" id="set-preview"></div>
+          <label class="field"><span class="label">Display name</span>
+            <input name="display" maxlength="20" autocomplete="off" spellcheck="false" value="${esc(me.display)}" />
+          </label>
+          <div class="field"><span class="label">Username</span><span class="set-static">@${esc(me.name)}</span></div>
+          <div class="field"><span class="label">Picture</span>
+            <div class="av-grid">${['', ...pickable.map((g) => g.slug)].map((slug) => `
+              <button type="button" class="av-pick${slug === me.avatar ? ' on' : ''}" data-avatar="${slug}" aria-label="${slug ? esc(bySlug(slug).title) : 'First letter'}" aria-pressed="${slug === me.avatar}">${avatarHTML({ ...me, avatar: slug }, 'pick')}</button>`).join('')}
+            </div>
+          </div>
+          <div class="field"><span class="label">Colour</span>
+            <div class="swatches">${Account.COLORS.map((c) => `
+              <button type="button" class="swatch${c === me.color ? ' on' : ''}" data-color="${c}" style="--av:${c}" aria-label="Colour ${c}" aria-pressed="${c === me.color}"></button>`).join('')}
+            </div>
+          </div>
+          <label class="field"><span class="label">Featured record</span>
+            <select name="badge" disabled><option value="">None</option></select>
+          </label>
+          <label class="field"><span class="label">Favourite game</span>
+            <select name="fav"><option value="">None</option>${pickable.map((g) => `<option value="${g.slug}"${g.slug === me.fav ? ' selected' : ''}>${esc(g.title)}</option>`).join('')}</select>
+          </label>
+          <p class="set-msg" id="look-msg" role="status"></p>
+          <button class="btn" type="submit">Save</button>
+        </form>
+
+        <div class="set-side">
+          <form class="set" id="pass-form" novalidate>
+            <h2 class="label">Password</h2>
+            <input type="text" name="username" autocomplete="username" value="${esc(me.name)}" hidden />
+            <label class="field"><span class="label">Current password</span><input type="password" name="current" autocomplete="current-password" /></label>
+            <label class="field"><span class="label">New password</span><input type="password" name="next" autocomplete="new-password" /></label>
+            <label class="field"><span class="label">Repeat new password</span><input type="password" name="again" autocomplete="new-password" /></label>
+            <p class="set-msg" id="pass-msg" role="status"></p>
+            <button class="btn" type="submit">Change password</button>
+          </form>
+
+          <form class="set" id="del-form" novalidate>
+            <h2 class="label">Account</h2>
+            <div class="set-row">
+              <a class="btn ghost" href="/u/${esc(me.name)}" data-link>View profile</a>
+              <button class="btn ghost" type="button" id="settings-sign-out">Sign out</button>
+            </div>
+            <label class="field"><span class="label">Password to delete account</span><input type="password" name="password" autocomplete="current-password" /></label>
+            <p class="set-msg" id="del-msg" role="status"></p>
+            <button class="btn danger" type="submit">Delete account</button>
+          </form>
+        </div>
+      </div>
+    </div>`
+
+  // The look being edited, drawn live in the preview.
+  const draft = { display: me.display, avatar: me.avatar, color: me.color, badge: me.badge, fav: me.fav }
+  let held = {}
+  const form = document.getElementById('look-form')
+  const preview = () => {
+    const p = { ...me, ...draft, display: draft.display.trim() || me.name }
+    document.getElementById('set-preview').innerHTML = `${avatarHTML(p, 'lg')}<div><strong>${esc(p.display)}</strong>${p.badge && held[p.badge] === me.uid ? recordHTML(p.badge) : ''}</div>`
+    form.querySelectorAll('.av-pick .av').forEach((el) => el.style.setProperty('--av', p.color))
+    form.querySelectorAll('.av-pick[data-avatar=""] .av').forEach((el) => { el.textContent = (p.display[0] || '?').toUpperCase() })
+  }
+  preview()
+
+  // Only games this account is No. 1 on can be featured.
+  Account.holders(scored.map((g) => g.slug)).then((h) => {
+    held = h
+    const select = form.badge
+    if (!select) return
+    const firsts = scored.filter((g) => h[g.slug] === me.uid)
+    select.innerHTML = '<option value="">None</option>' + firsts.map((g) =>
+      `<option value="${g.slug}"${g.slug === draft.badge ? ' selected' : ''}>${esc(g.title)} &middot; ${fmt(mine[g.slug])}</option>`).join('')
+    select.disabled = !firsts.length
+    if (!firsts.some((g) => g.slug === draft.badge)) draft.badge = ''
+    preview()
+  })
+
+  form.addEventListener('click', (e) => {
+    const pick = e.target.closest('.av-pick')
+    const sw = e.target.closest('.swatch')
+    if (pick) {
+      draft.avatar = pick.dataset.avatar
+      form.querySelectorAll('.av-pick').forEach((b) => { b.classList.toggle('on', b === pick); b.setAttribute('aria-pressed', b === pick) })
+    } else if (sw) {
+      draft.color = sw.dataset.color
+      form.querySelectorAll('.swatch').forEach((b) => { b.classList.toggle('on', b === sw); b.setAttribute('aria-pressed', b === sw) })
+    } else return
+    preview()
+  })
+  form.addEventListener('input', () => {
+    draft.display = form.display.value
+    draft.badge = form.badge.value
+    draft.fav = form.fav.value
+    preview()
+  })
+
+  const say = (id, text, bad) => { const el = document.getElementById(id); el.textContent = text; el.classList.toggle('bad', !!bad) }
+  const busy = async (f, run) => {
+    const go = f.querySelector('button[type="submit"]')
+    go.disabled = true
+    try { await run() } finally { go.disabled = false }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault()
+    busy(form, async () => {
+      try {
+        await Account.saveProfile({ ...draft, display: draft.display.trim() })
+        say('look-msg', 'Saved')
+      } catch (x) { say('look-msg', x.message, true) }
+    })
+  })
+
+  const pass = document.getElementById('pass-form')
+  pass.addEventListener('submit', (e) => {
+    e.preventDefault()
+    if (pass.next.value !== pass.again.value) return say('pass-msg', 'New passwords do not match', true)
+    busy(pass, async () => {
+      try {
+        await Account.changePassword(pass.current.value, pass.next.value)
+        pass.reset()
+        say('pass-msg', 'Password changed')
+      } catch (x) { say('pass-msg', x.message, true) }
+    })
+  })
+
+  const del = document.getElementById('del-form')
+  del.addEventListener('submit', (e) => {
+    e.preventDefault()
+    if (!del.password.value) return say('del-msg', 'Enter your password', true)
+    if (!confirm(`Delete ${me.name}? Your profile and leaderboard entries are removed for good. Bests stay on this device.`)) return
+    busy(del, async () => {
+      try {
+        await Account.deleteAccount(del.password.value, boardGames().map((g) => g.slug))
+        navigate('/')
+      } catch (x) { say('del-msg', x.message, true) }
+    })
+  })
+}
+
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('#settings-sign-in')) openDialog()
+  else if (e.target.closest('#settings-sign-out')) { await Account.signOut(); navigate('/') }
+})
+
+/* ── profiles ────────────────────────────────────────────────────
+   Anyone's, by username: their look, featured record, favourite game and
+   every score they have on a leaderboard, with the No. 1s marked. */
+
+async function renderProfile(name) {
+  const path = location.pathname
+  document.title = 'Player · Vela Arcade'
+  document.body.classList.remove('is-playing')
+  app.innerHTML = '<div class="wrap profile"></div>'
+  const p = await Account.profile(name)
+  if (location.pathname !== path) return
+  if (!p) {
+    app.innerHTML = `
+      <section class="wrap missing">
+        <span class="label">${p === null ? '404' : 'Offline'}</span>
+        <h1>${p === null ? `No player called ${esc(name)}.` : 'Could not load this player.'}</h1>
+        <a class="btn" href="/leaderboards" data-link>Leaderboards</a>
+      </section>`
+    return
+  }
+
+  const games = boardGames().filter((g) => p.bests[g.slug] > 0)
+  const held = await Account.holders([...games.map((g) => g.slug), p.badge].filter(Boolean))
+  if (location.pathname !== path) return
+  const first = (g) => held[g.slug] === p.uid
+  games.sort((a, b) => first(b) - first(a))
+  const firsts = games.filter(first)
+  const featured = p.badge && held[p.badge] === p.uid && bySlug(p.badge)
+  const fav = p.fav && bySlug(p.fav)
+  const me = Account.current()
+  const self = me && me.uid === p.uid
+  const shown = p.display || p.name
+  document.title = `${shown} · Vela Arcade`
+
+  app.innerHTML = `
+    <div class="wrap profile">
+      <header class="pf-head">
+        ${avatarHTML(p, 'xl')}
+        <div class="pf-id">
+          <h1>${esc(shown)}</h1>
+          <span class="pf-at">@${esc(p.name)}${p.joined ? ` &middot; Joined ${p.joined.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}</span>
+        </div>
+        <div class="pf-actions">
+          ${self ? '<a class="btn" href="/settings" data-link>Settings</a>' : ''}
+          ${me && me.mod && !self ? `<span class="mod-tools"><button class="mod-btn" data-act="reset" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Reset profile</button><button class="mod-btn" data-act="ban" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Ban</button></span>` : ''}
+        </div>
+      </header>
+      <div class="pf-tiles">
+        ${featured ? `
+        <a class="pf-tile feat" href="/leaderboards/${featured.slug}" data-link>
+          <span class="label">Featured record</span>
+          <span class="pf-game">${art(featured, 'mini')}<strong>${esc(featured.title)}</strong></span>
+          <span class="pf-num">${fmt(p.bests[featured.slug])}</span>
+          <span class="label">No. 1 &middot; ${esc(featured.bestLabel || 'Best score')}</span>
+        </a>` : ''}
+        <div class="pf-tile"><span class="label">No. 1 records</span><span class="pf-num">${firsts.length}</span></div>
+        <div class="pf-tile"><span class="label">Games on the boards</span><span class="pf-num">${games.length}</span></div>
+        ${fav ? `
+        <a class="pf-tile" href="/play/${fav.slug}" data-link>
+          <span class="label">Favourite game</span>
+          <span class="pf-game">${art(fav, 'mini')}<strong>${esc(fav.title)}</strong></span>
+        </a>` : ''}
+      </div>
+      <section>
+        <h2 class="label pf-sub">Records</h2>
+        ${games.length ? `<ol class="board-list pf-list">${games.map((g) => `
+          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${first(g) ? recordHTML(g.slug) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span></li>`).join('')}
+        </ol>` : '<p class="board-note">No scores yet</p>'}
+      </section>
+    </div>`
+}
+
 /* ── routing ─────────────────────────────────────────────────── */
 
 function route() {
@@ -480,6 +749,8 @@ function route() {
   else if (location.pathname.replace(/\/$/, '') === '/online') renderOnline()
   else if (/^\/leaderboards(\/[\w-]+)?\/?$/.test(location.pathname)) renderLeaderboards(location.pathname.split('/')[2])
   else if (/^\/rules(\/[\w-]+)?\/?$/.test(location.pathname)) renderRules(location.pathname.split('/')[2])
+  else if (location.pathname.replace(/\/$/, '') === '/settings') renderSettings()
+  else if (/^\/u\/\w+\/?$/.test(location.pathname)) renderProfile(location.pathname.split('/')[2])
   else renderMissing()
   const here = '/' + (location.pathname.split('/')[1] || '')
   document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))
@@ -519,10 +790,12 @@ function renderAccount({ user }) {
   }
   accountEl.innerHTML = `
     <button class="account-btn signed" id="account-open" aria-haspopup="true" aria-expanded="false" aria-label="Account">
-      <span class="avatar">${esc((user.name.trim()[0] || 'P').toUpperCase())}</span>
+      ${avatarHTML(user)}
     </button>
     <div class="account-menu" id="account-menu" hidden>
-      <span class="label">${esc(user.name)}${user.mod ? ' &middot; Moderator' : ''}</span>
+      <span class="label">${esc(user.display || user.name)}${user.mod ? ' &middot; Moderator' : ''}</span>
+      <a class="account-item" href="/u/${esc(user.name)}" data-link>Profile</a>
+      <a class="account-item" href="/settings" data-link>Settings</a>
       <button class="account-item" id="sign-out">Sign out</button>
     </div>`
 }
@@ -552,9 +825,15 @@ Account.onChange((state) => {
   renderAccount(state)
   if (state.bestsChanged) refreshBests()
   if (state.boardsChanged) refreshBoard(state.boardsChanged)
-  // Redraw on sign-in, sign-out, and when moderator status arrives.
-  const who = state.user ? state.user.uid + (state.user.mod ? ':mod' : '') : null
-  if (who !== lastUser) { lastUser = who; refreshBoard() }
+  // Redraw on sign-in, sign-out, and when moderator status or the profile
+  // arrives. Settings and profile pages depend on who is signed in.
+  const u = state.user
+  const who = u ? u.uid + (u.mod ? ':mod' : '') + (u.display ? ':p' : '') : null
+  if (who !== lastUser) {
+    lastUser = who
+    if (/^\/(settings|u\/)/.test(location.pathname)) route()
+    else refreshBoard()
+  }
 })
 
 /* The sign-in form: a username and a password. Opened only from the button. */
@@ -629,6 +908,8 @@ accountEl.addEventListener('click', async (e) => {
   else if (e.target.closest('#account-open')) {
     menu.hidden = !menu.hidden
     e.target.closest('#account-open').setAttribute('aria-expanded', String(!menu.hidden))
+  } else if (e.target.closest('a.account-item')) {
+    menu.hidden = true
   } else if (e.target.closest('#sign-out')) {
     menu.hidden = true
     await Account.signOut()

@@ -27,6 +27,14 @@
     {
       "source": "/rules/:slug",
       "destination": "/index.html"
+    },
+    {
+      "source": "/settings",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/u/:name",
+      "destination": "/index.html"
     }
   ],
   "headers": [

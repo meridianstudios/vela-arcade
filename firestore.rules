@@ -98,12 +98,56 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['bests', 'updatedAt'])
         && request.resource.data.bests is map
         && request.resource.data.bests.size() <= 500;
+      allow delete: if owner();
+    }
+
+    // How an account looks to everyone else: a display name, an avatar (a
+    // game's icon, or '' for the first letter), a colour, a featured record
+    // and a favourite game. The same checks guard the copy on leaderboard
+    // entries. Display names get the username blocklist, after the same
+    // flattening src/account.js does.
+    function okSlug(v) {
+      return v is string && v.matches('^[a-z0-9-]{0,40}$');
+    }
+    function okColor(v) {
+      return v in ['#ea5426', '#2d89ef', '#00a300', '#b91d47', '#7e3878', '#e3a21a', '#00aba9', '#5e6066'];
+    }
+    function okDisplay(v) {
+      return v is string && v.size() >= 2 && v.size() <= 20
+        && v.matches('^[A-Za-z0-9_]+([ .-][A-Za-z0-9_]+)*$')
+        && !v.lower().replace('[^a-z0-9]', '').replace('0', 'o').replace('1', 'i').replace('3', 'e').replace('4', 'a').replace('5', 's')
+          .matches('.*(fuck|shit|cunt|nigg|fag|bitch|whore|slut|rape|nazi|hitler|penis|vagina|porn|dick|cock|pussy|retard|kys).*');
+    }
+
+    // Public profiles, keyed by the lowercase username: anyone can look one
+    // up by name, only the account itself writes it, a moderator can wipe it.
+    match /profiles/{id} {
+      function me() {
+        return signedIn()
+          && request.auth.token.firebase.sign_in_provider == 'password'
+          && request.auth.token.email == id + '@players.invalid';
+      }
+      function valid() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['uid', 'name', 'display', 'avatar', 'color', 'badge', 'fav', 'bests', 'joined', 'updatedAt'])
+          && d.uid == request.auth.uid
+          && d.name is string && d.name.lower() == id
+          && okDisplay(d.display) && okSlug(d.avatar) && okColor(d.color) && okSlug(d.badge) && okSlug(d.fav)
+          && d.bests is map && d.bests.size() <= 500
+          && d.joined is timestamp && d.joined <= request.time
+          && d.updatedAt == request.time;
+      }
+      allow get: if true;
+      allow create: if me() && valid() && notBanned();
+      allow update: if me() && valid() && request.resource.data.joined == resource.data.joined && notBanned();
+      allow delete: if me() || isMod();
     }
 
     // Global leaderboards, one entry per account per game, src/account.js.
     // Anyone can read the top of a board (capped so a query can't run up the
     // bill). Only a username account writes, only its own entry, only under
-    // its own name, and a score can only go up.
+    // its own name, and a score can only go up. An entry carries a copy of
+    // the account's look so showing a board costs no extra reads.
     match /boards/{slug}/scores/{uid} {
       function account() {
         return signedIn() && request.auth.uid == uid
@@ -113,18 +157,28 @@ service cloud.firestore {
       function validEntry() {
         let d = request.resource.data;
         return slug.matches('^[a-z0-9-]{1,40}$')
-          && d.keys().hasOnly(['name', 'score', 'at'])
+          && d.keys().hasOnly(['name', 'score', 'at', 'display', 'avatar', 'color', 'badge'])
           && d.name is string
           && d.name.lower() + '@players.invalid' == request.auth.token.email
           && d.score is number && d.score > 0 && d.score < 1000000000000
-          && d.at == request.time;
+          && d.at == request.time
+          && (!('display' in d) || okDisplay(d.display))
+          && (!('avatar' in d) || okSlug(d.avatar))
+          && (!('color' in d) || okColor(d.color))
+          && (!('badge' in d) || okSlug(d.badge));
       }
       allow get: if true;
       allow list: if request.query.limit <= 25;
       allow create: if account() && validEntry() && notBanned();
-      allow update: if account() && validEntry() && request.resource.data.score > resource.data.score && notBanned();
-      // Moderators remove entries (an inappropriate name, an impossible score).
-      allow delete: if isMod();
+      // A higher score, or the same score with a new look.
+      allow update: if account() && validEntry() && request.resource.data.score >= resource.data.score && notBanned();
+      // Moderators strip the look off an entry (an inappropriate display name).
+      allow update: if isMod()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['display', 'avatar', 'color', 'badge'])
+        && request.resource.data.keys().hasOnly(['name', 'score', 'at']);
+      // The account deleting itself, or a moderator removing an entry (an
+      // inappropriate name, an impossible score).
+      allow delete: if account() || isMod();
     }
 
     match /{document=**} {
