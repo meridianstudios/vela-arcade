@@ -696,6 +696,20 @@ export const CATALOGUE = [
     controls: 'Tap or click a bid, then a card to play it. Arrow keys and Enter also work.',
     art: `<g fill="currentColor"><rect x="28" y="16" width="24" height="34" transform="rotate(12 40 33)" opacity=".45"/><rect x="12" y="12" width="24" height="34" transform="rotate(-8 24 29)"/><path transform="rotate(-8 24 29) translate(16 21) scale(.16)" d="M50 5C57 17 94 39 94 62 94 76 84 84 72 84 63 84 56 79 53 73 54 82 58 89 66 95H34C42 89 46 82 47 73 44 79 37 84 28 84 16 84 6 76 6 62 6 39 43 17 50 5Z" style="fill:var(--tile)"/></g>`,
   },
+  {
+    slug: 'plinko',
+    title: 'Plinko',
+    description:
+      'Drop balls through a triangle of pegs into slots that pay a multiple of the bet, biggest at the edges. Choose 8 to 16 rows and low, medium or high risk, and drop as many balls at once as you like. Your bankroll carries over between visits.',
+    kind: 'inhouse',
+    src: '/games/plinko/index.html',
+    tags: ['Casino', 'Solo'],
+    players: '1 player',
+    controls: 'Space or Drop releases a ball. Tap a slot to see its odds.',
+    scores: true,
+    bestLabel: 'Best bankroll',
+    art: `<g fill="currentColor"><circle cx="32" cy="12" r="2.5" opacity=".45"/><circle cx="25" cy="21" r="2.5" opacity=".45"/><circle cx="39" cy="21" r="2.5" opacity=".45"/><circle cx="18" cy="30" r="2.5" opacity=".45"/><circle cx="32" cy="30" r="2.5" opacity=".45"/><circle cx="46" cy="30" r="2.5" opacity=".45"/><circle cx="11" cy="39" r="2.5" opacity=".45"/><circle cx="25" cy="39" r="2.5" opacity=".45"/><circle cx="39" cy="39" r="2.5" opacity=".45"/><circle cx="53" cy="39" r="2.5" opacity=".45"/><circle cx="32" cy="21" r="4.5"/><rect x="1" y="47" width="11" height="10"/><rect x="14" y="47" width="11" height="10" opacity=".65"/><rect x="27" y="47" width="10" height="10" opacity=".35"/><rect x="39" y="47" width="11" height="10" opacity=".65"/><rect x="52" y="47" width="11" height="10"/></g>`,
+  },
   /* ── Embedded games: third-party, via GameDistribution ─────── */
   {
     slug: 'basketball-stars',

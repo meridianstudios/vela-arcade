@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.4',
+    date: '2026-10-30',
+    games: ['plinko'],
+    changes: [
+      'The lobby lists the games most people know first.',
+    ],
+  },
+  {
     version: '1.3.4',
     date: '2026-10-30',
     games: [],
