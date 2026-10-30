@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.3.4',
+    date: '2026-10-30',
+    games: [],
+    changes: [
+      'Rules tab in the top bar: every rulebook in one place.',
+    ],
+  },
+  {
     version: '1.3.3',
     date: '2026-10-29',
     games: [],

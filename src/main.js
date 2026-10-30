@@ -225,6 +225,40 @@ function renderLeaderboards(slug) {
   showBoard(g)
 }
 
+/* The Rules tab: every game with a rulebook down the side, one at a time. */
+function renderRules(slug) {
+  const games = GAMES.filter((x) => RULES[x.slug] && playable(x)).sort((a, b) => a.title.localeCompare(b.title))
+  const g = games.find((x) => x.slug === slug) || games[0]
+  document.title = `Rules · Vela Arcade`
+  document.body.classList.remove('is-playing')
+  app.innerHTML = `
+    <div class="wrap">
+      <div class="toolbar">
+        <h1>Rules</h1>
+      </div>
+      <div class="lb">
+        <nav class="lb-games" aria-label="Games">${games.map((x) => `
+          <a href="/rules/${x.slug}" data-link class="${x === g ? 'on' : ''}">${art(x, 'mini')}<span>${esc(x.title)}</span></a>`).join('')}
+        </nav>
+        <section class="lb-board">
+          <div class="lb-head">
+            ${art(g, 'mini')}
+            <div><h2>${esc(g.title)}</h2><span class="label">${esc(g.players)}</span></div>
+            <a class="btn" href="/play/${g.slug}" data-link>Play</a>
+          </div>
+          <div class="rules rules-page">${RULES[g.slug].map((sec) => `
+            <section>
+              <h3>${esc(sec.h)}</h3>
+              <ul>${sec.items.map((li) => `<li>${esc(li)}</li>`).join('')}</ul>
+            </section>`).join('')}
+          </div>
+        </section>
+      </div>
+    </div>`
+  const on = app.querySelector('.lb-games a.on')
+  if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' })
+}
+
 function renderPlay(slug) {
   const g = bySlug(slug)
   if (!g || !playable(g)) return renderMissing()
@@ -445,6 +479,7 @@ function route() {
   else if (location.pathname.replace(/\/$/, '') === '/updates') renderUpdates()
   else if (location.pathname.replace(/\/$/, '') === '/online') renderOnline()
   else if (/^\/leaderboards(\/[\w-]+)?\/?$/.test(location.pathname)) renderLeaderboards(location.pathname.split('/')[2])
+  else if (/^\/rules(\/[\w-]+)?\/?$/.test(location.pathname)) renderRules(location.pathname.split('/')[2])
   else renderMissing()
   const here = '/' + (location.pathname.split('/')[1] || '')
   document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))

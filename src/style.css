@@ -335,6 +335,8 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 .rules ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .rules li { position: relative; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--text-2); }
 .rules li::before { content: ""; position: absolute; left: 0; top: 0.78em; width: 8px; height: 2px; background: var(--vela); }
+.rules-page { margin-top: 0; padding-top: 0; border-top: 0; }
+.rules-page li { font-size: 15px; }
 .more { display: flex; flex-direction: column; gap: 2px; }
 .more a { display: flex; align-items: center; gap: 12px; padding: 6px; margin: 0 -6px; transition: background-color 0.15s var(--ease); }
 .more a:hover { background: var(--bg-2); }
@@ -404,7 +406,8 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .brand-sub, .search kbd, #sign-in span { display: none; }
   .account { margin-left: 12px; }
   /* No room for a full search box: it is an icon that opens across the bar. */
-  .nav-inner { position: relative; }
+  .nav-inner { position: relative; gap: 10px; }
+  .nav-link { margin-left: 0; }
   .search { flex: 0 0 32px; padding: 0; justify-content: center; }
   .search input { flex: 0 0 0; width: 0; }
   .search:focus-within, .search:has(input:not(:placeholder-shown)) {
@@ -419,7 +422,7 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .online-totals { margin-bottom: 48px; }
   .online-totals div { padding: 16px; }
   .online-totals strong { font-size: 40px; }
-  /* The footer links to Updates, so the bar keeps room for Leaderboards. */
+  /* The footer links to Updates, so the bar keeps room for Leaderboards and Rules. */
   .nav-link[href="/updates"] { display: none; }
   .lb { grid-template-columns: 1fr; gap: 16px; padding-top: 16px; }
   .lb-games { flex-direction: row; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }

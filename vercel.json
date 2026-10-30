@@ -19,6 +19,14 @@
     {
       "source": "/leaderboards/:slug",
       "destination": "/index.html"
+    },
+    {
+      "source": "/rules",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/rules/:slug",
+      "destination": "/index.html"
     }
   ],
   "headers": [
