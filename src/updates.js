@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.6',
+    date: '2026-10-30',
+    games: [],
+    changes: [
+      'Switch accounts: keep up to 5 signed in on one device and swap between them from the account menu.',
+      'Staff ranks show on profiles, and the Staff page lists moderators and bans.',
+    ],
+  },
+  {
     version: '1.5.1',
     date: '2026-10-30',
     games: [],

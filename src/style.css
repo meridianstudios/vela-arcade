@@ -132,6 +132,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   font: 600 14px var(--font); color: var(--text-2); transition: color 0.15s var(--ease);
 }
 .account-item:hover { color: var(--vela-2); }
+/* Other accounts on this device, one tap to switch. */
+.account-switch { display: flex; flex-direction: column; gap: 2px; margin: 4px 0; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.account-switch:not(:has(*)) { display: none; }
+.account-other {
+  display: flex; align-items: center; gap: 10px; padding: 6px 0; text-align: left;
+  font: 600 14px var(--font); color: var(--text-2); transition: color 0.15s var(--ease);
+}
+.account-other span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-other:hover { color: var(--text); }
 
 /* sign-in form */
 .dialog-back {
@@ -278,7 +287,22 @@ a.pf-tile:hover { background: var(--tile); }
 .pf-game { display: flex; align-items: center; gap: 10px; font-size: 15px; }
 .pf-num { margin-top: auto; font: 300 40px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .pf-sub { display: block; margin-bottom: 12px; }
-.pf-list li { grid-template-columns: minmax(0, 1fr) auto auto; height: 48px; }
+.pf-list li { grid-template-columns: minmax(0, 1fr) auto auto auto; height: 48px; }
+.role {
+  display: inline-block; margin-right: 10px; padding: 3px 6px; vertical-align: 1px;
+  background: var(--vela); color: #fff; font: 700 10px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+/* staff */
+.staff { display: flex; flex-direction: column; gap: 48px; max-width: 560px; padding: 24px 0 96px; }
+.staff-list li { grid-template-columns: minmax(0, 1fr) auto auto; }
+.staff-add { align-items: stretch; }
+.staff-input {
+  flex: 1; min-width: 0; height: 36px; padding: 0 12px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); border-bottom-color: var(--line-2); outline: none; font: 400 15px var(--font);
+}
+.staff-input:focus { border-bottom-color: var(--vela); }
+.staff-note { padding: 24px 0; }
 .pf-row { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--text-2); transition: color 0.15s var(--ease); }
 .pf-row:hover { color: var(--text); }
 .pf-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

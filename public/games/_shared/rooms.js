@@ -81,12 +81,13 @@ if (ACCOUNT) {
 
 let db = null
 let auth = null
-// The account shares src/account.js's app name, so it picks up the site's
-// saved session; anonymous players get an app of their own.
+// The account uses the same Firebase app name as src/account.js (one per
+// account signed in on the device), so it picks up the site's saved session;
+// anonymous players get an app of their own.
 function boot(anonymous = !ACCOUNT) {
   if (db) return
   if (!available) throw new RoomError('Online play is not set up yet.')
-  const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, anonymous ? 'vela-rooms' : 'vela-account')
+  const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, anonymous ? 'vela-rooms' : ACCOUNT.app || 'vela-account')
   db = getFirestore(app)
   auth = getAuth(app)
   if (local) {

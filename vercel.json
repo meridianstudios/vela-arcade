@@ -33,6 +33,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/staff",
+      "destination": "/index.html"
+    },
+    {
       "source": "/u/:name",
       "destination": "/index.html"
     }

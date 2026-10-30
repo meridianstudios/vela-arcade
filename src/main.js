@@ -202,23 +202,41 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest('.mod-btn')
   if (!b) return
   const { act, slug, id, name } = b.dataset
-  const ask = act === 'ban'
-    ? `Ban ${name}? They are removed from every leaderboard and cannot post again.`
-    : act === 'reset'
-      ? `Reset ${name}? Their display name, picture and featured record go back to the defaults.`
-      : `Remove ${name} from this leaderboard?`
-  if (!confirm(ask)) return
+  const game = slug && bySlug(slug)
+  let display = ''
+  if (act === 'rename') {
+    display = (prompt(`New display name for @${name}`, b.dataset.display) || '').trim()
+    const bad = display && Account.checkDisplay(display)
+    if (!display) return
+    if (bad) return alert(bad)
+  } else {
+    const ask = {
+      ban: `Ban ${name}? They are removed from every leaderboard and cannot post again.`,
+      unban: `Lift the ban on ${name}?`,
+      reset: `Reset ${name}? Their display name, picture and featured record go back to the defaults.`,
+      promote: `Make ${name} a moderator?`,
+      demote: `Remove ${name} as a moderator?`,
+      record: `Remove ${name}'s ${game ? game.title : ''} record of ${fmt(b.dataset.score)}? It cannot be posted again; only a better score can.`,
+      remove: `Remove ${name} from this leaderboard?`,
+    }[act]
+    if (!ask || !confirm(ask)) return
+  }
   b.disabled = true
   const slugs = boardGames().map((g) => g.slug)
   try {
     if (act === 'ban') await Account.ban(id, name, slugs)
+    else if (act === 'unban') await Account.unban(id)
     else if (act === 'reset') await Account.resetProfile(id, name, slugs)
+    else if (act === 'promote') await Account.promote(id, name)
+    else if (act === 'demote') await Account.demote(id)
+    else if (act === 'rename') await Account.rename(id, name, display, slugs)
+    else if (act === 'record') await Account.removeRecord(id, name, slug, Number(b.dataset.score))
     else await Account.removeEntry(slug, id)
   } catch (err) {
-    console.warn('moderation failed', err)
+    console.warn('staff action failed', err)
     alert('That did not go through. Try again.')
   }
-  if (location.pathname.startsWith('/u/')) route()
+  if (/^\/(u\/|staff)/.test(location.pathname)) route()
   else refreshBoard()
 })
 
@@ -723,7 +741,10 @@ async function renderProfile(name) {
   }
 
   const games = boardGames().filter((g) => p.bests[g.slug] > 0)
-  const held = await Account.holders([...games.map((g) => g.slug), p.badge].filter(Boolean))
+  const [held, rank] = await Promise.all([
+    Account.holders([...games.map((g) => g.slug), p.badge].filter(Boolean)),
+    Account.role(p.uid),
+  ])
   if (location.pathname !== path) return
   const first = (g) => held[g.slug] === p.uid
   games.sort((a, b) => first(b) - first(a))
@@ -741,11 +762,15 @@ async function renderProfile(name) {
         ${avatarHTML(p, 'xl')}
         <div class="pf-id">
           <h1>${esc(shown)}</h1>
-          <span class="pf-at">@${esc(p.name)}${p.joined ? ` &middot; Joined ${p.joined.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}</span>
+          <span class="pf-at">${rank ? `<span class="role">${rank === 'owner' ? 'Owner' : 'Moderator'}</span>` : ''}@${esc(p.name)}${p.joined ? ` &middot; Joined ${p.joined.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : ''}</span>
         </div>
         <div class="pf-actions">
           ${self ? '<a class="btn" href="/settings" data-link>Settings</a>' : ''}
-          ${me && me.mod && !self ? `<span class="mod-tools"><button class="mod-btn" data-act="reset" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Reset profile</button><button class="mod-btn" data-act="ban" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Ban</button></span>` : ''}
+          ${me && me.mod && !self && rank !== 'owner' ? `<span class="mod-tools">${me.owner ? `
+            <button class="mod-btn" data-act="rename" data-id="${esc(p.uid)}" data-name="${esc(p.name)}" data-display="${esc(shown)}">Rename</button>
+            <button class="mod-btn" data-act="${rank === 'mod' ? 'demote' : 'promote'}" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">${rank === 'mod' ? 'Remove moderator' : 'Make moderator'}</button>` : ''}
+            <button class="mod-btn" data-act="reset" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Reset profile</button>
+            <button class="mod-btn" data-act="ban" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">Ban</button></span>` : ''}
         </div>
       </header>
       <div class="pf-tiles">
@@ -767,10 +792,79 @@ async function renderProfile(name) {
       <section>
         <h2 class="label pf-sub">Records</h2>
         ${games.length ? `<ol class="board-list pf-list">${games.map((g) => `
-          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${first(g) ? recordHTML(g.slug) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span></li>`).join('')}
+          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${first(g) ? recordHTML(g.slug) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span>${me && me.owner ? `<button class="mod-btn" data-act="record" data-id="${esc(p.uid)}" data-name="${esc(p.name)}" data-slug="${g.slug}" data-score="${p.bests[g.slug]}">Remove</button>` : ''}</li>`).join('')}
         </ol>` : '<p class="board-note">No scores yet</p>'}
       </section>
     </div>`
+}
+
+/* ── staff ───────────────────────────────────────────────────────
+   Moderators and owners. Everyone on staff and every ban in one place;
+   owners add and remove moderators here. */
+
+async function renderStaff() {
+  const path = location.pathname
+  document.title = 'Staff · Vela Arcade'
+  document.body.classList.remove('is-playing')
+  const me = Account.current()
+  const head = '<div class="toolbar"><h1>Staff</h1></div>'
+  if (!me || !me.mod) { app.innerHTML = `<div class="wrap">${head}</div>`; return }
+  app.innerHTML = `<div class="wrap">${head}</div>`
+  let s
+  try { s = await Account.staff() } catch {
+    app.innerHTML = `<div class="wrap">${head}<p class="board-note staff-note">Could not load staff.</p></div>`
+    return
+  }
+  if (location.pathname !== path) return
+  const row = (p, tools = '') => `<li><a class="who" href="/u/${esc(p.name)}" data-link><span class="who-name">${esc(p.name)}</span></a><span></span>${tools}</li>`
+  const tool = (act, p, label) => `<button class="mod-btn" data-act="${act}" data-id="${esc(p.uid)}" data-name="${esc(p.name)}">${label}</button>`
+  const list = (items, toolsFor) => items.length
+    ? `<ol class="board-list staff-list">${items.map((p) => row(p, toolsFor(p))).join('')}</ol>`
+    : '<p class="board-note">None</p>'
+  app.innerHTML = `
+    <div class="wrap">
+      ${head}
+      <div class="staff">
+        <section class="set">
+          <h2 class="label">Owners</h2>
+          ${list(s.owners, () => '')}
+        </section>
+        <section class="set">
+          <h2 class="label">Moderators</h2>
+          ${list(s.mods, (p) => (me.owner ? tool('demote', p, 'Remove') : ''))}
+          ${me.owner ? `
+          <form class="set-row staff-add" id="staff-add" novalidate>
+            <input class="staff-input" name="username" placeholder="Username" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <button class="btn" type="submit">Make moderator</button>
+          </form>
+          <p class="set-msg" id="staff-msg" role="status"></p>` : ''}
+        </section>
+        <section class="set">
+          <h2 class="label">Banned</h2>
+          ${list(s.bans, (p) => tool('unban', p, 'Unban'))}
+        </section>
+      </div>
+    </div>`
+
+  const add = document.getElementById('staff-add')
+  if (!add) return
+  add.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const msg = document.getElementById('staff-msg')
+    const go = add.querySelector('button')
+    go.disabled = true
+    msg.classList.remove('bad')
+    try {
+      const p = await Account.profile(add.username.value.trim())
+      if (!p) throw new Error('No player with that username')
+      await Account.promote(p.uid, p.name)
+      route()
+    } catch (x) {
+      msg.textContent = x.message === 'No player with that username' ? x.message : 'That did not go through. Try again.'
+      msg.classList.add('bad')
+      go.disabled = false
+    }
+  })
 }
 
 /* ── routing ─────────────────────────────────────────────────── */
@@ -784,6 +878,7 @@ function route() {
   else if (/^\/leaderboards(\/[\w-]+)?\/?$/.test(location.pathname)) renderLeaderboards(location.pathname.split('/')[2])
   else if (/^\/rules(\/[\w-]+)?\/?$/.test(location.pathname)) renderRules(location.pathname.split('/')[2])
   else if (location.pathname.replace(/\/$/, '') === '/settings') renderSettings()
+  else if (location.pathname.replace(/\/$/, '') === '/staff') renderStaff()
   else if (/^\/u\/\w+\/?$/.test(location.pathname)) renderProfile(location.pathname.split('/')[2])
   else renderMissing()
   const here = '/' + (location.pathname.split('/')[1] || '')
@@ -827,9 +922,14 @@ function renderAccount({ user }) {
       ${avatarHTML(user)}
     </button>
     <div class="account-menu" id="account-menu" hidden>
-      <span class="label">${esc(user.display || user.name)}${user.mod ? ' &middot; Moderator' : ''}</span>
+      <span class="label">${esc(user.display || user.name)}${user.owner ? ' &middot; Owner' : user.mod ? ' &middot; Moderator' : ''}</span>
       <a class="account-item" href="/u/${esc(user.name)}" data-link>Profile</a>
       <a class="account-item" href="/settings" data-link>Settings</a>
+      ${user.mod ? '<a class="account-item" href="/staff" data-link>Staff</a>' : ''}
+      <div class="account-switch">${Account.otherAccounts().map((s) => `
+        <button class="account-other" data-app="${esc(s.app)}">${avatarHTML(s, 'sm')}<span>${esc(s.display || s.name)}</span></button>`).join('')}
+        ${Account.canAddAccount() ? '<button class="account-item" id="add-account">Add account</button>' : ''}
+      </div>
       <button class="account-item" id="sign-out">Sign out</button>
     </div>`
 }
@@ -862,10 +962,10 @@ Account.onChange((state) => {
   // Redraw on sign-in, sign-out, and when moderator status or the profile
   // arrives. Settings and profile pages depend on who is signed in.
   const u = state.user
-  const who = u ? u.uid + (u.mod ? ':mod' : '') + (u.display ? ':p' : '') : null
+  const who = u ? u.uid + (u.mod ? ':mod' : '') + (u.owner ? ':own' : '') + (u.display ? ':p' : '') : null
   if (who !== lastUser) {
     lastUser = who
-    if (/^\/(settings|u\/)/.test(location.pathname)) route()
+    if (/^\/(settings|staff|u\/)/.test(location.pathname)) route()
     else refreshBoard()
   }
 })
@@ -903,7 +1003,10 @@ function setMode(m) {
   document.getElementById('auth-go').textContent = m === 'in' ? 'Sign in' : 'Create account'
   document.getElementById('auth-error').textContent = ''
 }
-function openDialog() {
+// adding: a second account, signed in alongside the current one.
+let adding = false
+function openDialog(opts = {}) {
+  adding = !!opts.adding
   setMode('in')
   form.reset()
   dialog.hidden = false
@@ -927,7 +1030,8 @@ form.addEventListener('submit', async (e) => {
   go.disabled = true
   err.textContent = ''
   try {
-    if (mode === 'in') await Account.signIn(name, password)
+    if (adding && Account.current()) await Account.addAccount(mode, name, password)
+    else if (mode === 'in') await Account.signIn(name, password)
     else await Account.createAccount(name, password)
     closeDialog()
   } catch (x) {
@@ -944,6 +1048,11 @@ accountEl.addEventListener('click', async (e) => {
     e.target.closest('#account-open').setAttribute('aria-expanded', String(!menu.hidden))
   } else if (e.target.closest('a.account-item')) {
     menu.hidden = true
+  } else if (e.target.closest('.account-other')) {
+    Account.switchTo(e.target.closest('.account-other').dataset.app)
+  } else if (e.target.closest('#add-account')) {
+    menu.hidden = true
+    openDialog({ adding: true })
   } else if (e.target.closest('#sign-out')) {
     menu.hidden = true
     await Account.signOut()

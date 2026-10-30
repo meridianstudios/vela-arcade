@@ -34,6 +34,13 @@ const CONFIG = location.origin + '/games/_shared/firebase-config.js'
 const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
 const FLAG = 'vela:signed-in'
 const ACCOUNT_KEY = 'vela:account'
+// Several accounts can stay signed in on one device. Each lives in its own
+// Firebase app (Firebase saves one session per app name); ACTIVE names the one
+// in use and SAVED lists them all for the switcher.
+const ACTIVE = 'vela:active-app'
+const SAVED = 'vela:accounts'
+const MAX_SAVED = 5
+const DEFAULT_APP = 'vela-account'
 const BEST = 'vela:best:'
 const MAIL = '@players.invalid'
 export const BOARD_SIZE = 10
@@ -42,8 +49,9 @@ export const COLORS = ['#ea5426', '#2d89ef', '#00a300', '#b91d47', '#7e3878', '#
 
 let fb = null      // loaded SDK pieces
 let loading = null
-let user = null    // { uid, name, display, avatar, color, badge, fav, joined, mod }
+let user = null    // { uid, name, display, avatar, color, badge, fav, joined, mod, owner }
 let cloud = {}     // bests as stored in Firestore
+let cleared = {}   // records an owner removed: never posted again at that score
 const listeners = new Set()
 
 const storage = {
@@ -84,41 +92,85 @@ export function checkDisplay(v) {
 
 const emailFor = (name) => name.toLowerCase() + MAIL
 
+/* ── saved accounts ────────────────────────────────────────────── */
+
+const activeApp = () => storage.get(ACTIVE) || DEFAULT_APP
+function saved() {
+  try {
+    const list = JSON.parse(storage.get(SAVED) || '[]')
+    return Array.isArray(list) ? list.filter((s) => s && typeof s.app === 'string' && typeof s.name === 'string') : []
+  } catch { return [] }
+}
+const setSaved = (list) => storage.set(SAVED, JSON.stringify(list.slice(0, MAX_SAVED)))
+function remember(entry) {
+  const list = saved()
+  const i = list.findIndex((s) => s.app === entry.app)
+  if (i >= 0) list[i] = entry
+  else list.push(entry)
+  setSaved(list)
+}
+const forget = (app) => setSaved(saved().filter((s) => s.app !== app))
+
 /* ── firebase ──────────────────────────────────────────────────── */
 
-function load() {
-  if (fb) return Promise.resolve(fb)
-  if (loading) return loading
-  loading = (async () => {
-    const [{ initializeApp }, auth, store, { firebaseConfig }] = await Promise.all([
+let sdk = null
+async function loadSdk() {
+  if (!sdk) {
+    const [app, auth, store, { firebaseConfig }] = await Promise.all([
       import(/* @vite-ignore */ SDK + 'firebase-app.js'),
       import(/* @vite-ignore */ SDK + 'firebase-auth.js'),
       import(/* @vite-ignore */ SDK + 'firebase-firestore.js'),
       import(/* @vite-ignore */ CONFIG),
     ])
-    const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, 'vela-account')
-    const a = auth.getAuth(app)
-    const db = store.getFirestore(app)
-    if (local) {
-      auth.connectAuthEmulator(a, 'http://127.0.0.1:9199', { disableWarnings: true })
-      store.connectFirestoreEmulator(db, '127.0.0.1', 8181)
-    }
-    fb = { auth, store, a, db }
-    auth.onAuthStateChanged(a, (u) => {
+    sdk = { initializeApp: app.initializeApp, auth, store, config: firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' } }
+  }
+  return sdk
+}
+
+// One Firebase app by name, wired to the emulators on localhost.
+async function appNamed(name) {
+  const { initializeApp, auth, store, config } = await loadSdk()
+  const app = initializeApp(config, name)
+  const a = auth.getAuth(app)
+  const db = store.getFirestore(app)
+  if (local) {
+    auth.connectAuthEmulator(a, 'http://127.0.0.1:9199', { disableWarnings: true })
+    store.connectFirestoreEmulator(db, '127.0.0.1', 8181)
+  }
+  return { auth, store, a, db, app: name }
+}
+
+function load() {
+  if (fb) return Promise.resolve(fb)
+  if (loading) return loading
+  loading = (async () => {
+    fb = await appNamed(activeApp())
+    fb.auth.onAuthStateChanged(fb.a, (u) => {
       if (u && u.email && u.email.endsWith(MAIL)) {
         user = { uid: u.uid, name: u.displayName || u.email.slice(0, -MAIL.length) }
         storage.set(FLAG, '1')
+        const known = saved().find((s) => s.app === fb.app)
+        remember({ ...known, app: fb.app, name: user.name })
         // A brand-new account has no display name for a moment; createAccount
         // syncs once it is set, so leaderboard entries get the right case.
         if (u.displayName) sync()
-        checkMod()
+        checkStaff()
       } else {
         // Anything else (an old Google session) is signed out quietly.
-        if (u) auth.signOut(a)
+        if (u) fb.auth.signOut(fb.a)
+        const wasSaved = saved().some((s) => s.app === fb.app)
         user = null
         cloud = {}
+        cleared = {}
         storage.del(FLAG)
         storage.del(ACCOUNT_KEY)
+        // A saved account whose session has ended drops out of the switcher;
+        // the next saved one takes over.
+        if (wasSaved) {
+          forget(fb.app)
+          const next = saved()[0]
+          if (next) return switchTo(next.app)
+        }
       }
       emit()
     })
@@ -128,13 +180,15 @@ function load() {
   return loading
 }
 
-// Moderator status lives in mods/<uid>, which only an admin can write; the
-// rules let an account read its own entry and nothing else.
-async function checkMod() {
+// Staff status lives in mods/<uid> and owners/<uid>. Owners are written only
+// by an admin; an owner can make moderators. An owner is a moderator too.
+async function checkStaff() {
   const me = user
   try {
-    const snap = await fb.store.getDoc(fb.store.doc(fb.db, 'mods', me.uid))
-    if (user && user.uid === me.uid && snap.exists()) { user = { ...user, mod: true }; emit() }
+    const [mod, owner] = await Promise.all(['mods', 'owners'].map((c) => fb.store.getDoc(fb.store.doc(fb.db, c, me.uid))))
+    if (!user || user.uid !== me.uid || !(mod.exists() || owner.exists())) return
+    user = { ...user, mod: true, owner: owner.exists() }
+    emit()
   } catch {}
 }
 
@@ -156,8 +210,10 @@ function setLook(d) {
     fav: d.fav || '',
     joined: d.joined && d.joined.toDate ? d.joined.toDate() : user.joined,
   }
-  // Online games (public/games/_shared/rooms.js) seat the account under this name.
-  storage.set(ACCOUNT_KEY, JSON.stringify({ name: user.name, display: user.display }))
+  // Online games (public/games/_shared/rooms.js) seat the account under this
+  // name, through the same Firebase app.
+  storage.set(ACCOUNT_KEY, JSON.stringify({ name: user.name, display: user.display, app: fb.app }))
+  remember({ app: fb.app, name: user.name, display: user.display, avatar: user.avatar, color: user.color })
 }
 
 // Accounts made before profiles existed kept their bests in players/<uid>;
@@ -186,12 +242,13 @@ async function sync() {
     const snap = await fb.store.getDoc(profileRef())
     if (snap.exists()) {
       cloud = snap.data().bests || {}
+      cleared = snap.data().cleared || {}
       setLook(snap.data())
     } else await createProfile()
     emit()
     const mine = localBests()
     const up = {}
-    for (const [slug, n] of Object.entries(mine)) if (n > (cloud[slug] || 0)) up[slug] = n
+    for (const [slug, n] of Object.entries(mine)) if (postable(slug, n)) up[slug] = n
     for (const [slug, n] of Object.entries(cloud)) if (n > (mine[slug] || 0)) storage.set(BEST + slug, String(n))
     if (Object.keys(up).length) await save(up)
     emit({ bestsChanged: true })
@@ -215,9 +272,12 @@ async function save(bests) {
 window.addEventListener('message', (e) => {
   const d = e.data
   if (e.origin !== location.origin || !d || d.source !== 'vela-game' || d.type !== 'gameover') return
-  if (!user || !user.display || !d.isBest || !(d.best > (cloud[d.game] || 0))) return
+  if (!user || !user.display || !d.isBest || !postable(d.game, d.best)) return
   save({ [d.game]: d.best }).catch((err) => console.warn('score save failed', err))
 })
+
+// A best goes up when it beats the saved one and any record an owner removed.
+const postable = (slug, n) => n > (cloud[slug] || 0) && n > (cleared[slug] || 0)
 
 function emit(extra = {}) {
   listeners.forEach((fn) => fn({ user, ...extra }))
@@ -268,9 +328,52 @@ export async function createAccount(name, password) {
   } catch (e) { throw new Error(message(e)) }
 }
 
+// Signs this account out of this device. Another saved account, if there is
+// one, takes over.
 export async function signOut() {
   if (!fb) return
+  const app = fb.app
+  forget(app)
   await fb.auth.signOut(fb.a)
+  const next = saved()[0]
+  if (next) switchTo(next.app)
+}
+
+/* ── switching ─────────────────────────────────────────────────── */
+
+// The other accounts signed in on this device, for the switcher.
+export const otherAccounts = () => saved().filter((s) => !fb || s.app !== fb.app)
+export const canAddAccount = () => saved().length < MAX_SAVED
+
+// Makes a saved account the one in use. A reload starts everything (the
+// leaderboards, the games' rooms) cleanly on the new account.
+export function switchTo(app) {
+  storage.set(ACTIVE, app)
+  storage.set(FLAG, '1')
+  location.reload()
+}
+
+// Signs in, or creates, a second account without signing the current one out:
+// it gets a Firebase app of its own and becomes the one in use.
+export async function addAccount(mode, name, password) {
+  // Already signed in on this device: the switcher would do the same.
+  const have = saved().find((s) => s.name.toLowerCase() === name.toLowerCase())
+  if (have && mode === 'in') return switchTo(have.app)
+  if (!canAddAccount()) throw new Error(`Up to ${MAX_SAVED} accounts on one device`)
+  const bad = mode === 'new' ? checkName(name) || (password.length < 6 ? 'Password needs 6 or more characters' : null) : null
+  if (bad) throw new Error(bad)
+  const app = DEFAULT_APP + '-' + Math.random().toString(36).slice(2, 8)
+  const next = await appNamed(app)
+  try {
+    if (mode === 'new') {
+      const cred = await next.auth.createUserWithEmailAndPassword(next.a, emailFor(name), password)
+      await next.auth.updateProfile(cred.user, { displayName: name })
+    } else {
+      await next.auth.signInWithEmailAndPassword(next.a, emailFor(name), password)
+    }
+  } catch (e) { throw new Error(message(e)) }
+  remember({ app, name })
+  switchTo(app)
 }
 
 /* ── settings ──────────────────────────────────────────────────── */
@@ -323,8 +426,11 @@ export async function deleteAccount(password, slugs) {
     await Promise.all([...new Set([...slugs, ...Object.keys(cloud)])].map((slug) => store.deleteDoc(boardRef(slug)).catch(() => {})))
     await store.deleteDoc(profileRef()).catch(() => {})
     await store.deleteDoc(playerRef()).catch(() => {})
+    forget(fb.app)
     await fb.auth.deleteUser(fb.a.currentUser)
   } catch (e) { throw new Error(message(e)) }
+  const next = saved()[0]
+  if (next) switchTo(next.app)
 }
 
 /* ── public reads ──────────────────────────────────────────────── */
@@ -444,5 +550,64 @@ export async function ban(uid, name, slugs) {
   await Promise.all(slugs.map((slug) => store.deleteDoc(store.doc(db, 'boards', slug, 'scores', uid)).catch(() => {})))
 }
 
+/* ── owner ─────────────────────────────────────────────────────
+   Only work for an account listed in owners/; the rules refuse everyone else. */
+
+const own = () => { if (!user || !user.owner) throw new Error('Not an owner') }
+
+// 'owner', 'mod' or '' for any account, read without signing in.
+export async function role(uid) {
+  if (!uid) return ''
+  const has = (c) => fetch(`${REST}/${c}/${encodeURIComponent(uid)}`).then((r) => r.ok).catch(() => false)
+  const [owner, mod] = await Promise.all([has('owners'), has('mods')])
+  return owner ? 'owner' : mod ? 'mod' : ''
+}
+
+// Everyone on staff and every ban, for the Staff page.
+export async function staff() {
+  if (!user || !user.mod) throw new Error('Not staff')
+  const { store, db } = fb
+  const list = async (c) => (await store.getDocs(store.collection(db, c))).docs.map((d) => ({ uid: d.id, name: d.data().name || d.id }))
+  const [owners, mods, bans] = await Promise.all([list('owners'), list('mods'), list('bans')])
+  return { owners, mods, bans }
+}
+
+export async function promote(uid, name) {
+  own()
+  await fb.store.setDoc(fb.store.doc(fb.db, 'mods', uid), { name, by: user.uid, at: now() })
+}
+
+export async function demote(uid) {
+  own()
+  await fb.store.deleteDoc(fb.store.doc(fb.db, 'mods', uid))
+}
+
+// Moderators can lift bans too. The account makes a fresh profile on its next visit.
+export async function unban(uid) {
+  if (!user || !user.mod) throw new Error('Not staff')
+  await fb.store.deleteDoc(fb.store.doc(fb.db, 'bans', uid))
+}
+
+// Renames someone: their profile and every leaderboard entry they have.
+export async function rename(uid, name, display, slugs) {
+  own()
+  const bad = checkDisplay(display)
+  if (bad) throw new Error(bad)
+  const { store, db } = fb
+  await store.updateDoc(store.doc(db, 'profiles', name.toLowerCase()), { display, updatedAt: now() })
+  await Promise.all(slugs.map((slug) => store.updateDoc(store.doc(db, 'boards', slug, 'scores', uid), { display }).catch(() => {})))
+}
+
+// Removes one record: off the leaderboard and off the profile, and that
+// account's devices will not post that score again (only a better one).
+export async function removeRecord(uid, name, slug, score) {
+  own()
+  const { store, db } = fb
+  await store.deleteDoc(store.doc(db, 'boards', slug, 'scores', uid)).catch(() => {})
+  await store.updateDoc(store.doc(db, 'profiles', name.toLowerCase()), {
+    [`bests.${slug}`]: store.deleteField(), [`cleared.${slug}`]: score, updatedAt: now(),
+  })
+}
+
 // Someone who signed in before gets their session (and a sync) back quietly.
-if (storage.get(FLAG)) load().catch(() => {})
+if (storage.get(FLAG) || saved().length) load().catch(() => {})
