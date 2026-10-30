@@ -2,7 +2,9 @@
  *
  * Shared by every online game. A room is one Firestore document addressed by a
  * six-character code; knowing the code is what lets you in. Players are
- * anonymous Firebase users with a typed display name: no accounts.
+ * anonymous Firebase users with a typed display name, or, when signed in to a
+ * Vela account on the site, that account and its display name. The account
+ * is never required.
  *
  *   import * as Rooms from '../_shared/rooms.js'
  *
@@ -56,12 +58,35 @@ export const available = local || !!firebaseConfig
 
 export class RoomError extends Error {}
 
+// The site's account (src/account.js) leaves its display name here while
+// someone is signed in. The account itself is checked in signIn.
+const ACCOUNT = (() => {
+  try {
+    const a = localStorage.getItem('vela:signed-in') && JSON.parse(localStorage.getItem('vela:account') || 'null')
+    return a && a.display ? a : null
+  } catch { return null }
+})()
+
+// While signed in, the game's name field shows the account's display name and
+// cannot be edited. The games fill that field themselves at various points,
+// so later writes to it are ignored rather than chased.
+if (ACCOUNT) {
+  const field = document.getElementById('nameIn')
+  if (field) {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ACCOUNT.display)
+    Object.defineProperty(field, 'value', { get: () => ACCOUNT.display, set() {}, configurable: true })
+    field.readOnly = true
+  }
+}
+
 let db = null
 let auth = null
-function boot() {
+// The account shares src/account.js's app name, so it picks up the site's
+// saved session; anonymous players get an app of their own.
+function boot(anonymous = !ACCOUNT) {
   if (db) return
   if (!available) throw new RoomError('Online play is not set up yet.')
-  const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, 'vela-rooms')
+  const app = initializeApp(firebaseConfig || { apiKey: 'demo', projectId: 'demo-vela-arcade', appId: 'demo' }, anonymous ? 'vela-rooms' : 'vela-account')
   db = getFirestore(app)
   auth = getAuth(app)
   if (local) {
@@ -70,17 +95,35 @@ function boot() {
   }
 }
 
+// The signed-in user once auth has loaded its saved session, or null.
+const firstUser = (a) => new Promise((resolve, reject) => {
+  const stop = onAuthStateChanged(a, (u) => { stop(); resolve(u) }, reject)
+})
+
+let onAccount = false
 let uidPromise = null
 export function signIn() {
-  boot()
   if (!uidPromise) {
-    uidPromise = new Promise((resolve, reject) => {
-      const stop = onAuthStateChanged(auth, (u) => { if (u) { stop(); resolve(u.uid) } }, reject)
-      if (!auth.currentUser) signInAnonymously(auth).catch((e) => { uidPromise = null; reject(e) })
-    })
+    uidPromise = (async () => {
+      boot()
+      if (ACCOUNT) {
+        const u = await firstUser(auth)
+        if (u && !u.isAnonymous) { onAccount = true; return u.uid }
+        // The account's session has ended: play anonymously instead. Never
+        // anonymously on the account's app, which the site would sign out.
+        db = null
+        boot(true)
+      }
+      const u = await firstUser(auth)
+      if (u) return u.uid
+      return (await signInAnonymously(auth)).user.uid
+    })()
+    uidPromise.catch(() => { uidPromise = null })
   }
   return uidPromise
 }
+// The name that goes in the room: the account's while playing on it.
+const nameFor = (typed) => cleanName(onAccount ? ACCOUNT.display : typed)
 export const uid = () => (auth && auth.currentUser ? auth.currentUser.uid : null)
 
 const roomRef = (code) => doc(db, 'rooms', code)
@@ -101,7 +144,7 @@ export async function create({ game, maxSeats = 2, name = 'Player', state = {} }
       if (snap.exists()) return false
       const now = Date.now()
       tx.set(roomRef(code), {
-        game, code, hostUid: me, seats: [me], names: { [me]: cleanName(name) }, maxSeats,
+        game, code, hostUid: me, seats: [me], names: { [me]: nameFor(name) }, maxSeats,
         phase: 'lobby', state, seen: { [me]: serverTimestamp() }, createdAt: now, updatedAt: now,
       })
       return true
@@ -123,7 +166,7 @@ export async function join(code, { game, name = 'Player' }) {
     if (room.phase !== 'lobby') throw new RoomError('That game has already started.')
     if (room.seats.length >= room.maxSeats) throw new RoomError('That room is full.')
     const seats = [...room.seats, me]
-    const names = { ...room.names, [me]: cleanName(name) }
+    const names = { ...room.names, [me]: nameFor(name) }
     tx.update(roomRef(code), { seats, names, [`seen.${me}`]: serverTimestamp(), updatedAt: Date.now() })
     return { ...room, seats, names }
   })

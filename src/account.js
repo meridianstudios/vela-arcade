@@ -33,6 +33,7 @@ const SDK = 'https://www.gstatic.com/firebasejs/11.10.0/'
 const CONFIG = location.origin + '/games/_shared/firebase-config.js'
 const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
 const FLAG = 'vela:signed-in'
+const ACCOUNT_KEY = 'vela:account'
 const BEST = 'vela:best:'
 const MAIL = '@players.invalid'
 export const BOARD_SIZE = 10
@@ -117,6 +118,7 @@ function load() {
         user = null
         cloud = {}
         storage.del(FLAG)
+        storage.del(ACCOUNT_KEY)
       }
       emit()
     })
@@ -154,6 +156,8 @@ function setLook(d) {
     fav: d.fav || '',
     joined: d.joined && d.joined.toDate ? d.joined.toDate() : user.joined,
   }
+  // Online games (public/games/_shared/rooms.js) seat the account under this name.
+  storage.set(ACCOUNT_KEY, JSON.stringify({ name: user.name, display: user.display }))
 }
 
 // Accounts made before profiles existed kept their bests in players/<uid>;

@@ -523,14 +523,13 @@ function renderSettings() {
       ${head}
       <div class="settings">
         <form class="set" id="look-form" novalidate>
-          <h2 class="label">Profile</h2>
           <div class="set-preview" id="set-preview"></div>
           <label class="field"><span class="label">Display name</span>
             <input name="display" maxlength="20" autocomplete="off" spellcheck="false" value="${esc(me.display)}" />
           </label>
-          <div class="field"><span class="label">Username</span><span class="set-static">@${esc(me.name)}</span></div>
           <div class="field"><span class="label">Picture</span>
-            <div class="av-grid">${['', ...pickable.map((g) => g.slug)].map((slug) => `
+            <button type="button" class="btn ghost" id="pick-open" aria-expanded="false">Change picture</button>
+            <div class="av-grid" id="av-grid" hidden>${['', ...pickable.map((g) => g.slug)].map((slug) => `
               <button type="button" class="av-pick${slug === me.avatar ? ' on' : ''}" data-avatar="${slug}" aria-label="${slug ? esc(bySlug(slug).title) : 'First letter'}" aria-pressed="${slug === me.avatar}">${avatarHTML({ ...me, avatar: slug }, 'pick')}</button>`).join('')}
             </div>
           </div>
@@ -545,32 +544,44 @@ function renderSettings() {
           <label class="field"><span class="label">Favourite game</span>
             <select name="fav"><option value="">None</option>${pickable.map((g) => `<option value="${g.slug}"${g.slug === me.fav ? ' selected' : ''}>${esc(g.title)}</option>`).join('')}</select>
           </label>
+          <div class="set-row">
+            <button class="btn" type="submit">Save</button>
+            <a class="btn ghost" href="/u/${esc(me.name)}" data-link>View profile</a>
+          </div>
           <p class="set-msg" id="look-msg" role="status"></p>
-          <button class="btn" type="submit">Save</button>
         </form>
 
-        <div class="set-side">
-          <form class="set" id="pass-form" novalidate>
-            <h2 class="label">Password</h2>
+        <section class="set set-private">
+          <h2 class="label">Password</h2>
+          <button type="button" class="btn ghost" id="pass-open">Change password</button>
+          <form class="set" id="pass-form" novalidate hidden>
             <input type="text" name="username" autocomplete="username" value="${esc(me.name)}" hidden />
             <label class="field"><span class="label">Current password</span><input type="password" name="current" autocomplete="current-password" /></label>
             <label class="field"><span class="label">New password</span><input type="password" name="next" autocomplete="new-password" /></label>
             <label class="field"><span class="label">Repeat new password</span><input type="password" name="again" autocomplete="new-password" /></label>
-            <p class="set-msg" id="pass-msg" role="status"></p>
-            <button class="btn" type="submit">Change password</button>
-          </form>
-
-          <form class="set" id="del-form" novalidate>
-            <h2 class="label">Account</h2>
             <div class="set-row">
-              <a class="btn ghost" href="/u/${esc(me.name)}" data-link>View profile</a>
-              <button class="btn ghost" type="button" id="settings-sign-out">Sign out</button>
+              <button class="btn" type="submit">Save password</button>
+              <button class="btn ghost" type="button" data-close="pass">Cancel</button>
             </div>
-            <label class="field"><span class="label">Password to delete account</span><input type="password" name="password" autocomplete="current-password" /></label>
-            <p class="set-msg" id="del-msg" role="status"></p>
-            <button class="btn danger" type="submit">Delete account</button>
           </form>
-        </div>
+          <p class="set-msg" id="pass-msg" role="status"></p>
+        </section>
+
+        <section class="set">
+          <h2 class="label">Account</h2>
+          <div class="set-row">
+            <button class="btn ghost" type="button" id="settings-sign-out">Sign out</button>
+            <button class="btn ghost" type="button" id="del-open">Delete account</button>
+          </div>
+          <form class="set" id="del-form" novalidate hidden>
+            <label class="field"><span class="label">Password</span><input type="password" name="password" autocomplete="current-password" /></label>
+            <div class="set-row">
+              <button class="btn danger" type="submit">Delete for good</button>
+              <button class="btn ghost" type="button" data-close="del">Cancel</button>
+            </div>
+          </form>
+          <p class="set-msg" id="del-msg" role="status"></p>
+        </section>
       </div>
     </div>`
 
@@ -580,7 +591,7 @@ function renderSettings() {
   const form = document.getElementById('look-form')
   const preview = () => {
     const p = { ...me, ...draft, display: draft.display.trim() || me.name }
-    document.getElementById('set-preview').innerHTML = `${avatarHTML(p, 'lg')}<div><strong>${esc(p.display)}</strong>${p.badge && held[p.badge] === me.uid ? recordHTML(p.badge) : ''}</div>`
+    document.getElementById('set-preview').innerHTML = `${avatarHTML(p, 'lg')}<div class="set-id"><span><strong>${esc(p.display)}</strong>${p.badge && held[p.badge] === me.uid ? recordHTML(p.badge) : ''}</span><span class="pf-at">@${esc(me.name)}</span></div>`
     form.querySelectorAll('.av-pick .av').forEach((el) => el.style.setProperty('--av', p.color))
     form.querySelectorAll('.av-pick[data-avatar=""] .av').forEach((el) => { el.textContent = (p.display[0] || '?').toUpperCase() })
   }
@@ -600,8 +611,16 @@ function renderSettings() {
   })
 
   form.addEventListener('click', (e) => {
+    const open = e.target.closest('#pick-open')
     const pick = e.target.closest('.av-pick')
     const sw = e.target.closest('.swatch')
+    if (open) {
+      const grid = document.getElementById('av-grid')
+      grid.hidden = !grid.hidden
+      open.setAttribute('aria-expanded', String(!grid.hidden))
+      open.textContent = grid.hidden ? 'Change picture' : 'Done'
+      return
+    }
     if (pick) {
       draft.avatar = pick.dataset.avatar
       form.querySelectorAll('.av-pick').forEach((b) => { b.classList.toggle('on', b === pick); b.setAttribute('aria-pressed', b === pick) })
@@ -635,20 +654,35 @@ function renderSettings() {
     })
   })
 
+  // Password and deletion stay closed until asked for, and close again (with
+  // their fields cleared) on Cancel.
   const pass = document.getElementById('pass-form')
+  const del = document.getElementById('del-form')
+  const panes = { pass: [pass, 'pass-open', 'pass-msg'], del: [del, 'del-open', 'del-msg'] }
+  const show = (key, on) => {
+    const [f, opener, msg] = panes[key]
+    f.hidden = !on
+    document.getElementById(opener).hidden = on
+    if (!on) f.reset()
+    say(msg, '')
+    if (on) f.querySelector('input[type="password"]').focus()
+  }
+  document.getElementById('pass-open').addEventListener('click', () => show('pass', true))
+  document.getElementById('del-open').addEventListener('click', () => show('del', true))
+  app.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => show(b.dataset.close, false)))
+
   pass.addEventListener('submit', (e) => {
     e.preventDefault()
     if (pass.next.value !== pass.again.value) return say('pass-msg', 'New passwords do not match', true)
     busy(pass, async () => {
       try {
         await Account.changePassword(pass.current.value, pass.next.value)
-        pass.reset()
+        show('pass', false)
         say('pass-msg', 'Password changed')
       } catch (x) { say('pass-msg', x.message, true) }
     })
   })
 
-  const del = document.getElementById('del-form')
   del.addEventListener('submit', (e) => {
     e.preventDefault()
     if (!del.password.value) return say('del-msg', 'Enter your password', true)

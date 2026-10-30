@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.5.1',
+    date: '2026-10-30',
+    games: [],
+    changes: [
+      'Signed in, online games seat you under your account and display name. Signed out, they work as before.',
+      'A simpler Settings page. Password and deleting your account stay closed until you open them.',
+    ],
+  },
+  {
     version: '1.5',
     date: '2026-10-30',
     games: [],
