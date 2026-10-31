@@ -327,6 +327,13 @@ a.pf-tile:hover { background: var(--tile); }
 .staff { display: flex; flex-direction: column; gap: 48px; max-width: 560px; padding: 24px 0 96px; }
 .staff-list li { grid-template-columns: minmax(0, 1fr) auto auto; }
 .staff-add { align-items: stretch; }
+/* owner panel */
+.owner-panel { max-width: 720px; }
+.op-card { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; padding: 18px; background: var(--bg-2); }
+.op-id { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.op-id strong { font: 300 28px/1.1 var(--font-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.op-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.op-card .board-list li { padding-left: 0; padding-right: 0; }
 .staff-input {
   flex: 1; min-width: 0; height: 36px; padding: 0 12px; background: var(--bg); color: var(--text);
   border: 1px solid var(--line); border-bottom-color: var(--line-2); outline: none; font: 400 15px var(--font);
@@ -563,6 +570,8 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .online-totals strong { font-size: 40px; }
   /* The footer links to Updates, so the bar keeps room for Leaderboards and Rules. */
   .nav-link[href="/updates"] { display: none; }
+  /* The account menu links to the Owner panel too. */
+  .nav-link#nav-owner { display: none; }
   .lb { grid-template-columns: 1fr; gap: 16px; padding-top: 16px; }
   .lb-games { flex-direction: row; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
   .lb-games a { flex-shrink: 0; white-space: nowrap; }

@@ -37,6 +37,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/owner",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/owner/:name",
+      "destination": "/index.html"
+    },
+    {
       "source": "/u/:name",
       "destination": "/index.html"
     }

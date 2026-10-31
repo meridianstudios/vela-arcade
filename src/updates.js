@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.7.1',
+    date: '2026-10-31',
+    games: [],
+    changes: [
+      'Each account keeps its own bests. Switching accounts no longer carries scores from one to another.',
+    ],
+  },
+  {
     version: '1.7',
     date: '2026-10-30',
     games: [],

@@ -226,7 +226,7 @@ document.addEventListener('click', async (e) => {
     const ask = {
       ban: `Ban ${name}? They are removed from every leaderboard and cannot post again.`,
       unban: `Lift the ban on ${name}?`,
-      reset: `Reset ${name}? Their display name, picture and featured record go back to the defaults.`,
+      reset: `Reset ${name}? Their display name, picture, colour and tags go back to the defaults.`,
       promote: `Make ${name} a moderator?`,
       demote: `Remove ${name} as a moderator?`,
       record: `Remove ${name}'s ${game ? game.title : ''} record of ${fmt(b.dataset.score)}? It cannot be posted again; only a better score can.`,
@@ -249,7 +249,7 @@ document.addEventListener('click', async (e) => {
     console.warn('staff action failed', err)
     alert('That did not go through. Try again.')
   }
-  if (/^\/(u\/|staff)/.test(location.pathname)) route()
+  if (/^\/(u\/|staff|owner)/.test(location.pathname)) route()
   else refreshBoard()
 })
 
@@ -911,6 +911,108 @@ async function renderStaff() {
   })
 }
 
+/* ── owner ───────────────────────────────────────────────────────
+   Everything an owner can do, in one place: look a player up and act on them
+   (rename, moderator, reset, ban, records), and the moderator, ban and owner
+   lists. /owner/<username> keeps the player open across actions. */
+
+async function renderOwner(name) {
+  const path = location.pathname
+  document.title = 'Owner · Vela Arcade'
+  document.body.classList.remove('is-playing')
+  const me = Account.current()
+  const head = '<div class="toolbar"><h1>Owner</h1></div>'
+  if (!me || !me.owner) { app.innerHTML = `<div class="wrap">${head}</div>`; return }
+  app.innerHTML = `<div class="wrap">${head}</div>`
+  const [s, p] = await Promise.all([
+    Account.staff().catch(() => null),
+    name ? Account.profile(name) : Promise.resolve(null),
+  ])
+  if (location.pathname !== path) return
+  if (!s) {
+    app.innerHTML = `<div class="wrap">${head}<p class="board-note staff-note">Could not load.</p></div>`
+    return
+  }
+
+  const tool = (act, q, label, extra = '') => `<button class="mod-btn" data-act="${act}" data-id="${esc(q.uid)}" data-name="${esc(q.name)}"${extra}>${label}</button>`
+  const row = (q, tools = '') => `<li><a class="who" href="/owner/${esc(q.name)}" data-link><span class="who-name">${esc(q.name)}</span></a><span></span>${tools}</li>`
+  const list = (items, toolsFor) => items.length
+    ? `<ol class="board-list staff-list">${items.map((q) => row(q, toolsFor(q))).join('')}</ol>`
+    : '<p class="board-note">None</p>'
+
+  let player = ''
+  // A ban removes the profile, so a banned player is found on the ban list.
+  const gone = name && !p && s.bans.find((q) => q.name.toLowerCase() === name.toLowerCase())
+  if (gone) {
+    const wasMod = s.mods.some((q) => q.uid === gone.uid)
+    player = `
+      <div class="op-card">
+        <span class="set-id"><span><strong>${esc(gone.name)}</strong></span><span class="pf-at">Banned${wasMod ? ' &middot; Moderator' : ''} &middot; @${esc(gone.name)}</span></span>
+        <div class="op-actions">${tool('unban', gone, 'Unban')}${wasMod ? tool('demote', gone, 'Remove moderator') : ''}</div>
+      </div>`
+  } else if (name && !p) player = `<p class="board-note">${p === null ? 'No player with that username' : 'Could not load this player.'}</p>`
+  else if (p) {
+    const games = boardGames().filter((g) => p.bests[g.slug] > 0)
+    const ranks = await Account.ranks([...new Set([...games.map((g) => g.slug), ...tagGames([p])])])
+    if (location.pathname !== path) return
+    const place = (slug) => placeIn(ranks, slug, p.uid)
+    games.sort((a, b) => (place(a.slug) || 99) - (place(b.slug) || 99))
+    const role = s.owners.some((q) => q.uid === p.uid) ? 'owner' : s.mods.some((q) => q.uid === p.uid) ? 'mod' : ''
+    const banned = s.bans.some((q) => q.uid === p.uid)
+    const shown = p.display || p.name
+    const facts = [role === 'owner' ? 'Owner' : role === 'mod' ? 'Moderator' : '', banned ? 'Banned' : '', `@${esc(p.name)}`,
+      p.joined ? `Joined ${p.joined.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''].filter(Boolean)
+    player = `
+      <div class="op-card">
+        <a class="op-id" href="/u/${esc(p.name)}" data-link>${avatarHTML(p, 'lg')}
+          <span class="set-id"><span><strong class="${p.flair ? 'orange' : ''}">${esc(shown)}</strong>${tagsHTML(p, ranks)}</span><span class="pf-at">${facts.join(' &middot; ')}</span></span>
+        </a>
+        ${role === 'owner' ? '' : `<div class="op-actions">
+          ${tool('rename', p, 'Rename', ` data-display="${esc(shown)}"`)}
+          ${tool(role === 'mod' ? 'demote' : 'promote', p, role === 'mod' ? 'Remove moderator' : 'Make moderator')}
+          ${tool('reset', p, 'Reset profile')}
+          ${banned ? tool('unban', p, 'Unban') : tool('ban', p, 'Ban')}
+        </div>`}
+        ${games.length ? `<ol class="board-list pf-list">${games.map((g) => `
+          <li><a class="pf-row" href="/leaderboards/${g.slug}" data-link>${art(g, 'mini')}<span>${esc(g.title)}</span></a>${place(g.slug) ? tagHTML(g.slug, place(g.slug)) : '<span></span>'}<span class="pts">${fmt(p.bests[g.slug])}</span>${role === 'owner' && p.uid !== me.uid ? '<span></span>' : tool('record', p, 'Remove', ` data-slug="${g.slug}" data-score="${p.bests[g.slug]}"`)}</li>`).join('')}
+        </ol>` : '<p class="board-note">No scores yet</p>'}
+      </div>`
+  }
+
+  app.innerHTML = `
+    <div class="wrap">
+      ${head}
+      <div class="staff owner-panel">
+        <section class="set">
+          <h2 class="label">Player</h2>
+          <form class="set-row staff-add" id="owner-find" novalidate>
+            <input class="staff-input" name="username" placeholder="Username" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(p ? p.name : name || '')}" />
+            <button class="btn" type="submit">Find</button>
+          </form>
+          ${player}
+        </section>
+        <section class="set">
+          <h2 class="label">Moderators</h2>
+          ${list(s.mods, (q) => tool('demote', q, 'Remove'))}
+        </section>
+        <section class="set">
+          <h2 class="label">Banned</h2>
+          ${list(s.bans, (q) => tool('unban', q, 'Unban'))}
+        </section>
+        <section class="set">
+          <h2 class="label">Owners</h2>
+          ${list(s.owners, () => '')}
+        </section>
+      </div>
+    </div>`
+
+  document.getElementById('owner-find').addEventListener('submit', (e) => {
+    e.preventDefault()
+    const n = e.target.username.value.trim()
+    navigate(n ? `/owner/${encodeURIComponent(n)}` : '/owner')
+  })
+}
+
 /* ── routing ─────────────────────────────────────────────────── */
 
 function route() {
@@ -923,6 +1025,7 @@ function route() {
   else if (/^\/rules(\/[\w-]+)?\/?$/.test(location.pathname)) renderRules(location.pathname.split('/')[2])
   else if (location.pathname.replace(/\/$/, '') === '/settings') renderSettings()
   else if (location.pathname.replace(/\/$/, '') === '/staff') renderStaff()
+  else if (/^\/owner(\/\w+)?\/?$/.test(location.pathname)) renderOwner(location.pathname.split('/')[2])
   else if (/^\/u\/\w+\/?$/.test(location.pathname)) renderProfile(location.pathname.split('/')[2])
   else renderMissing()
   const here = '/' + (location.pathname.split('/')[1] || '')
@@ -954,6 +1057,7 @@ const accountEl = document.getElementById('account')
 const personIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5" fill="none" stroke="currentColor" stroke-width="2"/></svg>'
 
 function renderAccount({ user }) {
+  document.getElementById('nav-owner').hidden = !(user && user.owner)
   if (!user) {
     accountEl.innerHTML = `
       <button class="account-btn" id="sign-in" aria-label="Sign in">
@@ -969,7 +1073,7 @@ function renderAccount({ user }) {
       <span class="label">${esc(user.display || user.name)}${user.owner ? ' &middot; Owner' : user.mod ? ' &middot; Moderator' : ''}</span>
       <a class="account-item" href="/u/${esc(user.name)}" data-link>Profile</a>
       <a class="account-item" href="/settings" data-link>Settings</a>
-      ${user.mod ? '<a class="account-item" href="/staff" data-link>Staff</a>' : ''}
+      ${user.owner ? '<a class="account-item" href="/owner" data-link>Owner</a>' : user.mod ? '<a class="account-item" href="/staff" data-link>Staff</a>' : ''}
       <div class="account-switch">${Account.otherAccounts().map((s) => `
         <button class="account-other" data-app="${esc(s.app)}">${avatarHTML(s, 'sm')}<span>${esc(s.display || s.name)}</span></button>`).join('')}
         ${Account.canAddAccount() ? '<button class="account-item" id="add-account">Add account</button>' : ''}
@@ -1009,7 +1113,7 @@ Account.onChange((state) => {
   const who = u ? u.uid + (u.mod ? ':mod' : '') + (u.owner ? ':own' : '') + (u.display ? ':p' : '') : null
   if (who !== lastUser) {
     lastUser = who
-    if (/^\/(settings|staff|u\/)/.test(location.pathname)) route()
+    if (/^\/(settings|staff|owner|u\/)/.test(location.pathname)) route()
     else refreshBoard()
   }
 })

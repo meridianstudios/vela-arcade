@@ -78,6 +78,32 @@ function localBests() {
   return out
 }
 
+// The bests on this device (which the games read and write) belong to one
+// account at a time: BESTS_OF holds its uid, or '' when they are nobody's
+// (played signed out). Changing account puts the last one's away under
+// STASH + uid and brings the next one's back, so one account's records never
+// land on another. Bests played signed out go to whichever account signs in.
+// Returns true when the bests on the device changed.
+const BESTS_OF = 'vela:bests-of'
+const STASH = 'vela:bests:'
+function useBestsOf(uid) {
+  const was = storage.get(BESTS_OF) || ''
+  if (was === uid) return false
+  if (was) {
+    const mine = localBests()
+    storage.set(STASH + was, JSON.stringify(mine))
+    for (const slug of Object.keys(mine)) storage.del(BEST + slug)
+  }
+  if (uid) {
+    let back = {}
+    try { back = JSON.parse(storage.get(STASH + uid) || '{}') } catch {}
+    for (const [slug, n] of Object.entries(back)) if (n > (Number(storage.get(BEST + slug)) || 0)) storage.set(BEST + slug, String(n))
+    storage.del(STASH + uid)
+  }
+  storage.set(BESTS_OF, uid)
+  return true
+}
+
 /* ── names ─────────────────────────────────────────────────────── */
 
 // Names show on public leaderboards, so the obvious slurs and swears are out.
@@ -158,6 +184,7 @@ function load() {
         storage.set(FLAG, '1')
         const known = saved().find((s) => s.app === fb.app)
         remember({ ...known, app: fb.app, name: user.name })
+        if (useBestsOf(u.uid)) emit({ bestsChanged: true })
         // A brand-new account has no display name for a moment; createAccount
         // syncs once it is set, so leaderboard entries get the right case.
         if (u.displayName) sync()
@@ -178,6 +205,8 @@ function load() {
           const next = saved()[0]
           if (next) return switchTo(next.app)
         }
+        // Signed out: the account's bests go away with it.
+        if (useBestsOf('')) return emit({ bestsChanged: true })
       }
       emit()
     })
@@ -429,12 +458,13 @@ export async function changePassword(current, next) {
   try { await fb.auth.updatePassword(fb.a.currentUser, next) } catch (e) { throw new Error(message(e)) }
 }
 
-// Removes the account, its profile and its leaderboard entries. Bests stay on
+// Removes the account, its profile, its leaderboard entries and its bests on
 // this device. The username is free again afterwards.
 export async function deleteAccount(password, slugs) {
   if (!user) throw new Error('Not signed in')
   await reauth(password)
   const { store } = fb
+  const uid = user.uid
   try {
     await Promise.all([...new Set([...slugs, ...Object.keys(cloud)])].map((slug) => store.deleteDoc(boardRef(slug)).catch(() => {})))
     await store.deleteDoc(profileRef()).catch(() => {})
@@ -442,6 +472,9 @@ export async function deleteAccount(password, slugs) {
     forget(fb.app)
     await fb.auth.deleteUser(fb.a.currentUser)
   } catch (e) { throw new Error(message(e)) }
+  // Signing out put them away under the account; nobody can bring them back.
+  useBestsOf('')
+  storage.del(STASH + uid)
   const next = saved()[0]
   if (next) switchTo(next.app)
 }
