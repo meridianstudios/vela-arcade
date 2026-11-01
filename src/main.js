@@ -138,12 +138,18 @@ function renderHome() {
 
   app.innerHTML = `
     <div class="wrap">
-      <div class="toolbar">
-        <h1>Games<span class="count">${GAMES.filter(playable).length}</span><button class="random" id="random">Random</button></h1>
-        <div class="tabs" role="tablist" aria-label="Filter games">
-          ${tabs.map((t) => `<button class="tab${t === activeTag ? ' on' : ''}" data-tag="${t}" role="tab" aria-selected="${t === activeTag}">${t}</button>`).join('')}
+      <header class="lobby-head">
+        <h1>Games<span class="count">${GAMES.filter(playable).length}</span></h1>
+        <div class="filter">
+          <div class="tabs" role="tablist" aria-label="Filter games">
+            ${tabs.map((t) => `<button class="tab${t === activeTag ? ' on' : ''}" data-tag="${t}" role="tab" aria-selected="${t === activeTag}">${t}</button>`).join('')}
+          </div>
+          <button class="random" id="random">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"/><g fill="currentColor"><rect x="7.5" y="7.5" width="3" height="3"/><rect x="13.5" y="13.5" width="3" height="3"/><rect x="10.5" y="10.5" width="3" height="3"/></g></svg>
+            Random
+          </button>
         </div>
-      </div>
+      </header>
       ${recent.length ? `
       <div class="recent-row">
         <span class="label">Recent</span>

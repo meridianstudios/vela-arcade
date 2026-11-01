@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.9.1',
+    date: '2026-11-01',
+    games: [],
+    changes: [
+      'A new lobby header: the title and filters are centred, with Random beside the filters.',
+    ],
+  },
+  {
     version: '1.9',
     date: '2026-11-01',
     games: [],
