@@ -739,34 +739,6 @@ export const CATALOGUE = [
     art: `<g fill="currentColor"><rect x="9" y="12" width="24" height="34" transform="rotate(-12 21 29)" opacity=".45"/><rect x="23" y="9" width="24" height="34" transform="rotate(7 35 26)"/><path transform="rotate(7 35 26) translate(28 17) scale(.14)" d="M50 5C64 24 94 40 94 62C94 76 83 84 71 84C63 84 57 80 53 74C54 82 58 89 65 95H35C42 89 46 82 47 74C43 80 37 84 29 84C17 84 6 76 6 62C6 40 36 24 50 5Z" style="fill:var(--tile)"/><circle cx="45" cy="47" r="14" style="fill:var(--tile)"/><circle cx="45" cy="47" r="11"/><circle cx="45" cy="47" r="7" style="fill:var(--tile)"/><circle cx="45" cy="47" r="4"/></g>`,
   },
   {
-    slug: 'baccarat',
-    title: 'Baccarat',
-    description:
-      'Punto Banco from an eight-deck shoe with a bankroll that carries over between visits. Bet on Player at 1 to 1, Banker at 0.95 to 1, Tie at 8 to 1, or either pair at 11 to 1, and the cards are drawn by the standard third-card rules. A bead road tracks every result until the cut card comes out and the shoe is reshuffled.',
-    kind: 'inhouse',
-    src: '/games/baccarat/index.html',
-    tags: ['Solo', 'Cards', 'Casino'],
-    players: '1 player',
-    controls: 'Pick a chip and tap a bet, then Deal. Keys: 1 to 4 chips, P player, B banker, T tie, R rebet, C clear, Enter deals.',
-    scores: true,
-    bestLabel: 'Best bankroll',
-    art: `<g fill="currentColor"><rect x="7" y="8" width="23" height="33" opacity=".45"/><path d="M18.5 15L24 24.5L18.5 34L13 24.5Z" style="fill:var(--tile)"/><rect x="34" y="8" width="23" height="33"/><path d="M45.5 15L51 24.5L45.5 34L40 24.5Z" style="fill:var(--tile)"/><rect x="7" y="46" width="11" height="11"/><rect x="20" y="46" width="11" height="11" opacity=".45"/><rect x="33" y="46" width="11" height="11"/><rect x="46" y="46" width="11" height="11"/></g>`,
-  },
-  {
-    slug: 'craps',
-    title: 'Craps',
-    description:
-      "Craps on a full table with a bankroll that carries over between visits. Bet Pass Line, Don't Pass, Come and Don't Come with 3-4-5x odds, plus the Field, place bets, hardways and one-roll props at the standard payouts. The puck tracks the point and contract bets stay up until they win or lose.",
-    kind: 'inhouse',
-    src: '/games/craps/index.html',
-    tags: ['Solo', 'Casino'],
-    players: '1 player',
-    controls: 'Pick a chip, tap the table to bet, then Roll. Right click or long press takes a bet down. Keys: 1 to 5 chips, Z undo, C clear, O max odds, Space rolls or skips.',
-    scores: true,
-    bestLabel: 'Best bankroll',
-    art: `<g fill="currentColor"><rect x="6" y="22" width="28" height="28" transform="rotate(-14 20 36)" opacity=".45"/><g transform="rotate(-14 20 36)" style="fill:var(--tile)"><circle cx="13" cy="29" r="2.8"/><circle cx="27" cy="43" r="2.8"/></g><rect x="28" y="10" width="30" height="30" transform="rotate(10 43 25)"/><g transform="rotate(10 43 25)" style="fill:var(--tile)"><circle cx="35" cy="17" r="3"/><circle cx="43" cy="25" r="3"/><circle cx="51" cy="33" r="3"/></g><rect x="8" y="55" width="48" height="3" opacity=".35"/></g>`,
-  },
-  {
     slug: 'hi-lo',
     title: 'Hi-Lo',
     description:
@@ -779,20 +751,6 @@ export const CATALOGUE = [
     scores: true,
     bestLabel: 'Best bankroll',
     art: `<g fill="currentColor"><rect x="8" y="16" width="26" height="36" transform="rotate(-10 21 34)" opacity=".45"/><rect x="26" y="10" width="30" height="44"/><path d="M41 16L49 26H33Z" style="fill:var(--tile)"/><path d="M41 48L33 38H49Z" style="fill:var(--tile)"/></g>`,
-  },
-  {
-    slug: 'keno',
-    title: 'Keno',
-    description:
-      'Pick 1 to 10 numbers on an 80-number board, set a stake and watch 20 numbers drawn one at a time. Pays follow a standard video keno paytable shown for your spot count, with auto-play for a set number of rounds. Your bankroll carries over between visits.',
-    kind: 'inhouse',
-    src: '/games/keno/index.html',
-    tags: ['Casino', 'Solo'],
-    players: '1 player',
-    controls: 'Tap numbers to pick them. Space plays or skips the draw, Q quick pick, C clear, A auto or stop.',
-    scores: true,
-    bestLabel: 'Best bankroll',
-    art: `<g fill="currentColor"><rect x="6" y="6" width="10" height="10" opacity=".3"/><rect x="20" y="6" width="10" height="10"/><rect x="34" y="6" width="10" height="10" opacity=".3"/><rect x="48" y="6" width="10" height="10" opacity=".3"/><rect x="6" y="20" width="10" height="10" opacity=".3"/><rect x="20" y="20" width="10" height="10" opacity=".3"/><rect x="34" y="20" width="10" height="10"/><rect x="36.5" y="22.5" width="5" height="5" style="fill:var(--tile)"/><rect x="48" y="20" width="10" height="10"/><rect x="6" y="34" width="10" height="10"/><rect x="20" y="34" width="10" height="10" opacity=".3"/><rect x="34" y="34" width="10" height="10" opacity=".3"/><rect x="48" y="34" width="10" height="10" opacity=".3"/><rect x="6" y="48" width="10" height="10" opacity=".3"/><rect x="20" y="48" width="10" height="10"/><rect x="22.5" y="50.5" width="5" height="5" style="fill:var(--tile)"/><rect x="34" y="48" width="10" height="10"/><rect x="48" y="48" width="10" height="10" opacity=".3"/></g>`,
   },
   {
     slug: 'bowling',
