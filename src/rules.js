@@ -218,4 +218,95 @@ export const RULES = {
       'Flag squares you are sure hide mines. Tap a number whose mines are all flagged to open the rest around it.',
     ] },
   ],
+
+  baccarat: [
+    { h: 'A hand', items: [
+      'Played from an 8-deck shoe. Bet on Player, Banker or Tie, and on either pair if you like, then deal.',
+      'Player and Banker each get two cards. Tens and face cards count 0, aces count 1, other cards count their number. Only the last digit of the total counts, so 7 and 8 make 5.',
+      'The hand closer to 9 wins.',
+    ] },
+    { h: 'Third card', items: [
+      'A total of 8 or 9 on the first two cards is a natural, and neither hand draws.',
+      'Otherwise Player draws on 0 to 5 and stands on 6 or 7.',
+      'If Player stood, Banker draws on 0 to 5 and stands on 6 or 7.',
+      "If Player drew, Banker draws on 0 to 2; on 3 unless Player's third card is an 8; on 4 if it is 2 to 7; on 5 if it is 4 to 7; on 6 if it is 6 or 7. Banker stands on 7.",
+    ] },
+    { h: 'Payouts', items: [
+      'Player pays 1 to 1. Banker pays 1 to 1 less 5% commission, so 0.95 to 1.',
+      'Tie pays 8 to 1. On a tie, Player and Banker bets are returned.',
+      "Player pair and Banker pair pay 11 to 1 when that side's first two cards are the same rank.",
+    ] },
+    { h: 'The shoe', items: [
+      'The cut card sits 16 cards from the end. When it comes out, the hand is finished and the shoe is reshuffled before the next one.',
+      'The bead road shows every result in the current shoe, top to bottom and column by column. A dot in the top left corner marks a Banker pair, one in the bottom right a Player pair.',
+    ] },
+  ],
+
+  craps: [
+    { h: 'The roll', items: [
+      'Two dice are rolled. The first roll of a round is the come out roll.',
+      'On the come out, 7 or 11 wins for the Pass Line and 2, 3 or 12 loses. Any other total becomes the point and the puck turns ON.',
+      'With the point on, rolling it again wins for the Pass Line and a 7 loses. Either one ends the round and the next roll is a new come out.',
+    ] },
+    { h: 'Line bets', items: [
+      "Pass Line and Don't Pass go down on the come out and pay 1 to 1. Don't Pass is the opposite of Pass, except that 12 on the come out is a push.",
+      "Come and Don't Come work the same way but go down while a point is on. The next roll is their own come out, and a point number moves the bet into that number's box.",
+      "Pass Line and Come bets on a number cannot be taken down. Don't bets on a number also stay up until they win or lose.",
+    ] },
+    { h: 'Odds', items: [
+      'Behind a line or come bet on a number you can add odds at true odds: 2 to 1 on 4 and 10, 3 to 2 on 5 and 9, 6 to 5 on 6 and 8.',
+      'Odds go up to 3 times the bet on 4 and 10, 4 times on 5 and 9, and 5 times on 6 and 8.',
+      "Lay odds on don't bets go up to 6 times the bet and pay 1 to 2 on 4 and 10, 2 to 3 on 5 and 9, 5 to 6 on 6 and 8.",
+      'Odds on come bets are off on the come out roll and come back to you if that roll settles the bet.',
+    ] },
+    { h: 'Other bets', items: [
+      'Field wins on 2, 3, 4, 9, 10, 11 and 12 for one roll. 2 and 12 pay 2 to 1, the rest 1 to 1.',
+      'Place bets win when their number rolls before a 7: 9 to 5 on 4 and 10, 7 to 5 on 5 and 9, 7 to 6 on 6 and 8.',
+      'Hardways win when the number rolls as a pair before it rolls any other way or a 7. Hard 4 and 10 pay 7 to 1, hard 6 and 8 pay 9 to 1.',
+      'Place bets and hardways are off on the come out roll.',
+      'One roll bets: Any 7 pays 4 to 1, Any craps (2, 3 or 12) 7 to 1, 3 and 11 pay 15 to 1, 2 and 12 pay 30 to 1.',
+    ] },
+    { h: 'Chips', items: [
+      "Winning Pass Line, Don't Pass, Field, place, hardway and one roll bets stay on the table and keep working. Come bets and odds come back with their winnings.",
+      'Right click or long press a bet to take it down. Payouts round down to a whole chip.',
+    ] },
+  ],
+
+  'hi-lo': [
+    { h: 'A round', items: [
+      'Place a bet and one card is turned up. Ace is low and king is high.',
+      'Guess whether the next card is higher or the same, or lower or the same.',
+      'Cards come from an endless deck, so every rank is equally likely on every draw.',
+    ] },
+    { h: 'Payouts', items: [
+      'Each right guess multiplies your payout by 0.99 x 13 divided by the number of ranks that win. The multiplier and the chance are shown on each button.',
+      'On an ace the two choices become Higher and Same. On a king they become Same and Lower.',
+      'Cash out after any right guess to take your bet times the multiplier. A wrong guess loses the bet.',
+    ] },
+    { h: 'Skips', items: [
+      'Skip a card you do not like to draw a new one without changing the payout. You get five skips a round.',
+    ] },
+  ],
+
+  keno: [
+    { h: 'Picking', items: [
+      'The board has numbers 1 to 80. Pick from 1 to 10 of them; each one is a spot.',
+      'Quick pick chooses random numbers, keeping how many spots you have, and Clear empties the board.',
+      'Your picks stay on the board for the next round until you change them.',
+    ] },
+    { h: 'The draw', items: [
+      'Play takes your stake and draws 20 different numbers at random.',
+      'Each drawn number you picked is a hit. Hits light up orange, other drawn numbers turn grey.',
+    ] },
+    { h: 'Pays', items: [
+      'The paytable shows what each number of hits pays for your spot count, as a multiple of the stake, and the odds of getting it.',
+      'The pay includes your stake: pays 2x on a stake of 10 returns 20. Hit counts not on the table pay nothing.',
+      'The table is a standard video keno paytable. It returns about 90 to 93 percent of stakes over time for 2 to 10 spots, and 75 percent for 1 spot.',
+    ] },
+    { h: 'Auto and bankroll', items: [
+      'Auto plays the set number of rounds with the same picks and stake. Stop ends it after the round being drawn.',
+      'Auto also stops when the bankroll cannot cover the stake.',
+      'You start with 1,000 chips. If you run out, New bankroll gives you a fresh 1,000.',
+    ] },
+  ],
 }

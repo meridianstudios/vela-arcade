@@ -25,6 +25,12 @@ const recents = () => store.get('vela:recent', []).filter((s) => bySlug(s) && pl
 function markPlayed(slug) {
   store.set('vela:recent', [slug, ...recents().filter((s) => s !== slug)].slice(0, 6))
 }
+const favs = () => store.get('vela:favs', []).filter((s) => bySlug(s) && playable(bySlug(s)))
+const isFav = (slug) => favs().includes(slug)
+function toggleFav(slug) {
+  store.set('vela:favs', isFav(slug) ? favs().filter((s) => s !== slug) : [...favs(), slug])
+}
+const FAVS = 'Favourites'
 
 /* ── helpers ─────────────────────────────────────────────────── */
 
@@ -104,13 +110,15 @@ function renderHome() {
   document.title = 'Vela Arcade'
   document.body.classList.remove('is-playing')
   const recent = recents().map(bySlug)
+  if (activeTag === FAVS && !favs().length) activeTag = 'All'
+  const tabs = ['All', ...(favs().length ? [FAVS] : []), ...TAGS]
 
   app.innerHTML = `
     <div class="wrap">
       <div class="toolbar">
-        <h1>Games<span class="count">${GAMES.filter(playable).length}</span></h1>
+        <h1>Games<span class="count">${GAMES.filter(playable).length}</span><button class="random" id="random">Random</button></h1>
         <div class="tabs" role="tablist" aria-label="Filter games">
-          ${['All', ...TAGS].map((t) => `<button class="tab${t === activeTag ? ' on' : ''}" data-tag="${t}" role="tab" aria-selected="${t === activeTag}">${t}</button>`).join('')}
+          ${tabs.map((t) => `<button class="tab${t === activeTag ? ' on' : ''}" data-tag="${t}" role="tab" aria-selected="${t === activeTag}">${t}</button>`).join('')}
         </div>
       </div>
       ${recent.length ? `
@@ -137,7 +145,8 @@ function applyFilter() {
   app.querySelectorAll('.grid .card').forEach((el) => {
     const g = bySlug(el.dataset.slug)
     const text = `${g.title} ${g.tags.join(' ')}`.toLowerCase()
-    const ok = (activeTag === 'All' || g.tags.includes(activeTag)) && (!q || text.includes(q))
+    const inTab = activeTag === 'All' || (activeTag === FAVS ? isFav(g.slug) : g.tags.includes(activeTag))
+    const ok = inTab && (!q || text.includes(q))
     el.hidden = !ok
     if (ok) shown++
   })
@@ -150,6 +159,12 @@ function applyFilter() {
 }
 
 app.addEventListener('click', (e) => {
+  // Random picks from whatever the filter and search are showing.
+  if (e.target.closest('#random')) {
+    const shown = [...app.querySelectorAll('.grid a.card:not([hidden])')]
+    if (shown.length) navigate(shown[Math.floor(Math.random() * shown.length)].getAttribute('href'))
+    return
+  }
   const tab = e.target.closest('.tab')
   if (!tab) return
   activeTag = tab.dataset.tag
@@ -346,6 +361,9 @@ function renderPlay(slug) {
           <h1>${esc(g.title)}</h1>
         </div>
         <div class="player-actions">
+          <button class="icon-btn fav${isFav(slug) ? ' on' : ''}" id="fav" aria-label="Favourite" aria-pressed="${isFav(slug)}" title="Favourite">
+            <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
           <button class="icon-btn" id="restart" aria-label="Reload game" title="Reload">
             <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
           </button>
@@ -423,6 +441,12 @@ function renderPlay(slug) {
   stage.addEventListener('pointerdown', focusFrame)
 
   if (hasBoard(g)) showBoard(g)
+
+  document.getElementById('fav').addEventListener('click', (e) => {
+    toggleFav(slug)
+    e.currentTarget.classList.toggle('on', isFav(slug))
+    e.currentTarget.setAttribute('aria-pressed', isFav(slug))
+  })
 
   document.getElementById('restart').addEventListener('click', () => {
     loader.classList.remove('gone')

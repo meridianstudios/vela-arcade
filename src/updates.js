@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.8',
+    date: '2026-11-01',
+    games: ['baseball-manager', 'baccarat', 'craps', 'keno', 'hi-lo', 'bowling'],
+    changes: [
+      'Favourites: star a game from its page and it gets its own tab in the lobby.',
+      'Random picks a game from whatever the lobby is showing.',
+    ],
+  },
+  {
     version: '1.7.2',
     date: '2026-11-01',
     games: [],

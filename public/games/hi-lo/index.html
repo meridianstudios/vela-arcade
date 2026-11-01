@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Hi-Lo</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000000;
+    --bg-2: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --surface-3: #2a2e35;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --red: #ff7a4d;
+    --blk: #e4e6ea;
+    --face: #1d2025;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --gap: 10px;
+    --pad: 12px;
+    --cw: 150px;
+    --ch: 210px;
+    --mw: 30px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* ---------- layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    margin: 0 auto;
+    max-width: 1120px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "head" "stage" "panel";
+    gap: var(--gap);
+    padding: var(--pad);
+    visibility: hidden;
+  }
+  .app.ready { visibility: visible; }
+  .app.side {
+    grid-template-columns: minmax(0, 1fr) clamp(17em, 30vw, 21em);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "stage head" "stage panel";
+  }
+
+  .head { grid-area: head; display: flex; gap: 0.5em; align-items: stretch; min-width: 0; }
+  .brand { flex: 1 1 auto; align-self: center; min-width: 0; padding-right: 0.5em; }
+  .brand h1 {
+    margin: 0;
+    font: 600 1.05em/1 var(--font);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .brand h1::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .head.nobrand .brand { display: none; }
+  .head.nobrand .stat { flex: 1 1 0; }
+
+  .stat {
+    position: relative;
+    min-width: 7.2em;
+    padding: 0.5em 0.85em 0.55em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .lab {
+    display: block;
+    font: 600 clamp(11px, 0.66em, 12px)/1.2 var(--font);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .num {
+    display: block;
+    font: 600 1.4em/1.15 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    margin-top: 0.15em;
+    white-space: nowrap;
+    overflow: hidden;
+    transform-origin: 0 60%;
+    transition: color 300ms var(--ease);
+  }
+  .num.gain { color: var(--brand-hover); transition: none; }
+  .num.bump { animation: bump 260ms var(--ease); }
+  @keyframes bump { 35% { transform: scale(1.12); color: var(--brand-hover); } }
+
+  /* ---------- stage ---------- */
+  .stage {
+    grid-area: stage;
+    position: relative;
+    min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: var(--gap);
+  }
+  .table {
+    position: relative;
+    flex: none;
+    width: var(--cw); height: var(--ch);
+  }
+  .table.shake { animation: shake 440ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+  @keyframes shake {
+    10% { transform: translate(-7px, 2px); }
+    25% { transform: translate(8px, -3px); }
+    40% { transform: translate(-6px, 2px); }
+    55% { transform: translate(5px, -1px); }
+    70% { transform: translate(-3px, 1px); }
+    85% { transform: translate(2px, 0); }
+  }
+  .slot { position: absolute; inset: 0; }
+  .slot::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+
+  /* big card */
+  .cd {
+    position: absolute; inset: 0;
+    perspective: calc(var(--cw) * 5);
+    transition: transform 380ms var(--ease), opacity 260ms var(--ease);
+  }
+  .cd.enter { transform: translate(34%, -7%); opacity: 0; }
+  .cd.out { opacity: 0; transform: scale(0.94); transition: transform 240ms var(--ease), opacity 200ms ease-in; }
+  .cd .fl {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 380ms var(--ease);
+  }
+  .cd.up .fl { transform: rotateY(180deg); }
+  .bk, .fc {
+    position: absolute; inset: 0;
+    border-radius: 2px;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    overflow: hidden;
+  }
+  .bk { background: var(--brand); box-shadow: inset 0 0 0 1px var(--brand-dark); }
+  .bk::before {
+    content: "";
+    position: absolute; inset: 7%;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+  }
+  .bk::after {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 24%; aspect-ratio: 1;
+    background: var(--brand-dark);
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+  .fc {
+    transform: rotateY(180deg);
+    background: var(--face);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    color: var(--blk);
+  }
+  .fc.red { color: var(--red); }
+  .ix {
+    position: absolute;
+    left: 0; top: calc(var(--cw) * 0.06);
+    width: calc(var(--cw) * 0.24);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .ix.b { left: auto; top: auto; right: 0; bottom: calc(var(--cw) * 0.06); transform: rotate(180deg); }
+  .ix b {
+    font: 600 calc(var(--cw) * 0.17)/1 var(--font);
+    letter-spacing: -0.06em;
+    margin-left: -0.06em;
+  }
+  .ix svg { width: calc(var(--cw) * 0.11); height: calc(var(--cw) * 0.11); margin-top: calc(var(--cw) * 0.035); display: block; fill: currentColor; }
+  .ctr {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .ctr b {
+    font: 300 calc(var(--cw) * 0.5)/0.9 var(--font-display);
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+  .ctr svg { width: calc(var(--cw) * 0.2); height: calc(var(--cw) * 0.2); margin-top: calc(var(--cw) * 0.07); display: block; fill: currentColor; }
+  .fc::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: #fff;
+    opacity: 0;
+  }
+  .cd.pop { animation: pop 340ms var(--ease); }
+  @keyframes pop {
+    0% { transform: scale(0.94); }
+    45% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+  .cd.win .fc { box-shadow: inset 0 0 0 2px var(--brand); }
+  .cd.hit .fc { box-shadow: inset 0 0 0 2px #fff; }
+  .cd.hit .fc::after { animation: flash 560ms linear; }
+  @keyframes flash {
+    0% { opacity: 0.9; }
+    30% { opacity: 0; }
+    50% { opacity: 0.6; }
+    100% { opacity: 0; }
+  }
+  .nt, .nt *, .nt *::before, .nt *::after { transition: none !important; animation: none !important; }
+
+  .fx { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 3; }
+  .pt {
+    position: absolute; left: 0; top: 0;
+    background: var(--brand-hover);
+    transition: transform 520ms var(--ease), opacity 520ms ease-in;
+  }
+
+  .result {
+    position: absolute; left: 50%; top: 50%;
+    z-index: 4;
+    min-width: 9.5em;
+    padding: 0.9em 1.3em 1em;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 2px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.86);
+    transition: opacity 200ms var(--ease), transform 300ms var(--ease);
+  }
+  .result.on { opacity: 1; transform: translate(-50%, -50%); }
+  .result.lose { border-color: var(--outline); }
+  .result .big {
+    display: block;
+    font: 300 2.6em/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .result.win .big { color: var(--brand-hover); }
+  .result.lose .big { color: var(--muted); }
+  .result .sub { margin-top: 0.55em; color: #fff; }
+  .result .tag {
+    display: inline-block;
+    margin-top: 0.6em;
+    padding: 0.45em 0.6em;
+    background: var(--brand);
+    color: #fff;
+    font: 600 11px/1 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .result .tag[hidden] { display: none; }
+
+  /* history row */
+  .hist { flex: none; width: 100%; min-width: 0; }
+  .hist[hidden] { display: none; }
+  .hwin {
+    position: relative;
+    height: calc(var(--mw) * 1.4 + 1.6em);
+    overflow: hidden;
+  }
+  .htrack {
+    position: absolute; left: 0; top: 0;
+    display: flex; gap: 2px;
+    transition: transform 320ms var(--ease);
+  }
+  .hi {
+    flex: none;
+    width: max(48px, calc(var(--mw) + 18px));
+    display: flex; flex-direction: column; align-items: center; gap: 0.3em;
+  }
+  .hi.in { animation: hin 300ms var(--ease) both; }
+  @keyframes hin { from { opacity: 0; transform: translateY(-8px); } }
+  .mc {
+    position: relative;
+    width: var(--mw); height: calc(var(--mw) * 1.4);
+    border-radius: 2px;
+    background: var(--face);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    color: var(--blk);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: calc(var(--mw) * 0.08);
+  }
+  .mc.red { color: var(--red); }
+  .mc b { font: 600 calc(var(--mw) * 0.42)/1 var(--font); letter-spacing: -0.05em; }
+  .mc svg { width: calc(var(--mw) * 0.34); height: calc(var(--mw) * 0.34); display: block; fill: currentColor; }
+  .hi.w .mc { box-shadow: inset 0 0 0 2px var(--brand); }
+  .hi.l .mc { box-shadow: inset 0 0 0 2px #fff; }
+  .hi.s .mc { opacity: 0.5; }
+  .ht {
+    display: flex; align-items: center; justify-content: center; gap: 0.15em;
+    height: 1.3em;
+    font: 600 10px/1 var(--font);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .ht svg { width: 8px; height: 8px; fill: currentColor; flex: none; }
+  .hi.w .ht { color: var(--brand-hover); }
+  .hi.l .ht { color: #fff; }
+
+  /* ---------- panel ---------- */
+  .panel {
+    grid-area: panel;
+    min-width: 0;
+    display: grid;
+    gap: var(--gap);
+    align-content: start;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(0, 0.7fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .stats > div { background: var(--surface); padding: 0.5em 0.7em 0.55em; min-width: 0; }
+  .stats .num { font-size: 1.25em; }
+  .stats .num.off { color: var(--muted); }
+  .app.side .stats .num { font-size: 1.35em; }
+
+  .guess { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap); }
+  .gb {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7em;
+    min-width: 0;
+    height: 4.4em;
+    padding: 0 0.8em;
+    border: 1px solid var(--outline);
+    border-radius: 0;
+    background: var(--surface);
+    text-align: left;
+    cursor: pointer;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), opacity 160ms var(--ease), transform 150ms var(--ease);
+  }
+  .gb:hover { background: var(--surface-2); border-color: var(--brand); }
+  .gb:active { transform: scale(0.97); background: var(--surface-3); }
+  .gb:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .gb:disabled, .gb:disabled:hover { cursor: default; background: var(--surface); border-color: var(--line); transform: none; }
+  .gb:disabled .gt { opacity: 0.45; }
+  .gb:disabled .gi { background: var(--surface-3); }
+  .gi {
+    width: 2.2em; height: 2.2em;
+    display: grid; place-items: center;
+    background: var(--brand);
+    color: #fff;
+    transition: background 160ms var(--ease);
+  }
+  .gi svg { width: 48%; height: 48%; display: block; fill: currentColor; }
+  .gt { min-width: 0; display: flex; flex-direction: column; gap: 0.3em; transition: opacity 160ms var(--ease); }
+  .gt .lab { overflow: hidden; text-overflow: ellipsis; color: #fff; }
+  .gm { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; white-space: nowrap; }
+  .gm b { font: 600 1.15em/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .gm i { font: 400 0.82em/1 var(--font); font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .app.side .guess { grid-template-columns: minmax(0, 1fr); }
+  .app.narrow .gb { padding: 0 0.6em; gap: 0.55em; }
+  .app.narrow .gi { width: 1.9em; height: 1.9em; }
+  .app.narrow .gm { flex-direction: column; align-items: flex-start; gap: 0.2em; }
+  .app.narrow .gt { gap: 0.25em; }
+
+  .field .lab { margin-bottom: 0.4em; }
+  .stp {
+    display: grid;
+    height: 2.9em;
+    border: 1px solid var(--outline);
+    border-radius: 2px;
+    transition: opacity 160ms var(--ease);
+  }
+  .stp.bet { grid-template-columns: 1fr 1fr 2.2fr 1fr 1fr; }
+  .stp button {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: 600 1.05em/1 var(--font);
+    cursor: pointer;
+    transition: background 140ms var(--ease), opacity 140ms var(--ease);
+  }
+  .stp button.small { font-size: 0.82em; letter-spacing: 0.04em; }
+  .stp > * + * { border-left: 1px solid var(--line); }
+  .stp button:hover { background: rgba(255, 255, 255, 0.08); }
+  .stp button:active { background: rgba(255, 255, 255, 0.14); }
+  .stp button:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: -2px; }
+  .stp button:disabled { opacity: 0.3; cursor: default; background: transparent; }
+  .stp .val {
+    display: grid; place-items: center;
+    min-width: 0;
+    font: 600 1.15em/1 var(--font-display);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .stp.lock .val { color: var(--muted); }
+
+  .acts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: var(--gap); height: 3.3em; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+    min-width: 0;
+    padding: 0 0.8em;
+    border-radius: 0;
+    border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 clamp(11px, 0.8rem, 13px) var(--font);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease), opacity 160ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn:disabled, .btn:disabled:hover { opacity: 0.3; cursor: default; background: transparent; border-color: var(--outline); transform: none; }
+  .btn.primary:disabled { background: var(--brand); border-color: var(--brand); }
+  .btn kbd { font: inherit; opacity: 0.55; }
+  .app:not(.wide) .btn kbd { display: none; }
+  .btn.cash { background: #fff; border-color: #fff; color: #000; }
+  .btn.cash:hover { background: #e4e6ea; border-color: #e4e6ea; }
+  .btn.cash:active { background: #c9ccd2; border-color: #c9ccd2; }
+  .btn.cash:disabled, .btn.cash:disabled:hover { background: #fff; border-color: #fff; }
+
+  /* ---------- overlay ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    padding: 12px;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.72);
+    opacity: 0;
+    transition: opacity 220ms var(--ease);
+  }
+  .overlay[hidden] { display: none; }
+  .overlay.show { opacity: 1; }
+  .card {
+    width: min(100%, 23em);
+    padding: 1.4em 1.4em 1.3em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    transform: translateY(24px);
+    transition: transform 300ms var(--ease);
+  }
+  .card[hidden] { display: none; }
+  .overlay.show .card { transform: none; }
+  .card h2 {
+    margin: 0;
+    font: 600 0.95em/1.1 var(--font);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+  .card h2::before {
+    content: "";
+    display: inline-block;
+    width: 0.62em; height: 0.62em;
+    margin-right: 0.62em;
+    background: var(--brand);
+    vertical-align: 0.02em;
+  }
+  .card .line { margin: 0.7em 0 0; color: var(--muted); font-size: 0.9em; line-height: 1.45; }
+  .ov-stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin-top: 1.1em;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+  }
+  .ov-stats > div { padding: 0.75em 0.85em 0.8em; min-width: 0; }
+  .ov-stats > div + div { border-left: 1px solid var(--line); }
+  .ov-stats .num { font-size: 2em; font-weight: 300; line-height: 1.1; }
+  .card .btns { display: flex; gap: 0.5em; margin-top: 1.2em; }
+  .card .btns .btn { flex: 1 1 8em; min-height: 3.3em; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cd, .cd .fl, .htrack, .result, .overlay, .card, .num, .gb, .gi, .gt { transition: none; }
+    .cd.pop, .cd.hit .fc::after, .table.shake, .num.bump, .hi.in { animation: none; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="su0" viewBox="0 0 100 100"><path d="M50 5C64 24 94 40 94 62C94 76 83 84 71 84C63 84 57 80 53 74C54 82 58 89 65 95H35C42 89 46 82 47 74C43 80 37 84 29 84C17 84 6 76 6 62C6 40 36 24 50 5Z"/></symbol>
+  <symbol id="su1" viewBox="0 0 100 100"><path d="M50 92C40 81 6 61 6 34C6 18 17 8 30 8C40 8 46 14 50 22C54 14 60 8 70 8C83 8 94 18 94 34C94 61 60 81 50 92Z"/></symbol>
+  <symbol id="su2" viewBox="0 0 100 100"><path d="M50 4L87 50L50 96L13 50Z"/></symbol>
+  <symbol id="su3" viewBox="0 0 100 100"><path d="M31 27a19 19 0 1 0 38 0a19 19 0 1 0-38 0ZM8 57a19 19 0 1 0 38 0a19 19 0 1 0-38 0ZM54 57a19 19 0 1 0 38 0a19 19 0 1 0-38 0ZM40 50a10 10 0 1 0 20 0a10 10 0 1 0-20 0ZM46 56Q46 82 34 95H66Q54 82 54 56Z"/></symbol>
+  <symbol id="arUp" viewBox="0 0 100 100"><path d="M50 14L92 70H8Z"/></symbol>
+  <symbol id="arDn" viewBox="0 0 100 100"><path d="M50 86L8 30H92Z"/></symbol>
+  <symbol id="arSk" viewBox="0 0 100 100"><path d="M14 14L58 50L14 86ZM56 14L100 50L56 86Z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <header class="head" id="head">
+    <div class="brand"><h1>Hi-Lo</h1></div>
+    <div class="stat"><span class="lab">Bankroll</span><span class="num" id="cashNum">1,000</span></div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="table" id="table">
+      <div class="slot" id="slot"></div>
+      <div class="fx" id="fx"></div>
+      <div class="result" id="result" aria-live="polite">
+        <span class="big" id="resBig"></span>
+        <span class="lab sub" id="resSub"></span>
+        <span class="tag" id="resTag" hidden>New best</span>
+      </div>
+    </div>
+    <div class="hist" id="hist">
+      <div class="hwin" id="hwin"><div class="htrack" id="htrack"></div></div>
+    </div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <div class="stats">
+      <div><span class="lab">Multiplier</span><span class="num" id="sMult">1.00x</span></div>
+      <div><span class="lab">Cash out</span><span class="num" id="sCash">0</span></div>
+      <div><span class="lab">Skips</span><span class="num" id="sSkip">5</span></div>
+    </div>
+    <div class="guess">
+      <button class="gb" id="hiBtn" type="button">
+        <span class="gi"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#arUp"/></svg></span>
+        <span class="gt"><span class="lab" id="hiLab">Higher or same</span><span class="gm"><b id="hiMult">-</b><i id="hiPct">-</i></span></span>
+      </button>
+      <button class="gb" id="loBtn" type="button">
+        <span class="gi"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#arDn"/></svg></span>
+        <span class="gt"><span class="lab" id="loLab">Lower or same</span><span class="gm"><b id="loMult">-</b><i id="loPct">-</i></span></span>
+      </button>
+    </div>
+    <div class="field">
+      <span class="lab">Bet</span>
+      <div class="stp bet" id="betStp">
+        <button type="button" class="small" id="betHalf" aria-label="Half bet">1/2</button>
+        <button type="button" id="betDown" aria-label="Lower bet">-</button>
+        <span class="val" id="betVal">10</span>
+        <button type="button" id="betUp" aria-label="Raise bet">+</button>
+        <button type="button" class="small" id="betDouble" aria-label="Double bet">2x</button>
+      </div>
+    </div>
+    <div class="acts">
+      <button class="btn" id="skipBtn" type="button">Skip <kbd>S</kbd></button>
+      <button class="btn primary" id="mainBtn" type="button">Bet</button>
+    </div>
+  </aside>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="card" id="startCard" role="dialog" aria-labelledby="startTitle" hidden>
+    <h2 id="startTitle">Hi-Lo</h2>
+    <p class="line">Up and Down guess, S skips, Space bets and cashes out.</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="stCash">1,000</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="stBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="playBtn" type="button">Play</button></div>
+  </div>
+  <div class="card" id="overCard" role="dialog" aria-labelledby="overTitle" aria-live="polite" hidden>
+    <h2 id="overTitle">Game over</h2>
+    <p class="line">Out of chips</p>
+    <div class="ov-stats">
+      <div><span class="lab">Bankroll</span><span class="num" id="ovCash">0</span></div>
+      <div><span class="lab">Best bankroll</span><span class="num" id="ovBest">1,000</span></div>
+    </div>
+    <div class="btns"><button class="btn primary" id="againBtn" type="button">New bankroll</button></div>
+  </div>
+</div>
+
+<script src="../_shared/bridge.js" data-game="hi-lo"></script>
+<script>
+(function () {
+  'use strict';
+
+  const V = window.Vela || { embedded: false, ready() {}, score() {}, gameOver() { return false; }, best() { return 0; }, onPause() {} };
+
+  /* ===== LOGIC START (pure, no DOM) ===== */
+  const HL = (function () {
+    const START = 100000, MAX_BET = 1000000, SKIPS = 5, RANKS = 13;
+    // Money is kept in whole cents. Bets are whole chips.
+    // A card is 0..51: suit * 13 + (rank - 1). Ace is low (rank 1), king is 13.
+    // Every draw is from an infinite deck: each of the 52 cards is equally likely every time.
+    const rankOf = (c) => c % 13 + 1;
+    const suitOf = (c) => Math.floor(c / 13) % 4;
+
+    // How many of the 13 ranks win a guess on rank r.
+    // 'hi' wins on the same rank or higher, 'lo' on the same rank or lower.
+    // On an ace 'hi' becomes strictly higher and 'lo' becomes same only;
+    // on a king 'hi' becomes same only and 'lo' becomes strictly lower.
+    function wins(r, dir) {
+      if (dir === 'hi') return r === 1 ? 12 : 14 - r;
+      return r === 13 ? 12 : r;
+    }
+    function beats(r, dir, n) {
+      if (dir === 'hi') return r === 1 ? n > r : n >= r;
+      return r === 13 ? n < r : n <= r;
+    }
+    function label(r, dir) {
+      if (dir === 'hi') return r === 1 ? 'Higher' : r === 13 ? 'Same' : 'Higher or same';
+      return r === 13 ? 'Lower' : r === 1 ? 'Same' : 'Lower or same';
+    }
+    function chance(r, dir) { return wins(r, dir) / RANKS; }
+    // Multiplier for one guess in ten-thousandths: 0.99 x 13 / winning ranks, rounded down.
+    function step(r, dir) { return Math.floor(128700 / wins(r, dir)); }
+
+    // Running multiplier as a number (for display).
+    function multOf(R) { let m = 1; for (const s of R.steps) m *= s / 10000; return m; }
+    // Cash out value in cents: bet x every step multiplier, rounded down, computed exactly.
+    function payout(R) {
+      let num = BigInt(R.bet) * 100n, den = 1n;
+      for (const s of R.steps) { num *= BigInt(s); den *= 10000n; }
+      const p = num / den;
+      return p > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(p);
+    }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const draw = (rnd) => Math.min(51, Math.floor(rnd() * 52));
+
+    function newState() {
+      return { v: 1, cash: START, bet: 10, peak: START, rid: 0, round: null };
+    }
+    function playing(S) { return !!(S.round && S.round.phase === 'play'); }
+    function maxBet(S) { return Math.min(MAX_BET, Math.floor(S.cash / 100)); }
+    function isBroke(S) { return !playing(S) && S.cash < 100; }
+
+    function setBet(S, v) {
+      if (playing(S)) return false;
+      v = clamp(Math.floor(v) || 1, 1, Math.max(1, maxBet(S)));
+      if (v === S.bet) return false;
+      S.bet = v;
+      return true;
+    }
+    function fitBet(S) {
+      if (!playing(S) && S.bet > maxBet(S) && S.cash >= 100) { S.bet = maxBet(S); return true; }
+      return false;
+    }
+
+    function canStart(S) { return !playing(S) && S.bet >= 1 && S.bet * 100 <= S.cash; }
+    function start(S, rnd) {
+      if (!canStart(S)) return false;
+      S.cash -= S.bet * 100;
+      S.round = { id: ++S.rid, bet: S.bet, cards: [{ c: draw(rnd || Math.random), g: 'start' }], steps: [], skips: SKIPS, phase: 'play', payout: 0, best: false };
+      return true;
+    }
+    function current(R) { return R.cards[R.cards.length - 1].c; }
+
+    // Returns { win, c } or null when no guess can be made.
+    function guess(S, dir, rnd) {
+      if (!playing(S) || (dir !== 'hi' && dir !== 'lo')) return null;
+      const R = S.round;
+      const r = rankOf(current(R));
+      const c = draw(rnd || Math.random);
+      const win = beats(r, dir, rankOf(c));
+      const s = step(r, dir);
+      R.cards.push({ c, g: dir, w: win, s });
+      if (win) R.steps.push(s);
+      else { R.phase = 'lost'; R.payout = 0; }
+      return { win, c };
+    }
+
+    function canSkip(S) { return playing(S) && S.round.skips > 0; }
+    function skip(S, rnd) {
+      if (!canSkip(S)) return -1;
+      const R = S.round;
+      const c = draw(rnd || Math.random);
+      R.skips--;
+      R.cards.push({ c, g: 'skip' });
+      return c;
+    }
+
+    function canCashOut(S) { return playing(S) && S.round.steps.length > 0; }
+    function cashOut(S) {
+      if (!canCashOut(S)) return false;
+      const R = S.round;
+      R.payout = payout(R);
+      S.cash = Math.min(Number.MAX_SAFE_INTEGER, S.cash + R.payout);
+      R.phase = 'won';
+      if (S.cash > S.peak) S.peak = S.cash;
+      return true;
+    }
+
+    function fresh(S) {
+      if (!isBroke(S)) return false;
+      S.cash = START;
+      S.bet = 10;
+      S.round = null;
+      return true;
+    }
+
+    function valid(S) {
+      if (!S || S.v !== 1) return false;
+      if (!Number.isInteger(S.cash) || S.cash < 0 || !Number.isInteger(S.bet) || S.bet < 1) return false;
+      if (!Number.isInteger(S.peak) || !Number.isInteger(S.rid)) return false;
+      const R = S.round;
+      if (R) {
+        if (!Number.isInteger(R.bet) || R.bet < 1 || !Array.isArray(R.cards) || !R.cards.length || !Array.isArray(R.steps)) return false;
+        if (['play', 'won', 'lost'].indexOf(R.phase) < 0) return false;
+        if (!Number.isInteger(R.skips) || R.skips < 0 || R.skips > SKIPS) return false;
+        if (R.cards.some((x) => !x || !Number.isInteger(x.c) || x.c < 0 || x.c > 51)) return false;
+        if (R.steps.some((s) => !Number.isInteger(s) || s < 10000)) return false;
+      }
+      return true;
+    }
+
+    return {
+      START, MAX_BET, SKIPS, rankOf, suitOf, wins, beats, label, chance, step, multOf, payout,
+      newState, playing, maxBet, isBroke, setBet, fitBet, canStart, start, current, guess,
+      canSkip, skip, canCashOut, cashOut, fresh, valid,
+    };
+  })();
+  /* ===== LOGIC END ===== */
+
+  /* ---------- storage ---------- */
+  const KEY = 'vela:hi-lo:state';
+  function load() {
+    try {
+      const S = JSON.parse(localStorage.getItem(KEY));
+      return HL.valid(S) ? S : null;
+    } catch (_) { return null; }
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (_) {} }
+
+  /* ---------- helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  const clamp = (lo, v, hi) => Math.max(lo, Math.min(hi, v));
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rnd = (function () {
+    const c = window.crypto;
+    if (c && c.getRandomValues) {
+      const buf = new Uint32Array(1);
+      return () => { c.getRandomValues(buf); return buf[0] / 4294967296; };
+    }
+    return Math.random;
+  })();
+  const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+  function fmtC(c) {
+    c = Math.round(c);
+    const whole = Math.floor(c / 100), f = c % 100;
+    const s = whole.toLocaleString('en-US');
+    return f ? s + '.' + String(f).padStart(2, '0') : s;
+  }
+  // Running multiplier, rounded down to two places.
+  function fmtM(m) {
+    const v = Math.floor(m * 100 + 1e-7) / 100;
+    return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'x';
+  }
+  // One guess multiplier from ten-thousandths, exact: at least two places, no trailing zeros past that.
+  function fmtStep(s) {
+    let t = (s / 10000).toFixed(4);
+    while (/\.\d{2,}0$/.test(t)) t = t.slice(0, -1);
+    return t + 'x';
+  }
+  function fmtPct(p) { return (p * 100).toFixed(2) + '%'; }
+  function fit(el) {
+    el.style.fontSize = '';
+    if (el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+      const cur = parseFloat(getComputedStyle(el).fontSize);
+      el.style.fontSize = Math.max(9, Math.floor(cur * el.clientWidth / el.scrollWidth)) + 'px';
+    }
+  }
+  function restart(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+  const suitSvg = (s) => '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#su' + s + '"/></svg>';
+  const SUIT_NAMES = ['spades', 'hearts', 'diamonds', 'clubs'];
+  const RANK_NAMES = ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'];
+  const cardName = (c) => RANK_NAMES[HL.rankOf(c) - 1] + ' of ' + SUIT_NAMES[HL.suitOf(c)];
+
+  /* ---------- DOM ---------- */
+  const app = $('app'), head = $('head'), stage = $('stage'), table = $('table'), slot = $('slot');
+  const fx = $('fx'), result = $('result'), hist = $('hist'), hwin = $('hwin'), htrack = $('htrack');
+  const overlay = $('overlay'), startCard = $('startCard'), overCard = $('overCard');
+  const mainBtn = $('mainBtn'), skipBtn = $('skipBtn'), hiBtn = $('hiBtn'), loBtn = $('loBtn');
+
+  let st = load() || HL.newState();
+  let overlayOpen = false;
+  let L = null;
+  let busyUntil = 0;
+  let token = 0;
+  const timers = new Set();
+  function later(fn, ms) {
+    const t = token;
+    const id = setTimeout(() => { timers.delete(id); if (t === token) fn(); }, ms);
+    timers.add(id);
+  }
+  function clearTimers() { timers.forEach((id) => clearTimeout(id)); timers.clear(); }
+  const busy = () => performance.now() < busyUntil;
+
+  /* ---------- geometry ---------- */
+  function layout() {
+    const vw = window.innerWidth, vh = window.innerHeight, m = Math.min(vw, vh);
+    const fs = clamp(12, m / 42, 16);
+    document.documentElement.style.fontSize = fs + 'px';
+    const gap = Math.round(clamp(8, m * 0.018, 12));
+    app.style.setProperty('--pad', Math.round(clamp(8, m * 0.025, 18)) + 'px');
+    app.style.setProperty('--gap', gap + 'px');
+    const side = vw >= 600 && vw >= vh * 1.15;
+    app.classList.toggle('side', side);
+    app.classList.toggle('narrow', !side && vw < 560);
+    app.classList.toggle('wide', side && vw >= 900 && vh >= 460);
+    head.classList.remove('nobrand');
+    if (head.scrollWidth > head.clientWidth + 1) head.classList.add('nobrand');
+
+    const sw = stage.clientWidth, sh = stage.clientHeight;
+    const mw = Math.round(clamp(26, fs * 2.4, 40));
+    const histH = Math.ceil(mw * 1.4 + 10 * 1.3 + fs * 0.3 + 6);
+    let showHist = sh - histH - gap >= 150;
+    let ch = Math.floor(Math.min(showHist ? sh - histH - gap : sh, 440));
+    let cw = Math.floor(ch * 0.7);
+    if (cw > sw * 0.62) { cw = Math.floor(sw * 0.62); ch = Math.floor(cw / 0.7); }
+    cw = Math.max(70, cw); ch = Math.max(100, ch);
+    hist.hidden = !showHist;
+    stage.style.setProperty('--cw', cw + 'px');
+    stage.style.setProperty('--ch', ch + 'px');
+    stage.style.setProperty('--mw', mw + 'px');
+    L = { cw, ch, fs, mw };
+  }
+
+  /* ---------- big cards ---------- */
+  function bigCard(c) {
+    const el = document.createElement('div');
+    el.className = 'cd';
+    if (c < 0) { el.innerHTML = '<div class="fl"><div class="bk"></div></div>'; return el; }
+    const r = HL.rankOf(c), s = HL.suitOf(c), R = RANKS[r - 1];
+    const red = s === 1 || s === 2;
+    const ix = '<b>' + R + '</b>' + suitSvg(s);
+    el.innerHTML = '<div class="fl"><div class="bk"></div><div class="fc' + (red ? ' red' : '') + '">' +
+      '<div class="ix">' + ix + '</div><div class="ix b">' + ix + '</div>' +
+      '<div class="ctr"><b>' + R + '</b>' + suitSvg(s) + '</div></div></div>';
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', cardName(c));
+    return el;
+  }
+  function topCard() { return slot.lastElementChild; }
+  // Show card c (or the back when c is -1) without animation.
+  function setCard(c, cls) {
+    slot.innerHTML = '';
+    const el = bigCard(c);
+    el.classList.add('nt');
+    if (c >= 0) el.classList.add('up');
+    if (cls) el.classList.add(cls);
+    slot.appendChild(el);
+    el.offsetWidth;
+    el.classList.remove('nt');
+  }
+  // Deal card c from the right, turning it face up over the old card.
+  function deal(c) {
+    const olds = Array.from(slot.children);
+    const el = bigCard(c);
+    if (reduceMotion) {
+      el.classList.add('up');
+      slot.innerHTML = '';
+      slot.appendChild(el);
+      return el;
+    }
+    el.classList.add('enter');
+    slot.appendChild(el);
+    el.offsetWidth;
+    el.classList.remove('enter');
+    el.classList.add('up');
+    setTimeout(() => olds.forEach((o) => o.classList.add('out')), 220);
+    setTimeout(() => olds.forEach((o) => o.remove()), 480);
+    return el;
+  }
+
+  function burst(n, colors, reach) {
+    if (reduceMotion || !L) return;
+    const cx = L.cw / 2, cy = L.ch / 2;
+    for (let k = 0; k < n; k++) {
+      const d = document.createElement('div');
+      d.className = 'pt';
+      const s = Math.max(3, Math.round(L.cw * (0.03 + Math.random() * 0.03)));
+      d.style.width = d.style.height = s + 'px';
+      d.style.background = colors[k % colors.length];
+      const a = (k / n) * Math.PI * 2 + Math.random() * 0.6;
+      const r = L.cw * reach * (0.6 + Math.random() * 0.5);
+      d.style.transform = 'translate(' + (cx - s / 2) + 'px,' + (cy - s / 2) + 'px)';
+      fx.appendChild(d);
+      d.getBoundingClientRect();
+      d.style.transform = 'translate(' + (cx - s / 2 + Math.cos(a) * r) + 'px,' + (cy - s / 2 + Math.sin(a) * r) + 'px) rotate(' + Math.round(Math.random() * 180) + 'deg)';
+      d.style.opacity = '0';
+      setTimeout(() => d.remove(), 560);
+    }
+  }
+
+  /* ---------- history ---------- */
+  let histKey = '';
+  function histTag(x, R, j) {
+    if (x.g === 'start') return 'Start';
+    if (x.g === 'skip') return '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#arSk"/></svg>Skip';
+    const arrow = '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#' + (x.g === 'hi' ? 'arUp' : 'arDn') + '"/></svg>';
+    if (!x.w) return arrow + '0.00x';
+    let m = 1;
+    for (let i = 1; i <= j; i++) if (R.cards[i].w) m *= R.cards[i].s / 10000;
+    return arrow + fmtM(m);
+  }
+  function renderHist(animate) {
+    const R = st.round;
+    const cards = R ? R.cards : [];
+    const key = (R ? R.id : 0) + ':' + cards.length;
+    if (key !== histKey) {
+      const prev = histKey.split(':');
+      const sameRound = R && prev[0] === String(R.id);
+      const from = sameRound ? Number(prev[1]) : 0;
+      histKey = key;
+      htrack.innerHTML = '';
+      cards.forEach((x, j) => {
+        const s = HL.suitOf(x.c), red = s === 1 || s === 2;
+        const d = document.createElement('div');
+        const passed = j + 1 < cards.length && cards[j + 1].g === 'skip';
+        d.className = 'hi' + (x.g === 'skip' || x.g === 'start' ? '' : x.w ? ' w' : ' l') + (passed ? ' s' : '') +
+          (animate && !reduceMotion && j >= from && (sameRound || j === 0) ? ' in' : '');
+        d.innerHTML = '<div class="mc' + (red ? ' red' : '') + '"><b>' + RANKS[HL.rankOf(x.c) - 1] + '</b>' + suitSvg(s) + '</div>' +
+          '<div class="ht">' + histTag(x, R, j) + '</div>';
+        d.title = cardName(x.c);
+        htrack.appendChild(d);
+      });
+    }
+    placeHist();
+  }
+  function placeHist() {
+    const w = hwin.clientWidth, tw = htrack.offsetWidth;
+    const x = tw > w ? w - tw : (w - tw) / 2;
+    htrack.style.transform = 'translateX(' + Math.round(x) + 'px)';
+  }
+
+  /* ---------- panel ---------- */
+  let cashShown = null, cashTween = 0, cashSnap = 0;
+  function renderCash() {
+    const el = $('cashNum'), v = st.cash;
+    if (cashShown === v) return;
+    cancelAnimationFrame(cashTween); clearTimeout(cashSnap);
+    const from = cashShown;
+    cashShown = v;
+    if (from === null || reduceMotion || v < from) { el.textContent = fmtC(v); el.classList.remove('gain'); fit(el); return; }
+    el.classList.add('gain');
+    const t0 = performance.now(), dur = 500;
+    const stepF = () => {
+      const p = Math.min(1, (performance.now() - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = fmtC(Math.round(from + (v - from) * e));
+      if (p < 1) cashTween = requestAnimationFrame(stepF);
+      else { el.classList.remove('gain'); fit(el); }
+    };
+    cashTween = requestAnimationFrame(stepF);
+    cashSnap = setTimeout(() => { cancelAnimationFrame(cashTween); el.textContent = fmtC(v); el.classList.remove('gain'); fit(el); }, dur + 150);
+  }
+
+  let lastSteps = null;
+  function renderStats() {
+    const live = HL.playing(st), R = st.round;
+    const sm = $('sMult'), sc = $('sCash'), ss = $('sSkip');
+    const k = live ? R.steps.length : 0;
+    sm.textContent = live ? fmtM(HL.multOf(R)) : '1.00x';
+    sc.textContent = live && k > 0 ? fmtC(HL.payout(R)) : '0';
+    ss.textContent = String(live ? R.skips : HL.SKIPS);
+    sm.classList.toggle('off', k === 0);
+    sc.classList.toggle('off', k === 0);
+    ss.classList.toggle('off', !live || R.skips === 0);
+    [sm, sc, ss].forEach(fit);
+    const kk = live ? k : -1;
+    if (kk > 0 && lastSteps !== null && kk !== lastSteps) { restart(sm, 'bump'); restart(sc, 'bump'); }
+    lastSteps = kk;
+  }
+
+  function renderGuess() {
+    const live = HL.playing(st), R = st.round;
+    const c = R ? HL.current(R) : -1;
+    [['hi', hiBtn, 'hiLab', 'hiMult', 'hiPct'], ['lo', loBtn, 'loLab', 'loMult', 'loPct']].forEach(([dir, btn, lab, mu, pc]) => {
+      if (c >= 0) {
+        const r = HL.rankOf(c);
+        $(lab).textContent = HL.label(r, dir);
+        $(mu).textContent = fmtStep(HL.step(r, dir));
+        $(pc).textContent = fmtPct(HL.chance(r, dir));
+      } else {
+        $(lab).textContent = dir === 'hi' ? 'Higher or same' : 'Lower or same';
+        $(mu).textContent = '-';
+        $(pc).textContent = '-';
+      }
+      btn.disabled = !live || overlayOpen;
+      btn.setAttribute('aria-label', $(lab).textContent + ', ' + $(mu).textContent + ', ' + $(pc).textContent);
+    });
+  }
+
+  function renderControls() {
+    const live = HL.playing(st);
+    HL.fitBet(st);
+    $('betVal').textContent = st.bet.toLocaleString('en-US');
+    fit($('betVal'));
+    const mb = HL.maxBet(st);
+    $('betHalf').disabled = live || st.bet <= 1;
+    $('betDown').disabled = live || st.bet <= 1;
+    $('betUp').disabled = live || st.bet >= mb;
+    $('betDouble').disabled = live || st.bet >= mb;
+    $('betStp').classList.toggle('lock', live);
+    if (live) {
+      mainBtn.innerHTML = 'Cash out <kbd>Space</kbd>';
+      mainBtn.classList.add('cash');
+      mainBtn.disabled = !HL.canCashOut(st);
+    } else {
+      mainBtn.innerHTML = 'Bet <kbd>Space</kbd>';
+      mainBtn.classList.remove('cash');
+      mainBtn.disabled = !HL.canStart(st);
+    }
+    skipBtn.innerHTML = 'Skip <kbd>S</kbd>';
+    skipBtn.disabled = !HL.canSkip(st);
+    renderGuess();
+  }
+
+  function render(animate) {
+    renderCash();
+    renderStats();
+    renderControls();
+    renderHist(animate);
+  }
+
+  /* ---------- result ---------- */
+  function showResult(R) {
+    const win = R.phase === 'won';
+    $('resBig').textContent = win ? fmtM(HL.multOf(R)) : '0.00x';
+    $('resSub').textContent = win ? '+' + fmtC(R.payout - R.bet * 100) : '-' + R.bet.toLocaleString('en-US');
+    $('resTag').hidden = !R.best;
+    result.classList.toggle('win', win);
+    result.classList.toggle('lose', !win);
+    result.classList.add('on');
+  }
+  function hideResult() { result.classList.remove('on'); }
+
+  /* ---------- actions ---------- */
+  function report() {
+    const R = st.round;
+    const whole = Math.floor(st.cash / 100);
+    R.best = V.gameOver(whole) && st.cash > HL.START;
+    V.score(whole);
+  }
+
+  function startRound() {
+    if (overlayOpen || !HL.start(st, rnd)) return false;
+    token++;
+    clearTimers();
+    hideResult();
+    fx.innerHTML = '';
+    table.classList.remove('shake');
+    save();
+    deal(HL.current(st.round));
+    busyUntil = performance.now() + (reduceMotion ? 0 : 300);
+    render(true);
+    return true;
+  }
+
+  function guess(dir) {
+    if (overlayOpen || busy() || !HL.playing(st)) return;
+    const res = HL.guess(st, dir, rnd);
+    if (!res) return;
+    const R = st.round;
+    if (!res.win) report();
+    save();
+    const el = deal(res.c);
+    const land = reduceMotion ? 0 : 340;
+    busyUntil = performance.now() + land;
+    if (res.win) {
+      later(() => { el.classList.add('win'); restart(el, 'pop'); burst(10, ['#ff7a4d', '#ea5426'], 0.8); }, land);
+    } else {
+      later(() => {
+        el.classList.add('hit');
+        restart(table, 'shake');
+        burst(14, ['#ffffff', '#ea5426', '#ffffff', '#b83f19'], 1.0);
+      }, land);
+      later(() => showResult(R), land + 380);
+      later(checkBroke, land + 1100);
+    }
+    render(true);
+  }
+
+  function skip() {
+    if (overlayOpen || busy() || !HL.canSkip(st)) return;
+    const c = HL.skip(st, rnd);
+    save();
+    deal(c);
+    busyUntil = performance.now() + (reduceMotion ? 0 : 300);
+    render(true);
+  }
+
+  function cashOut() {
+    if (overlayOpen || !HL.canCashOut(st)) return;
+    const R = st.round;
+    HL.cashOut(st);
+    report();
+    save();
+    busyUntil = 0;
+    const el = topCard();
+    if (el) restart(el, 'pop');
+    burst(16, ['#ff7a4d', '#ea5426', '#ffffff'], 1.1);
+    later(() => showResult(R), reduceMotion ? 0 : 120);
+    render(true);
+  }
+
+  function mainAction() {
+    if (HL.playing(st)) cashOut(); else startRound();
+  }
+
+  function checkBroke() {
+    if (HL.isBroke(st) && !overlayOpen) showOver();
+  }
+
+  const BET_STEPS = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 25000, 50000, 100000, 200000, 250000, 500000, 1000000];
+  function betStep(dir) {
+    const b = st.bet;
+    let v;
+    if (dir > 0) { v = BET_STEPS.find((x) => x > b); if (v === undefined) v = HL.MAX_BET; }
+    else { v = 1; for (const x of BET_STEPS) if (x < b) v = x; }
+    return change(() => HL.setBet(st, Math.min(v, Math.max(1, HL.maxBet(st)))));
+  }
+  function change(fn) {
+    if (overlayOpen) return false;
+    const ok = fn();
+    if (ok) { save(); render(false); }
+    return ok;
+  }
+
+  /* ---------- overlay ---------- */
+  function openOverlay(card) {
+    startCard.hidden = card !== startCard;
+    overCard.hidden = card !== overCard;
+    overlayOpen = true;
+    overlay.hidden = false;
+    overlay.offsetWidth;
+    overlay.classList.add('show');
+    renderControls();
+    setTimeout(() => { try { card.querySelector('.btn.primary').focus({ preventScroll: true }); } catch (_) {} }, 60);
+  }
+  function hideOverlay() {
+    overlayOpen = false;
+    overlay.classList.remove('show');
+    overlay.hidden = true;
+    renderControls();
+  }
+  const bestNow = () => fmtC(Math.max(V.best() * 100, st.peak, st.cash));
+  function showStart() {
+    $('stCash').textContent = fmtC(st.cash + (HL.playing(st) ? st.round.bet * 100 : 0));
+    $('stBest').textContent = bestNow();
+    openOverlay(startCard);
+  }
+  function showOver() {
+    $('ovCash').textContent = fmtC(st.cash);
+    $('ovBest').textContent = bestNow();
+    openOverlay(overCard);
+  }
+
+  /* ---------- input ---------- */
+  hiBtn.addEventListener('click', () => guess('hi'));
+  loBtn.addEventListener('click', () => guess('lo'));
+  skipBtn.addEventListener('click', skip);
+  mainBtn.addEventListener('click', mainAction);
+
+  // Steppers repeat while held.
+  function holdable(btn, fn) {
+    let t = 0, fromPointer = false;
+    const stop = () => { clearTimeout(t); t = 0; };
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || btn.disabled) return;
+      fromPointer = true;
+      fn();
+      let delay = 380;
+      const again = () => { if (btn.disabled || !fn()) { stop(); return; } delay = Math.max(50, delay * 0.8); t = setTimeout(again, delay); };
+      t = setTimeout(again, delay);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach((ev) => btn.addEventListener(ev, stop));
+    btn.addEventListener('click', () => { if (fromPointer) { fromPointer = false; return; } fn(); });
+  }
+  holdable($('betDown'), () => betStep(-1));
+  holdable($('betUp'), () => betStep(1));
+  $('betHalf').addEventListener('click', () => change(() => HL.setBet(st, Math.max(1, Math.floor(st.bet / 2)))));
+  $('betDouble').addEventListener('click', () => change(() => HL.setBet(st, Math.min(st.bet * 2, Math.max(1, HL.maxBet(st))))));
+
+  $('playBtn').addEventListener('click', () => { hideOverlay(); });
+  $('againBtn').addEventListener('click', () => {
+    if (HL.fresh(st)) { save(); setCard(-1); hideResult(); }
+    hideOverlay();
+    render(false);
+  });
+
+  document.addEventListener('pointerdown', () => { window.focus(); }, true);
+  document.addEventListener('touchmove', (e) => {
+    if (overlayOpen && overlay.contains(e.target)) return;
+    e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('contextmenu', (e) => { if (table.contains(e.target)) e.preventDefault(); });
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const onBtn = e.target && e.target.tagName === 'BUTTON';
+    if (overlayOpen) {
+      if ((k === 'Enter' || k === ' ') && !onBtn) {
+        e.preventDefault();
+        (startCard.hidden ? $('againBtn') : $('playBtn')).click();
+      }
+      return;
+    }
+    if (e.repeat) { if (k === ' ' || k === 'ArrowUp' || k === 'ArrowDown') e.preventDefault(); return; }
+    if (k === 'ArrowUp') { e.preventDefault(); guess('hi'); return; }
+    if (k === 'ArrowDown') { e.preventDefault(); guess('lo'); return; }
+    if (k === ' ') { e.preventDefault(); mainAction(); return; }
+    if (k === 'Enter') {
+      if (onBtn) return;
+      e.preventDefault();
+      mainAction();
+      return;
+    }
+    if (k === 's') { e.preventDefault(); skip(); }
+  });
+  window.addEventListener('keyup', (e) => { if (e.key === ' ' && !overlayOpen) e.preventDefault(); });
+
+  let raf = 0;
+  function relayout() {
+    layout();
+    placeHist();
+    [$('sMult'), $('sCash'), $('sSkip'), $('cashNum'), $('betVal')].forEach(fit);
+  }
+  window.addEventListener('resize', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(relayout); setTimeout(relayout, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(relayout).catch(() => {});
+
+  /* ---------- boot ---------- */
+  HL.fitBet(st);
+  layout();
+  setCard(st.round ? HL.current(st.round) : -1, st.round && st.round.phase === 'lost' ? 'hit' : '');
+  render(false);
+  app.classList.add('ready');
+  if (HL.isBroke(st)) showOver(); else showStart();
+  V.ready();
+
+})();
+</script>
+</body>
+</html>

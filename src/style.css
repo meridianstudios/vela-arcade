@@ -397,6 +397,16 @@ a.pf-tile:hover { background: var(--tile); }
 .tab:hover { color: var(--text-2); }
 .tab.on { color: var(--text); }
 .tab.on::after { transform: scaleX(1); }
+.toolbar h1 { white-space: nowrap; flex-shrink: 0; }
+.toolbar h1 .random {
+  font-family: var(--font); font-size: 15px; font-weight: 600; letter-spacing: 0; vertical-align: 0.9em;
+  color: var(--vela); margin-left: 20px; transition: color 0.15s var(--ease);
+}
+.toolbar h1 .random:hover { color: var(--vela-2); }
+.tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.icon-btn.fav svg { fill: none; transition: fill 0.15s var(--ease); }
+.icon-btn.fav.on { color: var(--vela); }
+.icon-btn.fav.on svg { fill: currentColor; }
 
 .recent-row { display: flex; align-items: center; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
 .recent-row .label { flex-shrink: 0; }

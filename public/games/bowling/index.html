@@ -1,0 +1,2040 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Bowling</title>
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #000;
+    --s1: #16181c;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-2: rgba(255, 255, 255, 0.22);
+    --text: #fff;
+    --dim: rgba(255, 255, 255, 0.6);
+    --brand: #ea5426;
+    --brand-l: #ff7a4d;
+    --brand-d: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font, "Segoe UI", system-ui, sans-serif);
+    -webkit-font-smoothing: antialiased;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; }
+  #sheet { flex: none; padding: 8px 8px 0; }
+  #view { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  canvas { display: block; position: absolute; left: 0; top: 0; }
+
+  /* Scorecard */
+  .sc { max-width: 760px; margin: 0 auto; border: 1px solid var(--line); background: #0b0c0f; }
+  .sc-row { display: grid; grid-template-columns: 1.25fr repeat(9, 1fr) 1.5fr 1.35fr; }
+  .sc-row + .sc-row { border-top: 1px solid var(--line); }
+  .sc-head > span {
+    font: 600 10px/1 var(--font, sans-serif);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    text-align: center;
+    padding: 4px 0 3px;
+  }
+  .sc-head > span + span { border-left: 1px solid var(--line); }
+  .nm {
+    display: flex; align-items: center;
+    padding-left: 6px;
+    min-width: 0;
+    overflow: hidden;
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .nm em { display: inline-block; width: 6px; height: 6px; margin-right: 5px; flex: none; }
+  .cur .nm { color: var(--brand-l); }
+  .fr { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; transition: background-color 0.2s var(--ease); }
+  .fr.on { background: rgba(234, 84, 38, 0.18); }
+  .bx { display: flex; height: 15px; }
+  .bx i {
+    flex: 1 1 0; min-width: 0;
+    font: 600 11px/14px var(--font, sans-serif);
+    font-style: normal;
+    text-align: center;
+    color: #fff;
+  }
+  .bx i + i { border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .bx i.sp { color: var(--brand-l); }
+  .bx i.new { animation: pop 0.3s var(--ease); }
+  .fr b {
+    display: block;
+    font: 400 13px/1 var(--font-display, sans-serif);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    padding: 3px 0 4px;
+    min-height: 20px;
+  }
+  .tot {
+    border-left: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+    font: 300 18px/1 var(--font-display, sans-serif);
+    font-variant-numeric: tabular-nums;
+  }
+  .sc-head .tot { font: 600 10px/1 var(--font, sans-serif); }
+  @keyframes pop { from { transform: scale(1.6); color: var(--brand-l); } to { transform: none; } }
+  @media (max-width: 420px) {
+    #sheet { padding: 6px 6px 0; }
+    .bx i { font-size: 10px; }
+    .fr b { font-size: 12px; }
+    .tot { font-size: 15px; }
+    .nm { padding-left: 4px; font-size: 10px; letter-spacing: 0.04em; }
+    .nm em { display: none; }
+  }
+
+  /* Overlays */
+  .ov {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease), visibility 0s linear 0.2s;
+    z-index: 5;
+  }
+  .ov.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.25s var(--ease), visibility 0s;
+  }
+  .card {
+    width: 100%;
+    max-width: 340px;
+    max-height: 100%;
+    overflow: auto;
+    background: var(--s1);
+    border: 1px solid var(--line);
+    border-radius: 0;
+    padding: 22px 24px 24px;
+    text-align: left;
+    transform: translateY(14px);
+    transition: transform 0.3s var(--ease);
+  }
+  .ov.show .card { transform: none; }
+  .label {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .name { font: 300 44px/1 var(--font-display, sans-serif); letter-spacing: -0.01em; }
+  .controls { color: var(--dim); font-size: 13px; font-weight: 400; line-height: 1.5; margin: 10px 0 18px; min-height: 39px; }
+  .opt { margin-bottom: 14px; }
+  .opt .label { display: block; margin-bottom: 8px; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: 600 12px/1 var(--font, sans-serif);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--dim);
+    background: transparent;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    padding: 11px 8px;
+    margin-left: -1px;
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease);
+  }
+  .seg button:first-child { margin-left: 0; }
+  .seg button:hover { color: #fff; border-color: rgba(255, 255, 255, 0.4); z-index: 1; }
+  .seg button.on { background: var(--brand); border-color: var(--brand); color: #fff; z-index: 2; }
+  .seg button:focus { outline: none; }
+  .seg button:focus-visible { outline: 1px solid #fff; outline-offset: -3px; z-index: 3; }
+  .btn {
+    display: block;
+    width: 100%;
+    font: 600 13px/1 var(--font, sans-serif);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    color: #fff;
+    background: var(--brand);
+    border: 1px solid var(--brand);
+    border-radius: 0;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+  }
+  .btn:hover { background: var(--brand-l); border-color: var(--brand-l); }
+  .btn:active { background: var(--brand-d); border-color: var(--brand-d); transform: scale(0.985); }
+  .btn:focus { outline: none; }
+  .btn:focus-visible { outline: 1px solid #fff; outline-offset: 2px; }
+  .btn.ghost { background: transparent; border-color: var(--line-2); }
+  .btn.ghost:hover { background: transparent; border-color: rgba(255, 255, 255, 0.5); }
+  .btn.ghost:active { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.5); }
+  .btn + .btn { margin-top: 8px; }
+  .play { margin-top: 18px; }
+  .rows { margin: 16px 0 18px; border-bottom: 1px solid var(--line); }
+  .row {
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--line);
+    padding: 11px 0;
+  }
+  .row b { font: 600 16px/1 var(--font-display, sans-serif); font-variant-numeric: tabular-nums; }
+  .row.big b { font: 300 28px/1 var(--font-display, sans-serif); }
+  .row.win .label { color: var(--brand-l); }
+  .badge {
+    font: 600 11px/1 var(--font, sans-serif);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-l);
+    margin-left: 10px;
+  }
+  .gap { height: 18px; }
+  #pauseBtn {
+    position: absolute;
+    right: 10px; top: 10px;
+    width: 34px; height: 34px;
+    background: #000;
+    border: 1px solid var(--line-2);
+    border-radius: 0;
+    cursor: pointer;
+    display: none;
+    z-index: 2;
+    transition: border-color 0.15s var(--ease);
+  }
+  #pauseBtn.on { display: block; }
+  #pauseBtn:hover { border-color: rgba(255, 255, 255, 0.5); }
+  #pauseBtn:focus { outline: none; }
+  #pauseBtn i { position: absolute; top: 11px; width: 3px; height: 10px; background: var(--dim); }
+  #pauseBtn i:first-child { left: 12px; }
+  #pauseBtn i:last-child { left: 17px; }
+  @media (prefers-reduced-motion: reduce) {
+    .ov, .ov.show, .card, .btn, .seg button, .fr { transition: none; }
+    .card { transform: none; }
+    .bx i.new { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sheet"></div>
+  <div id="view">
+    <canvas id="c" aria-label="Bowling lane"></canvas>
+    <button id="pauseBtn" type="button" aria-label="Pause"><i></i><i></i></button>
+  </div>
+
+  <section id="ovStart" class="ov show">
+    <div class="card">
+      <div class="name">Bowling</div>
+      <p class="controls" id="ctrlText"></p>
+      <div class="opt">
+        <span class="label">Mode</span>
+        <div class="seg" data-key="mode">
+          <button type="button" data-v="solo">Solo</button>
+          <button type="button" data-v="cpu">Computer</button>
+          <button type="button" data-v="pass">Pass and play</button>
+        </div>
+      </div>
+      <div class="opt" id="optPlayers">
+        <span class="label">Players</span>
+        <div class="seg" data-key="players">
+          <button type="button" data-v="2">2</button>
+          <button type="button" data-v="3">3</button>
+          <button type="button" data-v="4">4</button>
+        </div>
+      </div>
+      <div class="opt" id="optDiff">
+        <span class="label">Computer</span>
+        <div class="seg" data-key="diff">
+          <button type="button" data-v="easy">Easy</button>
+          <button type="button" data-v="normal">Normal</button>
+          <button type="button" data-v="hard">Hard</button>
+        </div>
+      </div>
+      <button class="btn play" id="btnPlay" type="button">Play</button>
+    </div>
+  </section>
+
+  <section id="ovPause" class="ov">
+    <div class="card">
+      <div class="label">Paused</div>
+      <div class="gap"></div>
+      <button class="btn" id="btnResume" type="button">Resume</button>
+      <button class="btn ghost" id="btnPauseMode" type="button">Change mode</button>
+    </div>
+  </section>
+
+  <section id="ovOver" class="ov">
+    <div class="card">
+      <div class="name" id="overTitle">Game over</div>
+      <div class="rows" id="overRows"></div>
+      <button class="btn" id="btnAgain" type="button">Play again</button>
+      <button class="btn ghost" id="btnMode" type="button">Change mode</button>
+    </div>
+  </section>
+</div>
+
+<script src="../_shared/bridge.js" data-game="bowling"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Bridge (with a standalone fallback if the bridge failed to load) ----------
+  const V = window.Vela || (() => {
+    const key = 'vela:best:bowling';
+    const rb = () => { try { return Number(localStorage.getItem(key)) || 0; } catch (_) { return 0; } };
+    return {
+      embedded: false, ready() {}, score() {}, best: rb, onPause() {},
+      gameOver(n) { const p = rb(); if (n > p) { try { localStorage.setItem(key, String(n)); } catch (_) {} } return n > p; },
+    };
+  })();
+
+  /* CORE-BEGIN
+   * Scoring, lane and pin physics, and the computer bowler. No DOM in here, so it can be tested on its own.
+   * Units are inches, seconds and pounds. x runs across the lane (+x is the bowler's right),
+   * y runs down the lane from the foul line (y = 0) to the pit.
+   */
+  const Core = (() => {
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const HALF_PI = Math.PI / 2;
+
+    // ---------- Scoring ----------
+    // rolls: pin counts in order for one player. Returns the frames as they would be
+    // written on a scorecard, with a running total where it is known.
+    function frames(rolls) {
+      const out = [];
+      let i = 0;
+      for (let f = 0; f < 10; f++) {
+        const fr = { rolls: [], start: i };
+        out.push(fr);
+        if (f < 9) {
+          if (i < rolls.length) fr.rolls.push(rolls[i++]);
+          if (fr.rolls.length && fr.rolls[0] !== 10 && i < rolls.length) fr.rolls.push(rolls[i++]);
+        } else {
+          while (i < rolls.length && fr.rolls.length < 3) fr.rolls.push(rolls[i++]);
+        }
+      }
+      return out;
+    }
+
+    function score(rolls) {
+      const fs = frames(rolls);
+      const n = rolls.length;
+      let total = 0, known = true;
+      for (let f = 0; f < 10; f++) {
+        const fr = fs[f], i = fr.start, r = fr.rolls;
+        let val = null;
+        if (f < 9) {
+          if (r.length && r[0] === 10) { if (i + 2 < n) val = 10 + rolls[i + 1] + rolls[i + 2]; }
+          else if (r.length === 2) val = r[0] + r[1] === 10 ? (i + 2 < n ? 10 + rolls[i + 2] : null) : r[0] + r[1];
+        } else if (r.length === 3 || (r.length === 2 && r[0] + r[1] < 10)) {
+          val = r.reduce((a, b) => a + b, 0);
+        }
+        if (val === null) known = false;
+        if (known) total += val;
+        fr.value = val;
+        fr.total = known ? total : null;
+        fr.marks = marks(f, r);
+      }
+      let sum = 0;
+      for (const fr of fs) if (fr.value !== null) sum += fr.value; else break;
+      return { frames: fs, total: sum };
+    }
+
+    function marks(f, r) {
+      const d = (v) => (v === 0 ? '-' : String(v));
+      if (f < 9) {
+        if (!r.length) return [];
+        if (r[0] === 10) return ['', 'X'];
+        if (r.length === 1) return [d(r[0])];
+        return [d(r[0]), r[0] + r[1] === 10 ? '/' : d(r[1])];
+      }
+      const m = [];
+      let fresh = true, prev = 0;
+      for (const v of r) {
+        if (fresh && v === 10) { m.push('X'); fresh = true; prev = 0; }
+        else if (!fresh && prev + v === 10) { m.push('/'); fresh = true; prev = 0; }
+        else { m.push(d(v)); if (fresh) { fresh = false; prev = v; } else { fresh = true; prev = 0; } }
+      }
+      return m;
+    }
+
+    // What the next ball is: which frame and ball, and whether it is bowled at a full rack.
+    function next(rolls) {
+      const fs = frames(rolls);
+      for (let f = 0; f < 10; f++) {
+        const r = fs[f].rolls;
+        if (f < 9) {
+          if (!r.length) return { done: false, frame: f, ball: 0, fresh: true, up: 10 };
+          if (r[0] !== 10 && r.length === 1) return { done: false, frame: f, ball: 1, fresh: false, up: 10 - r[0] };
+          continue;
+        }
+        if (r.length === 0) return { done: false, frame: 9, ball: 0, fresh: true, up: 10 };
+        if (r.length === 1) return r[0] === 10
+          ? { done: false, frame: 9, ball: 1, fresh: true, up: 10 }
+          : { done: false, frame: 9, ball: 1, fresh: false, up: 10 - r[0] };
+        if (r.length === 2) {
+          if (r[0] === 10) return r[1] === 10
+            ? { done: false, frame: 9, ball: 2, fresh: true, up: 10 }
+            : { done: false, frame: 9, ball: 2, fresh: false, up: 10 - r[1] };
+          if (r[0] + r[1] === 10) return { done: false, frame: 9, ball: 2, fresh: true, up: 10 };
+        }
+      }
+      return { done: true, frame: 10, ball: 0, fresh: true, up: 0 };
+    }
+
+    // ---------- Lane ----------
+    const BOARD = 41.5 / 39;
+    const LANE_HW = 20.75;                 // half the lane width
+    const WALL_X = 30;                     // outer edge of the gutters, and the kickbacks beside the deck
+    const GUTTER_X = LANE_HW + 4.6;        // where a ball runs in the gutter
+    const ARROW_Y = 180, DECK_Y = 685, HEAD_Y = 720;
+    const ROW = 6 * Math.sqrt(3);          // 10.39: pins are 12 inches apart
+    const PIT_Y = HEAD_Y + 34.19;
+    const BALL_R = 4.25, BALL_M = 15;
+    const PIN_M = 3.5, PIN_R = 2.38, PIN_RF = 2.6, PIN_HL = 5.45, PIN_H = 15;
+    const SPOTS = [[0, 0], [-6, 1], [6, 1], [-12, 2], [0, 2], [12, 2], [-18, 3], [-6, 3], [6, 3], [18, 3]]
+      .map(([x, r]) => ({ x, y: HEAD_Y + r * ROW }));
+    const COL = [3, 2, 4, 1, 3, 5, 0, 2, 4, 6];
+    const FULL = 1023;
+    const V_MIN = 210, V_MAX = 370;        // 12 to 21 mph
+    const HOOK_A = 31, HOOK_Y0 = 200, HOOK_Y1 = 560;
+    const BALL_DECEL = 9, DRIVE = 1.5;
+    const E_BALL = 0.66, E_PIN = 0.75, E_WALL = 0.45;
+    const TOPPLE_V = 38;
+    const PIN_MU = 150, PIN_MU_AIR = 25, TIP_G = 46;
+    const STEP = 1 / 360;
+
+    const boardX = (b) => LANE_HW - (b - 0.5) * BOARD;
+    const xBoard = (x) => (LANE_HW - x) / BOARD + 0.5;
+    const speedOf = (p) => V_MIN + (V_MAX - V_MIN) * clamp(p, 0, 1);
+    const count = (mask) => { let c = 0; for (let i = 0; i < 10; i++) if (mask & (1 << i)) c++; return c; };
+
+    // A split: head pin down and an empty column between standing pins.
+    function isSplit(mask) {
+      if (mask & 1) return false;
+      const cols = [];
+      for (let i = 0; i < 10; i++) if (mask & (1 << i)) cols.push(COL[i]);
+      if (cols.length < 2) return false;
+      cols.sort((a, b) => a - b);
+      for (let i = 1; i < cols.length; i++) if (cols[i] - cols[i - 1] > 1) return true;
+      return false;
+    }
+
+    function makeBall(t) {
+      const s = speedOf(t.power);
+      return {
+        kind: 'ball', x: t.x, y: 0, vx: s * Math.sin(t.angle), vy: s * Math.cos(t.angle),
+        hook: clamp(t.hook, -1, 1), gutter: 0, pit: false, roll: 0,
+        r: BALL_R, hl: 0, ax: 0, ay: 1, w: 0, grow: 0, invI: 0,
+        // Revs make a ball drive through the pins instead of deflecting off them.
+        invM: 1 / (BALL_M * (1 + DRIVE * Math.abs(clamp(t.hook, -1, 1)))),
+      };
+    }
+
+    function makePin(i) {
+      const s = SPOTS[i];
+      return {
+        kind: 'pin', id: i, x: s.x, y: s.y, vx: 0, vy: 0, state: 'stand',
+        phi: 0, phiDot: 0, th: 0, ax: 0, ay: 1, hl: 0, grow: 0, r: PIN_R, w: 0,
+        invM: 1 / PIN_M, invI: 0, wob: 0, wobA: 0, pitT: 0, gutter: 0,
+      };
+    }
+
+    function makeWorld(mask) {
+      const pins = [];
+      for (let i = 0; i < 10; i++) if (mask & (1 << i)) pins.push(makePin(i));
+      return { ball: null, pins, t: 0, hits: [], firstHit: -1, onHit: null };
+    }
+
+    function standingMask(w) {
+      let m = 0;
+      for (const p of w.pins) if (p.state === 'stand') m |= 1 << p.id;
+      return m;
+    }
+
+    function smooth01(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
+
+    function stepBall(b, dt) {
+      if (b.gutter) {
+        b.x += (b.gutter * GUTTER_X - b.x) * Math.min(1, dt * 20);
+        b.vx = 0;
+      } else {
+        b.vx -= b.hook * HOOK_A * smooth01((b.y - HOOK_Y0) / (HOOK_Y1 - HOOK_Y0)) * dt;
+      }
+      const s = Math.hypot(b.vx, b.vy);
+      if (s > 1) {
+        const ns = Math.max(0, s - BALL_DECEL * dt);
+        b.vx *= ns / s; b.vy *= ns / s;
+      }
+      if (b.vy < 40) b.vy = Math.min(40, b.vy + 200 * dt);   // a ball always reaches the pit
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.roll += Math.hypot(b.vx, b.vy) * dt / BALL_R;
+      if (!b.gutter && Math.abs(b.x) > LANE_HW) b.gutter = Math.sign(b.x);
+      if (b.y > PIT_Y + BALL_R) b.pit = true;
+    }
+
+    function topple(p) {
+      const s = Math.hypot(p.vx, p.vy);
+      p.state = 'fall';
+      p.th = Math.atan2(p.vy, p.vx);
+      p.ax = Math.cos(p.th); p.ay = Math.sin(p.th);
+      p.phi = 0.02;
+      p.phiDot = clamp(s / 25, 3, 9);
+      p.invI = 1 / (PIN_M * (PIN_R * PIN_R / 2 + 36));
+    }
+
+    function stepPin(p, dt) {
+      if (p.state === 'stand') { if (p.wob > 0) { p.wob = Math.max(0, p.wob - dt * 1.4); } return; }
+      if (p.state === 'pit') { p.pitT += dt; return; }
+      if (p.phi < HALF_PI) {
+        p.phiDot += TIP_G * Math.sin(p.phi + 0.12) * dt;
+        p.phi = Math.min(HALF_PI, p.phi + p.phiDot * dt);
+        const sn = Math.sin(p.phi), hl = PIN_HL * sn, dh = hl - p.hl;
+        p.grow = dh / dt;
+        p.x += p.ax * dh; p.y += p.ay * dh;
+        p.hl = hl;
+        p.r = PIN_R - (PIN_R - PIN_RF) * sn;
+        if (p.phi >= HALF_PI) p.grow = 0;
+      }
+      const s = Math.hypot(p.vx, p.vy);
+      if (s > 0) {
+        const ns = Math.max(0, s - (p.phi < HALF_PI ? PIN_MU_AIR : PIN_MU) * dt);
+        p.vx *= ns / s; p.vy *= ns / s;
+      }
+      if (p.w) {
+        p.w *= Math.exp(-(p.phi < HALF_PI ? 1 : 6) * dt);
+        if (Math.abs(p.w) < 0.05) p.w = 0;
+        p.th += p.w * dt;
+        p.ax = Math.cos(p.th); p.ay = Math.sin(p.th);
+      }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const ext = Math.abs(p.ax) * p.hl + p.r;
+      if (p.x > WALL_X - ext) { p.x = WALL_X - ext; if (p.vx > 0) p.vx = -p.vx * E_WALL; }
+      else if (p.x < -WALL_X + ext) { p.x = -WALL_X + ext; if (p.vx < 0) p.vx = -p.vx * E_WALL; }
+      if (p.y > PIT_Y + 1) { p.state = 'pit'; p.pitT = 0; }
+      else if (!p.gutter && Math.abs(p.x) > LANE_HW + 0.5) p.gutter = Math.sign(p.x);
+    }
+
+    // Closest points between two segments (each may be a single point).
+    const CP = { ax: 0, ay: 0, bx: 0, by: 0 };
+    function closest(A, B) {
+      const p1x = A.x - A.ax * A.hl, p1y = A.y - A.ay * A.hl;
+      const d1x = 2 * A.ax * A.hl, d1y = 2 * A.ay * A.hl;
+      const p2x = B.x - B.ax * B.hl, p2y = B.y - B.ay * B.hl;
+      const d2x = 2 * B.ax * B.hl, d2y = 2 * B.ay * B.hl;
+      const rx = p1x - p2x, ry = p1y - p2y;
+      const a = d1x * d1x + d1y * d1y, e = d2x * d2x + d2y * d2y, f = d2x * rx + d2y * ry;
+      let s = 0, t = 0;
+      if (a <= 1e-9 && e <= 1e-9) { s = t = 0; }
+      else if (a <= 1e-9) { t = clamp(f / e, 0, 1); }
+      else {
+        const c = d1x * rx + d1y * ry;
+        if (e <= 1e-9) { s = clamp(-c / a, 0, 1); }
+        else {
+          const b = d1x * d2x + d1y * d2y, den = a * e - b * b;
+          s = den > 1e-9 ? clamp((b * f - c * e) / den, 0, 1) : 0;
+          t = (b * s + f) / e;
+          if (t < 0) { t = 0; s = clamp(-c / a, 0, 1); }
+          else if (t > 1) { t = 1; s = clamp((b - c) / a, 0, 1); }
+        }
+      }
+      CP.ax = p1x + d1x * s; CP.ay = p1y + d1y * s;
+      CP.bx = p2x + d2x * t; CP.by = p2y + d2y * t;
+    }
+
+    // Velocity of a point on a body, including the sweep of a pin that is tipping over.
+    function pointVel(o, cx, cy, out) {
+      const rx = cx - o.x, ry = cy - o.y;
+      let vx = o.vx - o.w * ry, vy = o.vy + o.w * rx;
+      if (o.grow) {
+        const u = o.hl > 1e-6 ? clamp((rx * o.ax + ry * o.ay) / o.hl, -1, 1) : 0;
+        vx += o.ax * o.grow * (1 + u); vy += o.ay * o.grow * (1 + u);
+      }
+      out.x = vx; out.y = vy;
+    }
+
+    const VA = { x: 0, y: 0 }, VB = { x: 0, y: 0 };
+    function collide(w, A, B) {
+      closest(A, B);
+      let dx = CP.bx - CP.ax, dy = CP.by - CP.ay;
+      const rs = A.r + B.r;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= rs * rs) return;
+      let d = Math.sqrt(d2), nx, ny;
+      if (d > 1e-6) { nx = dx / d; ny = dy / d; }
+      else {
+        dx = B.x - A.x; dy = B.y - A.y; d = Math.hypot(dx, dy);
+        if (d > 1e-6) { nx = dx / d; ny = dy / d; } else { nx = 0; ny = 1; }
+        d = 0;
+      }
+      const cx = (CP.ax + nx * A.r + CP.bx - nx * B.r) / 2, cy = (CP.ay + ny * A.r + CP.by - ny * B.r) / 2;
+      pointVel(A, cx, cy, VA); pointVel(B, cx, cy, VB);
+      const vn = (VB.x - VA.x) * nx + (VB.y - VA.y) * ny;
+      if (vn < 0) {
+        const rAx = cx - A.x, rAy = cy - A.y, rBx = cx - B.x, rBy = cy - B.y;
+        const ca = rAx * ny - rAy * nx, cb = rBx * ny - rBy * nx;
+        const e = A.kind === 'ball' || B.kind === 'ball' ? E_BALL : E_PIN;
+        const j = -(1 + e) * vn / (A.invM + B.invM + ca * ca * A.invI + cb * cb * B.invI);
+        A.vx -= j * nx * A.invM; A.vy -= j * ny * A.invM; A.w -= ca * j * A.invI;
+        B.vx += j * nx * B.invM; B.vy += j * ny * B.invM; B.w += cb * j * B.invI;
+        settleStanding(A); settleStanding(B);
+        if (w.firstHit < 0) w.firstHit = w.t;
+        if (w.onHit && -vn > 30) w.onHit(cx, cy, -vn, A.kind === 'ball' || B.kind === 'ball');
+      }
+      // Push apart. A standing pin is held by the deck, so only the moving body gives way.
+      const ia = A.state === 'stand' ? 0 : A.invM, ib = B.state === 'stand' ? 0 : B.invM;
+      if (ia + ib > 0) {
+        const ov = rs - d, ka = ov * ia / (ia + ib), kb = ov * ib / (ia + ib);
+        A.x -= nx * ka; A.y -= ny * ka;
+        B.x += nx * kb; B.y += ny * kb;
+      }
+    }
+
+    // A standing pin either goes over or stays up (rocking) after a knock.
+    function settleStanding(p) {
+      if (p.kind !== 'pin' || p.state !== 'stand') return;
+      const s = Math.hypot(p.vx, p.vy);
+      if (s > TOPPLE_V) { topple(p); return; }
+      if (s > 4) { p.wob = Math.max(p.wob, Math.min(1, s / TOPPLE_V)); p.wobA = Math.atan2(p.vy, p.vx); }
+      p.vx = 0; p.vy = 0;
+    }
+
+    function step(w, dt) {
+      w.t += dt;
+      const b = w.ball;
+      if (b && !b.pit) stepBall(b, dt);
+      const ps = w.pins;
+      for (const p of ps) stepPin(p, dt);
+      const ballLive = b && !b.pit && !b.gutter && b.y > HEAD_Y - 20;
+      for (let it = 0; it < 2; it++) {
+        for (let i = 0; i < ps.length; i++) {
+          const A = ps[i];
+          if (A.state === 'pit') continue;
+          if (ballLive) collide(w, b, A);
+          for (let k = i + 1; k < ps.length; k++) {
+            const B = ps[k];
+            if (B.state === 'pit' || (A.state === 'stand' && B.state === 'stand')) continue;
+            if (!A.gutter !== !B.gutter) continue;   // a pin down in the gutter runs below the deck
+            if (Math.abs(A.x - B.x) > 18 || Math.abs(A.y - B.y) > 18) continue;
+            collide(w, A, B);
+          }
+        }
+      }
+    }
+
+    function moving(w) {
+      for (const p of w.pins) {
+        if (p.state !== 'fall') continue;
+        if (p.phi < HALF_PI || Math.hypot(p.vx, p.vy) > 3 || Math.abs(p.w) > 0.6) return true;
+      }
+      return false;
+    }
+
+    function settled(w) {
+      if (w.ball && !w.ball.pit) return false;
+      return !moving(w);
+    }
+
+    // Bowl one ball at the pins in mask and return the pins left standing.
+    function simulate(t, mask, maxT) {
+      const w = makeWorld(mask);
+      w.ball = makeBall(t);
+      const lim = maxT || 12;
+      while (w.t < lim && !settled(w)) step(w, STEP);
+      return standingMask(w);
+    }
+
+    // Where a ball crosses the head pin line, ignoring pins. Off the lane counts as far out.
+    function arrival(x0, angle, power, hook) {
+      const b = makeBall({ x: x0, angle, power, hook });
+      const dt = 1 / 120;
+      while (b.y < HEAD_Y) {
+        stepBall(b, dt);
+        if (b.gutter) return b.gutter * (100 + (HEAD_Y - b.y));
+      }
+      return b.x;
+    }
+
+    function solveAngle(x0, power, hook, tx) {
+      let lo = -0.25, hi = 0.25;
+      for (let i = 0; i < 26; i++) {
+        const mid = (lo + hi) / 2;
+        if (arrival(x0, mid, power, hook) < tx) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+
+    // ---------- Computer bowler ----------
+    const DIFF = {
+      easy: { angle: 0.0075, power: 0.12, hook: 0.2, strikeHook: 0.35 },
+      normal: { angle: 0.0021, power: 0.05, hook: 0.07, strikeHook: 0.5 },
+      hard: { angle: 0.0007, power: 0.02, hook: 0.025, strikeHook: 0.65 },
+    };
+    const gauss = () => { let s = 0; for (let i = 0; i < 6; i++) s += Math.random(); return (s - 3) / Math.sqrt(0.5); };
+
+    // Choose the best aim for the pins in mask, by bowling candidate balls without error.
+    function plan(mask, diff, cache) {
+      const d = DIFF[diff] || DIFF.normal;
+      const key = diff + ':' + mask;
+      if (cache && cache[key]) return cache[key];
+      const full = mask === FULL;
+      const power = full ? 0.62 : 0.74;
+      const hook = full ? d.strikeHook : 0.12;
+      let xs = [];
+      if (full) for (let x = -2; x <= 7.01; x += 0.5) xs.push(x);
+      else for (let x = -21; x <= 21.01; x += 1) xs.push(x);
+      // Cross the lane for spares: stand on the side away from the pins.
+      let cx = 0, n = 0;
+      for (let i = 0; i < 10; i++) if (mask & (1 << i)) { cx += SPOTS[i].x; n++; }
+      cx = n ? cx / n : 0;
+      const x0 = full ? clamp(4 + hook * 8, -16, 16) : clamp(-cx * 0.6 + 4, -14, 16);
+      const up = count(mask);
+      const res = xs.map((tx) => {
+        const angle = solveAngle(x0, power, hook, tx);
+        const left = simulate({ x: x0, angle, power, hook }, mask);
+        const k = up - count(left);
+        return { angle, k: k + (k === up ? 2 : 0) };
+      });
+      // Prefer the middle of a wide window over a lucky single line.
+      let best = 0, bestV = -1;
+      for (let i = 0; i < res.length; i++) {
+        let v = 0;
+        for (let o = -4; o <= 4; o++) v += (res[i + o] ? res[i + o].k : 0) * (5 - Math.abs(o));
+        if (v > bestV) { bestV = v; best = i; }
+      }
+      const out = { x: x0, angle: res[best].angle, power, hook };
+      if (cache) cache[key] = out;
+      return out;
+    }
+
+    function aim(mask, diff, cache) {
+      const d = DIFF[diff] || DIFF.normal;
+      const p = plan(mask, diff, cache);
+      return {
+        x: p.x,
+        angle: p.angle + gauss() * d.angle,
+        power: clamp(p.power + gauss() * d.power, 0, 1),
+        hook: clamp(p.hook + gauss() * d.hook, -1, 1),
+      };
+    }
+
+    return {
+      frames, score, marks, next, isSplit, count,
+      BOARD, LANE_HW, WALL_X, GUTTER_X, ARROW_Y, DECK_Y, HEAD_Y, PIT_Y, ROW, SPOTS, FULL,
+      BALL_R, PIN_R, PIN_H, PIN_HL, STEP, V_MIN, V_MAX,
+      boardX, xBoard, speedOf, makeBall, makeWorld, standingMask, step, settled, moving, simulate,
+      arrival, solveAngle, plan, aim, DIFF,
+    };
+  })();
+  /* CORE-END */
+
+  // ---------- Constants ----------
+  const { BOARD, LANE_HW, WALL_X, ARROW_Y, DECK_Y, HEAD_Y, PIT_Y, SPOTS, FULL, BALL_R, PIN_H, STEP } = Core;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const ease = (t) => { t = clamp(t, 0, 1); return 1 - Math.pow(1 - t, 3); };
+  const easeIO = (t) => { t = clamp(t, 0, 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+  const C = { orange: '#ea5426', light: '#ff7a4d', dark: '#b83f19' };
+  const BALLS = [
+    { fill: '#ea5426', dark: '#b83f19' },
+    { fill: '#f2f2f2', dark: '#9ea2a9' },
+    { fill: '#ff7a4d', dark: '#c4542c' },
+    { fill: '#80858e', dark: '#4b4f56' },
+  ];
+  const MASK_Y = HEAD_Y - 36, MASK_Z0 = 30, MASK_Z1 = 64;
+  const GUARD_Y = HEAD_Y - 15, BAR_UP = 36, LIFT = 11, BACK_Y = PIT_Y + 30;
+  const PANEL_H = 66, PANEL_PAD = 12;
+  const POWER_T = 1.8, HOOK_T = 1.6;
+  const SWEEP_T = 2.25;
+  // pin outline: height (in) and radius (in) up the pin
+  const PROFILE = [[0, 1.0], [0.7, 1.65], [2.2, 2.2], [4.5, 2.38], [6.6, 2.15], [8.4, 1.5], [9.9, 0.95], [11.0, 0.92], [12.4, 1.18], [13.5, 1.25], [14.4, 1.0], [15, 0.35]];
+  const rootStyle = getComputedStyle(document.documentElement);
+  const FONT = rootStyle.getPropertyValue('--font').trim() || '"Segoe UI", system-ui, sans-serif';
+  const FONT_D = rootStyle.getPropertyValue('--font-display').trim() || FONT;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+  // ---------- Storage ----------
+  const OPTS_KEY = 'vela:bowling:options';
+  function loadOpts() {
+    const def = { mode: 'solo', players: 2, diff: 'normal' };
+    try {
+      const v = JSON.parse(localStorage.getItem(OPTS_KEY));
+      if (v && typeof v === 'object') Object.assign(def, v);
+    } catch (_) {}
+    if (!['solo', 'cpu', 'pass'].includes(def.mode)) def.mode = 'solo';
+    if (![2, 3, 4].includes(def.players)) def.players = 2;
+    if (!Core.DIFF[def.diff]) def.diff = 'normal';
+    return def;
+  }
+  const opts = loadOpts();
+  function saveOpts() { try { localStorage.setItem(OPTS_KEY, JSON.stringify(opts)); } catch (_) {} }
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const view = $('view'), cv = $('c'), ctx = cv.getContext('2d'), sheet = $('sheet'), pauseBtn = $('pauseBtn');
+  const ovStart = $('ovStart'), ovPause = $('ovPause'), ovOver = $('ovOver');
+
+  // ---------- Camera ----------
+  let VW = 1, VH = 1, dpr = 1, F = 800, CX = 0, CY = 0;
+  let aimCam = { x: 0, y: -130, z: 70, pitch: 0.12 }, deckCam = { x: 0, y: 450, z: 52, pitch: 0.2 };
+  const cam = { x: 0, y: -130, z: 70, pitch: 0.12, cp: 1, sp: 0 };
+  let camQ = 0;          // 0 = behind the foul line, 1 = at the pins
+
+  function setCam(q) {
+    camQ = q;
+    const e = q;
+    cam.x = 0;
+    cam.y = lerp(aimCam.y, deckCam.y, e);
+    cam.z = lerp(aimCam.z, deckCam.z, e);
+    cam.pitch = lerp(aimCam.pitch, deckCam.pitch, e);
+    cam.cp = Math.cos(cam.pitch); cam.sp = Math.sin(cam.pitch);
+  }
+
+  // Normalised projection for a camera, used to fit the view.
+  function nproj(c, x, y, z) {
+    const cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+    const dx = x - c.x, dy = y - c.y, dz = z - c.z;
+    const zc = dy * cp - dz * sp, yc = dy * sp + dz * cp;
+    return { x: dx / zc, y: -yc / zc };
+  }
+
+  function fitCamera() {
+    const padT = 58, padB = PANEL_H + PANEL_PAD;
+    const free = Math.max(40, VH - padT - padB);
+    // A higher camera spreads the lane down the screen; pick the height that shows it largest.
+    let best = null;
+    for (let t = 0; t <= 1.0001; t += 0.05) {
+      const c = { x: 0, y: lerp(-118, -150, t), z: lerp(40, 104, t), pitch: lerp(0.05, 0.22, t) };
+      const half = nproj(c, LANE_HW + 5, 0, 0).x;
+      const bottom = nproj(c, 0, -12, 0).y;
+      const top = Math.min(nproj(c, 0, MASK_Y, MASK_Z1).y, nproj(c, 0, BACK_Y, 44).y);
+      const f = Math.max(50, Math.min((VW / 2 - 4) / half, free / (bottom - top)));
+      if (!best || f > best.f + 1e-6) best = { f, c, bottom, top };
+    }
+    aimCam = best.c;
+    F = best.f;
+    const bottom = best.bottom, top = best.top;
+    CX = VW / 2;
+    const span = F * (bottom - top);
+    CY = VH - padB - F * bottom - Math.max(0, free - span) * 0.3;
+    // At the pins: close enough that the deck fills most of the width.
+    const d = clamp(F * 62 / (0.82 * VW), 150, 330);
+    const c = { x: 0, y: HEAD_Y - d, z: 50 };
+    const ty = clamp(VH * 0.5, padT + 60, VH - padB - 40);
+    const alpha = Math.atan2(c.z - 5, HEAD_Y + 16 - c.y);
+    c.pitch = alpha - Math.atan((ty - CY) / F);
+    deckCam = c;
+    setCam(camQ);
+  }
+
+  function proj(x, y, z) {
+    const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
+    let zc = dy * cam.cp - dz * cam.sp;
+    const yc = dy * cam.sp + dz * cam.cp;
+    if (zc < 0.5) zc = 0.5;
+    return { x: CX + F * dx / zc + shakeX, y: CY - F * yc / zc + shakeY, s: F / zc };
+  }
+
+  // Nearest y on a horizontal plane at height z that is still in front of the camera.
+  function nearY(z) { return cam.y + (6 + (z - cam.z) * cam.sp) / cam.cp; }
+
+  // Screen point to a point on the plane at height z.
+  function unproject(sx, sy, z) {
+    const a = (sx - CX) / F, b = -(sy - CY) / F;
+    const dx = a, dy = cam.sp * b + cam.cp, dz = cam.cp * b - cam.sp;
+    if (dz >= -1e-4) return null;
+    const t = (z - cam.z) / dz;
+    return { x: cam.x + dx * t, y: cam.y + dy * t };
+  }
+
+  function resize() {
+    const r = view.getBoundingClientRect();
+    VW = Math.max(1, Math.floor(r.width));
+    VH = Math.max(1, Math.floor(r.height));
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    cv.style.width = VW + 'px';
+    cv.style.height = VH + 'px';
+    cv.width = Math.round(VW * dpr);
+    cv.height = Math.round(VH * dpr);
+    fitCamera();
+  }
+
+  // ---------- State ----------
+  // title, setup, roll, settle, result, sweep, return, over
+  let state = 'title';
+  let paused = false, pausedBy = null;
+  let mode = { mode: 'solo', players: 1, diff: 'normal' };
+  let players = [], cur = 0;
+  let world = Core.makeWorld(FULL);
+  let rackMask = FULL;              // pins standing when this ball is bowled
+  let stateT = 0, ffwd = false, acc = 0;
+  let setup = null, cpuPlan = null, cpuCache = {};
+  let result = null, banner = null, sweep = null, overT = 0;
+  let parts = [], shake = 0, shakeX = 0, shakeY = 0, clock = 0;
+  let gest = null, hoverX = null, hoverY = null;
+  let lastPointer = matchMedia('(hover: none) and (pointer: coarse)').matches ? 'touch' : 'mouse';
+  let retQ = 1;
+
+  const human = () => players[cur] && !players[cur].cpu;
+  const playing = () => state !== 'title' && state !== 'over';
+
+  function makePlayers() {
+    const list = [];
+    if (mode.mode === 'solo') list.push({ name: 'You', short: 'You', cpu: false });
+    else if (mode.mode === 'cpu') list.push({ name: 'You', short: 'You', cpu: false }, { name: 'Computer', short: 'CPU', cpu: true });
+    else for (let i = 0; i < mode.players; i++) list.push({ name: 'Player ' + (i + 1), short: 'P' + (i + 1), cpu: false });
+    return list.map((p, i) => Object.assign(p, {
+      rolls: [], splits: [], ball: BALLS[i % BALLS.length], streak: 0, stand: 15, target: 10,
+    }));
+  }
+
+  // ---------- Game flow ----------
+  function newGame() {
+    mode = { mode: opts.mode, players: opts.mode === 'pass' ? opts.players : opts.mode === 'cpu' ? 2 : 1, diff: opts.diff };
+    hideAll();
+    paused = false; pausedBy = null;
+    players = makePlayers();
+    cur = 0;
+    cpuCache = {};
+    parts = []; shake = 0; result = null; sweep = null;
+    rackMask = FULL;
+    world = Core.makeWorld(FULL);
+    setCam(0);
+    banner = mode.players > 1 ? { text: players[0].name, t: 0 } : null;
+    beginBall();
+    renderSheet(true);
+    if (mode.mode === 'solo') V.score(0);
+  }
+
+  function beginBall() {
+    const p = players[cur];
+    state = 'setup';
+    stateT = 0;
+    ffwd = false;
+    gest = null;
+    setup = { step: 0, stand: p.stand, target: p.target, power: 0, hook: 0, t: 0, swipe: null };
+    cpuPlan = null;
+    if (p.cpu) startCpu();
+    renderSheet();
+  }
+
+  function angleOf(s) { return Math.atan((Core.boardX(s.target) - Core.boardX(s.stand)) / ARROW_Y); }
+  function standX(s) { return Core.boardX(s.stand); }
+
+  function throwBall(t) {
+    const p = players[cur];
+    p.stand = setup.stand;
+    p.target = setup.target;
+    world.ball = Core.makeBall(t);
+    world.t = 0;
+    world.firstHit = -1;
+    world.onHit = onPinHit;
+    state = 'roll';
+    stateT = 0;
+    acc = 0;
+    gest = null;
+  }
+
+  function throwFromSetup() {
+    throwBall({ x: standX(setup), angle: angleOf(setup), power: setup.power, hook: setup.hook });
+  }
+
+  function onPinHit(x, y, imp, ball) {
+    if (reduceMotion.matches) return;
+    if (ball && imp > 120) addShake(Math.min(5, imp / 90));
+    if (parts.length > 260) return;
+    const n = Math.round(clamp(imp / 80, 1, 6));
+    for (let i = 0; i < n; i++) {
+      parts.push({ x, y, z: rand(3, 12), vx: rand(-60, 60), vy: rand(-20, 90), vz: rand(30, 120),
+        life: rand(0.2, 0.45), max: 0.45, size: rand(0.6, 1.2), color: i % 3 === 0 ? C.light : '#ffffff' });
+    }
+  }
+
+  function finishRoll() {
+    const p = players[cur];
+    const before = Core.next(p.rolls);
+    const left = Core.standingMask(world);
+    const knocked = Core.count(rackMask) - Core.count(left);
+    const split = before.fresh && left !== 0 && Core.isSplit(left);
+    p.rolls.push(knocked);
+    p.splits[p.rolls.length - 1] = split;
+    const strike = before.fresh && left === 0;
+    const spare = !before.fresh && left === 0;
+    p.streak = strike ? p.streak + 1 : 0;
+    let text = String(knocked), sub = '';
+    if (strike) {
+      text = p.streak === 2 ? 'Double' : p.streak === 3 ? 'Turkey' : 'Strike';
+      strikeBurst();
+    } else if (spare) {
+      text = 'Spare';
+      spareBurst();
+    } else if (knocked === 0 && world.ball && world.ball.gutter) {
+      text = 'Gutter';
+    } else if (split) {
+      text = 'Split';
+      sub = pinList(left);
+    } else if (knocked === 0) {
+      text = 'Miss';
+    }
+    result = { text, sub, t: 0, big: strike || spare };
+    renderSheet(true);
+    if (mode.mode === 'solo') V.score(Core.score(p.rolls).total);
+
+    // What comes next
+    const after = Core.next(p.rolls);
+    const turnOver = after.done || after.frame !== before.frame;
+    let nextCur = cur;
+    if (turnOver) {
+      nextCur = (cur + 1) % players.length;
+      if (players.every((q) => Core.next(q.rolls).done)) nextCur = -1;
+    }
+    const sameBowler = nextCur === cur;
+    sweep = {
+      t: 0,
+      respot: sameBowler && !after.fresh,
+      next: nextCur,
+      mask: sameBowler && !after.fresh ? left : FULL,
+    };
+    state = 'result';
+    stateT = 0;
+  }
+
+  function pinList(mask) {
+    const a = [];
+    for (let i = 0; i < 10; i++) if (mask & (1 << i)) a.push(i + 1);
+    return a.join(' ');
+  }
+
+  function afterResult() {
+    if (sweep.next < 0) { endGame(); return; }
+    state = 'sweep';
+    stateT = 0;
+    sweep.t = 0;
+    // Pins still standing that the setter will put back down.
+    sweep.lifted = new Set();
+    if (sweep.respot) for (const p of world.pins) if (p.state === 'stand') sweep.lifted.add(p);
+    world.ball = null;
+  }
+
+  function afterSweep() {
+    rackMask = sweep.mask;
+    world = Core.makeWorld(rackMask);
+    const changed = sweep.next !== cur;
+    cur = sweep.next;
+    if (changed && players.length > 1) banner = { text: players[cur].name, t: 0 };
+    state = 'return';
+    stateT = 0;
+    retQ = camQ;
+    sweep = null;
+    renderSheet();
+  }
+
+  function endGame() {
+    state = 'over';
+    overT = 0;
+    renderSheet();
+    const totals = players.map((p) => Core.score(p.rolls).total);
+    const rows = [];
+    let title = 'Game over';
+    if (mode.mode === 'solo') {
+      const isBest = V.gameOver(totals[0]);
+      rows.push(row('Score', totals[0], false, true));
+      rows.push(row('Best', V.best(), false, false, isBest ? 'New best' : ''));
+    } else {
+      const top = Math.max(...totals);
+      const winners = players.filter((p, i) => totals[i] === top);
+      if (mode.mode === 'cpu') title = winners.length > 1 ? 'Draw' : winners[0].cpu ? 'You lose' : 'You win';
+      else title = winners.length > 1 ? 'Draw' : winners[0].name + ' wins';
+      players.forEach((p, i) => rows.push(row(p.name, totals[i], totals[i] === top && winners.length === 1, true)));
+    }
+    $('overTitle').textContent = title;
+    $('overRows').innerHTML = rows.join('');
+    setTimeout(() => { if (state === 'over') show(ovOver); }, 350);
+  }
+
+  function row(label, value, win, big, badge) {
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return '<div class="row' + (big ? ' big' : '') + (win ? ' win' : '') + '"><span class="label">' + esc(label) +
+      (badge ? '<span class="badge">' + esc(badge) + '</span>' : '') + '</span><b>' + esc(value) + '</b></div>';
+  }
+
+  function toTitle() {
+    state = 'title';
+    paused = false; pausedBy = null;
+    gest = null;
+    parts = []; shake = 0; result = null; banner = null; sweep = null;
+    players = [];
+    rackMask = FULL;
+    world = Core.makeWorld(FULL);
+    setCam(0);
+    hideAll();
+    renderSheet();
+    syncOptions();
+    show(ovStart);
+  }
+
+  // ---------- Setup steps (human) ----------
+  function lockStep() {
+    if (state !== 'setup' || !human() || paused) return;
+    const s = setup;
+    if (s.step === 0) { s.step = 1; }
+    else if (s.step === 1) { s.step = 2; s.t = 0; s.power = 0; }
+    else if (s.step === 2) { s.step = 3; s.t = 0; s.hook = 0; }
+    else { throwFromSetup(); }
+  }
+
+  function backStep() {
+    if (state !== 'setup' || !human() || paused) return;
+    const s = setup;
+    if (s.step > 0) { s.step--; s.t = 0; if (s.step < 3) s.hook = 0; if (s.step < 2) s.power = 0; }
+  }
+
+  function moveStand(d) {
+    setup.stand = clamp(Math.round(setup.stand) + d, 2, 38);
+  }
+  function moveTarget(d) {
+    setup.target = clamp(Math.round(setup.target * 2) / 2 + d, 1, 39);
+  }
+
+  function tri(t) { t = t - Math.floor(t); return t < 0.5 ? t * 2 : 2 - t * 2; }
+  // 0 -> 0, 0.25 -> 1 (curve left), 0.5 -> 0, 0.75 -> -1
+  function hookWave(t) { t = t - Math.floor(t); return t < 0.25 ? t * 4 : t < 0.75 ? 2 - t * 4 : t * 4 - 4; }
+
+  function updateSetup(dt) {
+    const s = setup;
+    s.t += dt;
+    if (players[cur].cpu) { updateCpu(dt); return; }
+    if (s.step === 2) s.power = tri(s.t / POWER_T);
+    else if (s.step === 3) s.hook = hookWave(s.t / HOOK_T);
+  }
+
+  // ---------- Computer bowler ----------
+  function startCpu() {
+    const t = Core.aim(rackMask, mode.diff, cpuCache);
+    const xa = t.x + Math.tan(t.angle) * ARROW_Y;
+    cpuPlan = {
+      throw: t, t: 0,
+      stand0: setup.stand, stand1: Core.xBoard(t.x),
+      target0: setup.target, target1: Core.xBoard(xa),
+    };
+  }
+
+  function updateCpu(dt) {
+    const c = cpuPlan, s = setup;
+    if (!c) return;
+    c.t += dt;
+    const t = c.t;
+    const T0 = 0.5, T1 = 1.2, T2 = 1.9;
+    if (t < T0) { s.step = 0; return; }
+    if (t < T1) { s.step = 0; s.stand = lerp(c.stand0, c.stand1, easeIO((t - T0) / (T1 - T0 - 0.15))); return; }
+    s.stand = c.stand1;
+    if (t < T2) { s.step = 1; s.target = lerp(c.target0, c.target1, easeIO((t - T1) / (T2 - T1 - 0.15))); return; }
+    s.target = c.target1;
+    // Meters fill at the same speed as a person's.
+    const pt = c.throw.power * POWER_T / 2;
+    const T3 = T2 + 0.15 + pt;
+    if (t < T3) { s.step = 2; s.power = Math.max(0, (t - T2 - 0.15) / (POWER_T / 2)); return; }
+    s.power = c.throw.power;
+    const ht = Math.abs(c.throw.hook) * HOOK_T / 4;
+    const T4 = T3 + 0.25 + ht;
+    if (t < T4) { s.step = 3; s.hook = Math.sign(c.throw.hook) * Math.max(0, (t - T3 - 0.25) / (HOOK_T / 4)); return; }
+    s.hook = c.throw.hook;
+    if (t < T4 + 0.2) return;
+    throwBall(c.throw);
+  }
+
+  // ---------- Juice ----------
+  function addShake(a) { if (!reduceMotion.matches) shake = Math.max(shake, a); }
+  function strikeBurst() {
+    addShake(7);
+    if (reduceMotion.matches) return;
+    const cols = ['#ffffff', C.orange, C.light];
+    for (let i = 0; i < 46; i++) {
+      parts.push({ x: rand(-18, 18), y: HEAD_Y + rand(-4, 34), z: rand(2, 16), vx: rand(-90, 90), vy: rand(-40, 60), vz: rand(60, 220),
+        life: rand(0.5, 1.0), max: 1.0, size: rand(0.8, 1.6), color: cols[i % 3] });
+    }
+  }
+  function spareBurst() {
+    addShake(3);
+    if (reduceMotion.matches) return;
+    for (let i = 0; i < 22; i++) {
+      parts.push({ x: rand(-18, 18), y: HEAD_Y + rand(0, 34), z: rand(2, 12), vx: rand(-60, 60), vy: rand(-20, 40), vz: rand(50, 160),
+        life: rand(0.4, 0.8), max: 0.8, size: rand(0.7, 1.3), color: i % 2 ? C.light : '#ffffff' });
+    }
+  }
+
+  // ---------- Update ----------
+  function update(dt) {
+    clock += dt;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const q = parts[i];
+      q.life -= dt;
+      if (q.life <= 0) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+      q.vz -= 386 * dt * 0.6;
+      q.x += q.vx * dt; q.y += q.vy * dt; q.z += q.vz * dt;
+      if (q.z < 0) { q.z = 0; q.vz = -q.vz * 0.3; }
+    }
+    shake = Math.max(0, shake - dt * 22);
+    if (banner) { banner.t += dt; if (banner.t > 1.3) banner = null; }
+    if (result) result.t += dt;
+    if (state !== 'roll' && state !== 'settle') {
+      for (const p of world.pins) {
+        if (p.state === 'stand' && p.wob > 0) p.wob = Math.max(0, p.wob - dt * 1.4);
+        else if (p.state === 'pit') p.pitT += dt;
+      }
+    }
+
+    const k = ffwd ? 3 : 1;
+    if (state === 'setup') {
+      updateSetup(dt);
+      approachCam(0, dt, 6);
+    } else if (state === 'roll') {
+      stateT += dt;
+      acc += dt * k;
+      let n = 0;
+      while (acc >= STEP && n < 400) { Core.step(world, STEP); acc -= STEP; n++; }
+      const b = world.ball;
+      const target = b ? clamp((b.y - 150 - aimCam.y) / (deckCam.y - aimCam.y), 0, 1) : 1;
+      approachCam(Math.max(camQ, target), dt, 7);
+      if (Core.settled(world) || world.t > 14) { state = 'settle'; stateT = 0; }
+    } else if (state === 'settle') {
+      stateT += dt * k;
+      acc += dt * k;
+      while (acc >= STEP) { Core.step(world, STEP); acc -= STEP; }
+      approachCam(1, dt, 5);
+      if (stateT > 0.45) finishRoll();
+    } else if (state === 'result') {
+      stateT += dt * k;
+      approachCam(1, dt, 5);
+      const hold = result && result.big ? 1.25 : 1.0;
+      if (stateT > hold) afterResult();
+    } else if (state === 'sweep') {
+      stateT += dt * k;
+      approachCam(1, dt, 5);
+      updateSweep(stateT);
+      if (stateT >= SWEEP_T) afterSweep();
+    } else if (state === 'return') {
+      stateT += dt * k;
+      const d = 0.75;
+      setCam(lerp(retQ, 0, easeIO(stateT / d)));
+      if (stateT >= d) { setCam(0); beginBall(); }
+    } else if (state === 'over') {
+      overT += dt;
+    }
+  }
+
+  function approachCam(q, dt, rate) {
+    setCam(camQ + (q - camQ) * (1 - Math.exp(-rate * dt)));
+  }
+
+  // Pinsetter: guard down, lift standing pins (second ball), sweep the deadwood, set pins down.
+  function sweepGeom(t) {
+    let barZ = 0, barY = GUARD_Y, lift = 0;
+    if (t < 0.3) barZ = BAR_UP * (1 - ease(t / 0.3));
+    else if (t < 0.65) lift = sweep.respot ? LIFT * easeIO((t - 0.3) / 0.35) : 0;
+    else if (t < 1.25) { lift = sweep.respot ? LIFT : 0; barY = lerp(GUARD_Y, PIT_Y + 14, easeIO((t - 0.65) / 0.6)); }
+    else if (t < 1.6) { lift = LIFT; barY = lerp(PIT_Y + 14, GUARD_Y, easeIO((t - 1.25) / 0.35)); }
+    else if (t < 2.0) lift = LIFT * (1 - easeIO((t - 1.6) / 0.4));
+    else barZ = BAR_UP * ease((t - 2.0) / 0.25);
+    if (t >= 1.25 && !sweep.respot && t < 1.6) lift = LIFT;
+    return { barZ, barY, lift };
+  }
+
+  function updateSweep(t) {
+    const g = sweepGeom(t);
+    sweep.g = g;
+    if (t >= 0.65 && t < 1.25) {
+      for (const p of world.pins) {
+        if (p.state === 'pit' || sweep.lifted.has(p)) continue;
+        const ext = Math.abs(p.ay) * p.hl + p.r;
+        if (p.y - ext < g.barY + 2) {
+          p.y = g.barY + 2 + ext;
+          p.vx = 0; p.vy = 0; p.w = 0;
+          if (p.y > PIT_Y + 1) { p.state = 'pit'; p.pitT = 0; }
+        }
+      }
+    }
+  }
+
+  // ---------- Render ----------
+  function render() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VW, VH);
+    shakeX = shakeY = 0;
+    if (shake > 0 && !paused) { shakeX = rand(-1, 1) * shake; shakeY = rand(-1, 1) * shake; }
+
+    drawLane();
+    drawAimLine();
+    drawObjects();
+    drawParticles();
+    shakeX = shakeY = 0;
+    if (state !== 'title') {
+      drawHud();
+      drawPanel();
+      drawResult();
+      drawBanner();
+    }
+  }
+
+  function fillPoly(pts, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function ground(x0, x1, y0, y1, z, color) {
+    y0 = Math.max(y0, nearY(z));
+    if (y1 <= y0) return;
+    fillPoly([proj(x0, y0, z), proj(x1, y0, z), proj(x1, y1, z), proj(x0, y1, z)], color);
+  }
+
+  function sideWall(x, y0, y1, z0, z1, color) {
+    y0 = Math.max(y0, nearY(z0), nearY(z1));
+    if (y1 <= y0) return;
+    fillPoly([proj(x, y0, z0), proj(x, y1, z0), proj(x, y1, z1), proj(x, y0, z1)], color);
+  }
+
+  function front(x0, x1, y, z0, z1, color) {
+    if (y < nearY(z0) || y < nearY(z1)) return;
+    fillPoly([proj(x0, y, z0), proj(x1, y, z0), proj(x1, y, z1), proj(x0, y, z1)], color);
+  }
+
+  function line3(x0, y0, z0, x1, y1, z1, color, w) {
+    const ny = Math.max(nearY(z0), nearY(z1));
+    if (y1 < ny) return;
+    if (y0 < ny) { const f = (ny - y0) / (y1 - y0); x0 = lerp(x0, x1, f); y0 = ny; }
+    const a = proj(x0, y0, z0), b = proj(x1, y1, z1);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  function drawLane() {
+    const GX = WALL_X;
+    // back of the pit and the kickbacks
+    front(-GX - 10, GX + 10, BACK_Y, 0, 46, '#101215');
+    sideWall(-GX, DECK_Y - 30, BACK_Y, 0, 34, '#15171b');
+    sideWall(GX, DECK_Y - 30, BACK_Y, 0, 34, '#15171b');
+    line3(-GX, DECK_Y - 30, 34, -GX, BACK_Y, 34, 'rgba(255,255,255,0.1)', 1);
+    line3(GX, DECK_Y - 30, 34, GX, BACK_Y, 34, 'rgba(255,255,255,0.1)', 1);
+    // approach, gutters, lane, deck
+    ground(-GX - 14, GX + 14, -400, 0, 0, '#101216');
+    ground(-GX, -LANE_HW, 0, PIT_Y, -1.5, '#08090b');
+    ground(LANE_HW, GX, 0, PIT_Y, -1.5, '#08090b');
+    ground(-LANE_HW, LANE_HW, 0, DECK_Y, 0, '#1a1d22');
+    ground(-LANE_HW, LANE_HW, DECK_Y, PIT_Y, 0, '#20242a');
+    // boards
+    for (let b = 1; b < 39; b++) {
+      const x = LANE_HW - b * BOARD;
+      line3(x, 0, 0, x, PIT_Y, 0, b % 5 === 0 ? 'rgba(255,255,255,0.055)' : 'rgba(255,255,255,0.022)', 1);
+    }
+    line3(-LANE_HW, 0, 0, -LANE_HW, PIT_Y, 0, 'rgba(255,255,255,0.14)', 1);
+    line3(LANE_HW, 0, 0, LANE_HW, PIT_Y, 0, 'rgba(255,255,255,0.14)', 1);
+    line3(-GX, 0, 0, -GX, DECK_Y - 30, 0, 'rgba(255,255,255,0.08)', 1);
+    line3(GX, 0, 0, GX, DECK_Y - 30, 0, 'rgba(255,255,255,0.08)', 1);
+    // deck edge
+    line3(-LANE_HW, PIT_Y, 0, LANE_HW, PIT_Y, 0, 'rgba(255,255,255,0.12)', 1);
+    // foul line
+    ground(-GX, GX, -0.6, 0.6, 0, 'rgba(255,255,255,0.32)');
+    // dots at 7 feet and arrows at 13 to 16 feet
+    for (const b of [3, 5, 8, 11, 14, 26, 29, 32, 35, 37]) {
+      const x = Core.boardX(b);
+      ground(x - 0.5, x + 0.5, 83.5, 84.5, 0, 'rgba(255,255,255,0.28)');
+    }
+    for (let b = 5; b <= 35; b += 5) {
+      const x = Core.boardX(b), y = 156 + (3 - Math.abs(b - 20) / 5) * 12;
+      const a = proj(x, y + 9, 0), l = proj(x - BOARD, y, 0), r = proj(x + BOARD, y, 0);
+      if (y > nearY(0)) fillPoly([a, r, l], C.orange);
+    }
+    // pin spots
+    ctx.fillStyle = 'rgba(255,255,255,0.13)';
+    for (const s of SPOTS) {
+      if (s.y < nearY(0)) continue;
+      const p = proj(s.x, s.y, 0);
+      const r = Math.max(0.8, 1.1 * p.s);
+      ctx.fillRect(p.x - r, p.y - r * 0.4, r * 2, r * 0.8);
+    }
+  }
+
+  function drawObjects() {
+    const objs = [];
+    const lift = sweep && sweep.g ? sweep.g.lift : 0;
+    for (const p of world.pins) {
+      if (p.state === 'pit' && p.pitT > 0.5) continue;
+      objs.push({ y: p.state === 'stand' ? p.y : p.y + 0.01, pin: p });
+    }
+    // fresh rack coming down during a full sweep
+    if (sweep && !sweep.respot && stateT >= 1.25 && sweep.g) {
+      for (let i = 0; i < 10; i++) if (sweep.mask & (1 << i)) objs.push({ y: SPOTS[i].y, ghost: i });
+    }
+    if (world.ball && !world.ball.pit) objs.push({ y: world.ball.y, ball: world.ball });
+    if (state === 'setup') objs.push({ y: -2, held: true });
+    objs.push({ y: MASK_Y, mask: true });
+    if (sweep && sweep.g && sweep.g.barZ < BAR_UP) objs.push({ y: sweep.g.barY, bar: sweep.g });
+    objs.sort((a, b) => b.y - a.y);
+    // pins that fall into the pit are drawn only above the deck edge
+    for (const o of objs) {
+      if (o.pin) {
+        const p = o.pin;
+        let z = 0;
+        if (sweep && sweep.lifted && sweep.lifted.has(p)) z = lift;
+        if (p.state === 'pit') { drawPitPin(p); continue; }
+        drawPin(p, z);
+      } else if (o.ghost !== undefined) {
+        const s = SPOTS[o.ghost];
+        drawPinAt(s.x, s.y, lift, s.x, s.y, lift + PIN_H);
+      } else if (o.ball) drawBall(o.ball);
+      else if (o.held) drawHeld();
+      else if (o.mask) drawMasking();
+      else if (o.bar) drawBar(o.bar);
+    }
+  }
+
+  function drawMasking() {
+    front(-WALL_X - 12, WALL_X + 12, MASK_Y, MASK_Z0, MASK_Z1, '#0b0c0f');
+    line3(-WALL_X - 12, MASK_Y, MASK_Z0, WALL_X + 12, MASK_Y, MASK_Z0, C.orange, 2);
+  }
+
+  function drawBar(g) {
+    const x0 = -WALL_X + 0.5, x1 = WALL_X - 0.5;
+    front(x0, x1, g.barY, g.barZ, g.barZ + 9, '#2c3037');
+    const a = proj(x0, g.barY, g.barZ + 9), b = proj(x1, g.barY, g.barZ + 9), c = proj(x1, g.barY + 2.5, g.barZ + 9), d = proj(x0, g.barY + 2.5, g.barZ + 9);
+    fillPoly([a, b, c, d], '#40454e');
+    line3(x0, g.barY, g.barZ + 0.5, x1, g.barY, g.barZ + 0.5, C.dark, 2);
+  }
+
+  function drawPitPin(p) {
+    // clip to the region beyond the deck edge so the pin drops out of sight behind it
+    const l = proj(-WALL_X, PIT_Y, 0), r = proj(WALL_X, PIT_Y, 0);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-10, -10); ctx.lineTo(VW + 10, -10); ctx.lineTo(VW + 10, r.y); ctx.lineTo(r.x, r.y); ctx.lineTo(l.x, l.y); ctx.lineTo(-10, l.y);
+    ctx.closePath();
+    ctx.clip();
+    drawPin(p, -p.pitT * p.pitT * 200);
+    ctx.restore();
+  }
+
+  function drawPin(p, z) {
+    if (p.state === 'stand') {
+      let tx = p.x, ty = p.y;
+      if (p.wob > 0 && !reduceMotion.matches) {
+        const a = Math.sin(clock * 26) * p.wob * 0.18;
+        tx += Math.cos(p.wobA) * Math.sin(a) * PIN_H;
+        ty += Math.sin(p.wobA) * Math.sin(a) * PIN_H;
+      }
+      drawPinAt(p.x, p.y, z, tx, ty, z + PIN_H);
+      return;
+    }
+    const sn = Math.sin(p.phi), cs = Math.cos(p.phi);
+    const lift = Core.PIN_R * sn;
+    const gz = p.gutter ? -2 : 0;
+    const bx = p.x - p.ax * p.hl, by = p.y - p.ay * p.hl;
+    drawPinAt(bx, by, z + lift + gz, bx + p.ax * PIN_H * sn, by + p.ay * PIN_H * sn, z + lift + gz + PIN_H * cs);
+  }
+
+  // A pin from its base (x0, y0, z0) to its top (x1, y1, z1), drawn as a flat silhouette.
+  function drawPinAt(x0, y0, z0, x1, y1, z1) {
+    const ny = nearY(0);
+    if (y0 < ny || y1 < ny) return;
+    const B = proj(x0, y0, z0), T = proj(x1, y1, z1), M = proj((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    let ax = T.x - B.x, ay = T.y - B.y;
+    const L = Math.hypot(ax, ay);
+    const s = M.s;
+    if (L < 0.01) return;
+    let nx = -ay / L, ny2 = ax / L;
+    // keep the shaded half on the right of the screen
+    if (nx < 0) { nx = -nx; ny2 = -ny2; }
+    const pts = PROFILE.map(([h, r]) => ({ x: B.x + ax * h / PIN_H, y: B.y + ay * h / PIN_H, r: r * s }));
+    ctx.fillStyle = '#f2f2f2';
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) { const q = pts[i]; i ? ctx.lineTo(q.x - nx * q.r, q.y - ny2 * q.r) : ctx.moveTo(q.x - nx * q.r, q.y - ny2 * q.r); }
+    for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; ctx.lineTo(q.x, q.y); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c9ccd1';
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) { const q = pts[i]; i ? ctx.lineTo(q.x + nx * q.r, q.y + ny2 * q.r) : ctx.moveTo(q.x + nx * q.r, q.y + ny2 * q.r); }
+    for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; ctx.lineTo(q.x, q.y); }
+    ctx.closePath(); ctx.fill();
+    // neck stripes
+    if (s * 0.4 > 0.5) {
+      ctx.fillStyle = C.orange;
+      for (const [h0, h1] of [[9.3, 9.75], [10.25, 10.7]]) {
+        const r0 = pinR(h0) * s, r1 = pinR(h1) * s;
+        const ax0 = B.x + ax * h0 / PIN_H, ay0 = B.y + ay * h0 / PIN_H, ax1 = B.x + ax * h1 / PIN_H, ay1 = B.y + ay * h1 / PIN_H;
+        ctx.beginPath();
+        ctx.moveTo(ax0 - nx * r0, ay0 - ny2 * r0); ctx.lineTo(ax0 + nx * r0, ay0 + ny2 * r0);
+        ctx.lineTo(ax1 + nx * r1, ay1 + ny2 * r1); ctx.lineTo(ax1 - nx * r1, ay1 - ny2 * r1);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+
+  function pinR(h) {
+    for (let i = 1; i < PROFILE.length; i++) {
+      if (h <= PROFILE[i][0]) {
+        const [h0, r0] = PROFILE[i - 1], [h1, r1] = PROFILE[i];
+        return lerp(r0, r1, (h - h0) / (h1 - h0));
+      }
+    }
+    return 0.3;
+  }
+
+  function drawBallAt(x, y, z, roll, look) {
+    if (y < nearY(0) + 2) return;
+    const c = proj(x, y, z), r = BALL_R * c.s;
+    const g = proj(x, y, 0);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath(); ctx.ellipse(g.x, g.y, r * 1.02, Math.max(1, r * 0.28), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = look.fill;
+    ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
+    // finger holes, turning with the roll
+    ctx.fillStyle = look.dark;
+    const cr = Math.cos(roll), sr = Math.sin(roll);
+    for (const [hx, hy, hz] of [[-0.2, -0.3, 0.93], [0.2, -0.3, 0.93], [0, 0.32, 0.95]]) {
+      const ly = hy * cr + hz * sr, lz = -hy * sr + hz * cr;
+      const wx = x + hx * BALL_R, wy = y + ly * BALL_R, wz = z + lz * BALL_R;
+      // facing the camera?
+      const tx = cam.x - wx, ty = cam.y - wy, tz = cam.z - wz;
+      if (hx * tx + ly * ty + lz * tz <= 0) continue;
+      const p = proj(wx, wy, wz);
+      const hr = Math.max(0.6, 0.55 * p.s);
+      ctx.beginPath(); ctx.arc(p.x, p.y, hr, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawBall(b) {
+    const gz = b.gutter ? -2 : 0;
+    drawBallAt(b.x, b.y, BALL_R + gz, b.roll, players[cur] ? players[cur].ball : BALLS[0]);
+  }
+
+  function drawHeld() {
+    const p = players[cur];
+    drawBallAt(standX(setup), -2, BALL_R, 0, p.ball);
+  }
+
+  function drawAimLine() {
+    if (state !== 'setup') return;
+    const s = setup;
+    let ang = angleOf(s);
+    if (s.swipe) ang = s.swipe.angle;
+    const x0 = standX(s);
+    const ny = nearY(0);
+    for (let y = 14; y < 420; y += 18) {
+      if (y < ny) continue;
+      const x = x0 + Math.tan(ang) * y;
+      if (Math.abs(x) > LANE_HW) break;
+      const a = proj(x, y, 0.2), b = proj(x + Math.tan(ang) * 8, y + 8, 0.2);
+      ctx.strokeStyle = s.step === 1 || s.swipe ? 'rgba(255,122,77,0.95)' : 'rgba(234,84,38,0.55)';
+      ctx.lineWidth = Math.max(1.5, 0.9 * a.s);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    // the board at the arrows
+    const xa = x0 + Math.tan(ang) * ARROW_Y;
+    if (Math.abs(xa) < LANE_HW) {
+      const p = proj(xa, ARROW_Y, 0.2);
+      const r = Math.max(3, 2.2 * p.s);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(p.x - r, p.y - r * 0.5, r * 2, r);
+    }
+  }
+
+  function drawParticles() {
+    for (const q of parts) {
+      if (q.y < nearY(q.z)) continue;
+      const p = proj(q.x, q.y, q.z);
+      const sz = clamp(q.size * p.s, 1.5, 7);
+      ctx.globalAlpha = clamp((q.life / q.max) * 1.6, 0, 1);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- HUD ----------
+  function label(text, x, y, color, align, size) {
+    ctx.font = '600 ' + (size || 11) + 'px ' + FONT;
+    ctx.fillStyle = color;
+    ctx.textAlign = align || 'left';
+    ctx.textBaseline = 'alphabetic';
+    const t = String(text).toUpperCase();
+    // canvas letterSpacing is not in every browser yet
+    if ('letterSpacing' in ctx) { ctx.letterSpacing = '0.1em'; ctx.fillText(t, x, y); ctx.letterSpacing = '0px'; }
+    else ctx.fillText(t, x, y);
+  }
+
+  function drawHud() {
+    if (state === 'over' || !players[cur]) return;
+    const p = players[cur];
+    const nx = Core.next(p.rolls);
+    ctx.fillStyle = p.ball.fill;
+    ctx.fillRect(12, 14, 8, 8);
+    label(p.name, 26, 22, '#ffffff');
+    if (!nx.done) label('Frame ' + (nx.frame + 1) + '   Ball ' + (nx.ball + 1), 12, 40, 'rgba(255,255,255,0.6)');
+    drawRack(VW - 54 - 44 - 10, 14);
+  }
+
+  // The pins as a pinsetter display: back row on top.
+  function drawRack(x, y) {
+    const sp = 11, d = 7;
+    let standing = 0;
+    if (state === 'setup' || state === 'return') standing = rackMask;
+    else for (const p of world.pins) if (p.state === 'stand') standing |= 1 << p.id;
+    if (state === 'sweep' && sweep) standing = sweep.mask;
+    const rows = [[6, 7, 8, 9], [3, 4, 5], [1, 2], [0]];
+    rows.forEach((r, ri) => {
+      r.forEach((id, k) => {
+        const px = x + (ri * sp) / 2 + k * sp + (44 - 3 * sp - d) / 2;
+        const py = y + ri * 9;
+        if (standing & (1 << id)) { ctx.fillStyle = '#ffffff'; ctx.fillRect(px, py, d, d); }
+        else { ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, py + 0.5, d - 1, d - 1); }
+      });
+    });
+  }
+
+  function drawPanel() {
+    if (!setup || state === 'over') return;
+    const y0 = VH - PANEL_H;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, y0, VW, PANEL_H);
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(0, y0, VW, 1);
+    const w = Math.min(VW, 560), x0 = (VW - w) / 2, cw = w / 4;
+    const s = setup;
+    const active = state === 'setup' ? s.step : -1;
+    const cols = [
+      { name: 'Stand', val: String(Math.round(s.stand)) },
+      { name: 'Target', val: fmtBoard(s) },
+      { name: 'Power', bar: 'power' },
+      { name: 'Hook', bar: 'hook' },
+    ];
+    cols.forEach((c, i) => {
+      const cx = x0 + i * cw + 12;
+      const on = i === active;
+      const done = state !== 'setup' || i < active;
+      if (on) { ctx.fillStyle = C.orange; ctx.fillRect(x0 + i * cw + 12, y0, cw - 24, 2); }
+      label(c.name, cx, y0 + 22, on ? C.light : done ? '#ffffff' : 'rgba(255,255,255,0.45)');
+      if (i > 0) { ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x0 + i * cw, y0 + 12, 1, PANEL_H - 24); }
+      const bw = cw - 24;
+      if (c.val !== undefined) {
+        ctx.font = '300 24px ' + FONT_D;
+        ctx.fillStyle = on || done ? '#ffffff' : 'rgba(255,255,255,0.45)';
+        ctx.textAlign = 'left';
+        ctx.fillText(c.val, cx, y0 + 52);
+      } else if (c.bar === 'power') {
+        const shown = i <= active || state !== 'setup';
+        const v = shown ? s.power : 0;
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx + 0.5, y0 + 34.5, bw - 1, 11);
+        ctx.fillStyle = on ? C.orange : '#ffffff';
+        ctx.fillRect(cx + 2, y0 + 36, Math.max(0, (bw - 4) * v), 8);
+        if (shown && (done || on)) {
+          ctx.font = '400 11px ' + FONT;
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.fillText((Core.speedOf(v) * 0.0568).toFixed(1) + ' mph', cx, y0 + 59);
+        }
+      } else {
+        const shown = i <= active || state !== 'setup';
+        const v = shown ? s.hook : 0;
+        const mid = cx + bw / 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx + 0.5, y0 + 34.5, bw - 1, 11);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(mid - 0.5, y0 + 32, 1, 16);
+        const nxp = mid - v * (bw / 2 - 2);
+        ctx.fillStyle = on ? C.orange : '#ffffff';
+        ctx.fillRect(Math.min(mid, nxp), y0 + 36, Math.abs(nxp - mid), 8);
+        if (shown) { ctx.fillStyle = '#ffffff'; ctx.fillRect(nxp - 1.5, y0 + 32, 3, 16); }
+        if (shown && (done || on)) {
+          ctx.font = '400 11px ' + FONT;
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          const a = Math.abs(v);
+          ctx.fillText(a < 0.05 ? 'Straight' : (v > 0 ? 'Left ' : 'Right ') + Math.round(a * 100), cx, y0 + 59);
+        }
+      }
+    });
+  }
+
+  function fmtBoard(s) {
+    let ang = angleOf(s);
+    if (s.swipe) ang = s.swipe.angle;
+    const b = Core.xBoard(standX(s) + Math.tan(ang) * ARROW_Y);
+    if (b < 0.5 || b > 39.5) return 'Off';
+    return String(Math.round(b * 2) / 2);
+  }
+
+  function drawResult() {
+    if (!result || (state !== 'result' && state !== 'sweep')) return;
+    const t = result.t;
+    const total = (result.big ? 1.25 : 1.0) + 0.5;
+    if (t > total) return;
+    const k = reduceMotion.matches ? 1 : ease(t / 0.28);
+    const sc = 1 + (1 - k) * 0.35;
+    const a = t > total - 0.3 ? clamp((total - t) / 0.3, 0, 1) : clamp(t / 0.12, 0, 1);
+    const size = Math.round(clamp(VW * 0.15, 40, 84));
+    const y = Math.max(96, VH * 0.27);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(VW / 2, y);
+    ctx.scale(sc, sc);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '300 ' + size + 'px ' + FONT_D;
+    const w = ctx.measureText(result.text).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(-w / 2 - 18, -size * 0.62, w + 36, size * 1.2 + (result.sub ? 22 : 0));
+    ctx.fillStyle = result.big ? C.orange : '#ffffff';
+    if (result.big) { ctx.fillRect(-w / 2 - 18, -size * 0.62, w + 36, 3); ctx.fillStyle = '#ffffff'; }
+    ctx.fillText(result.text, 0, 0);
+    if (result.sub) label(result.sub, 0, size * 0.62 + 6, C.light, 'center', 12);
+    ctx.restore();
+  }
+
+  function drawBanner() {
+    if (!banner || state === 'over') return;
+    const t = banner.t;
+    const a = t < 0.15 ? t / 0.15 : t > 1.0 ? clamp((1.3 - t) / 0.3, 0, 1) : 1;
+    const dy = reduceMotion.matches ? 0 : (1 - ease(t / 0.3)) * 12;
+    const size = Math.round(clamp(VW * 0.09, 28, 44));
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '300 ' + size + 'px ' + FONT_D;
+    const w = ctx.measureText(banner.text).width;
+    const y = Math.max(110, VH * 0.36) + dy;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(VW / 2 - w / 2 - 18, y - size * 0.7, w + 36, size * 1.4);
+    ctx.fillStyle = players[cur] ? players[cur].ball.fill : C.orange;
+    ctx.fillRect(VW / 2 - w / 2 - 18, y - size * 0.7, 3, size * 1.4);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(banner.text, VW / 2, y);
+    ctx.restore();
+  }
+
+  // ---------- Scorecard ----------
+  let sheetKey = '';
+  function renderSheet(animate) {
+    if (!players.length) { sheet.innerHTML = ''; sheetKey = ''; requestResize(); return; }
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let h = '<div class="sc"><div class="sc-row sc-head"><span></span>';
+    for (let f = 1; f <= 10; f++) h += '<span>' + f + '</span>';
+    h += '<span class="tot">Total</span></div>';
+    players.forEach((pl, pi) => {
+      const sc = Core.score(pl.rolls), nx = Core.next(pl.rolls);
+      const isCur = pi === cur && playing();
+      h += '<div class="sc-row' + (isCur ? ' cur' : '') + '"><span class="nm"><em style="background:' + pl.ball.fill + '"></em>' + esc(pl.short) + '</span>';
+      for (let f = 0; f < 10; f++) {
+        const fr = sc.frames[f];
+        const on = isCur && !nx.done && nx.frame === f;
+        const n = f < 9 ? 2 : 3;
+        let bx = '';
+        for (let j = 0; j < n; j++) {
+          const m = fr.marks[j] || '';
+          const ri = f < 9 && fr.rolls[0] === 10 ? (j === 1 ? fr.start : -1) : fr.start + j;
+          const sp = m && ri >= 0 && pl.splits[ri];
+          const fresh = animate && isCur && m !== '' && ri === pl.rolls.length - 1;
+          bx += '<i class="' + (sp ? 'sp' : '') + (fresh ? ' new' : '') + '">' + esc(m) + '</i>';
+        }
+        h += '<div class="fr' + (on ? ' on' : '') + '"><div class="bx">' + bx + '</div><b>' + (fr.total === null ? '' : fr.total) + '</b></div>';
+      }
+      h += '<span class="tot">' + sc.total + '</span></div>';
+    });
+    h += '</div>';
+    const key = h;
+    if (key === sheetKey && !animate) return;
+    sheetKey = key;
+    sheet.innerHTML = h;
+    requestResize();
+  }
+
+  let resizeQueued = false;
+  function requestResize() {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => { resizeQueued = false; resize(); });
+    // rAF can stall in a hidden frame; make sure the layout still updates
+    setTimeout(() => { if (resizeQueued) { resizeQueued = false; resize(); } }, 60);
+  }
+
+  // ---------- Overlays + pause ----------
+  function show(el) { el.classList.add('show'); }
+  function hideAll() {
+    for (const el of [ovStart, ovPause, ovOver]) el.classList.remove('show');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  function setPaused(p, by) {
+    if (p) {
+      if (paused || !playing()) return;
+      paused = true; pausedBy = by || 'user';
+      gest = null;
+      show(ovPause);
+    } else {
+      if (!paused) return;
+      paused = false; pausedBy = null;
+      ovPause.classList.remove('show');
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+  }
+
+  V.onPause((p) => {
+    if (p) setPaused(true, 'host');
+    else if (paused && pausedBy === 'host' && state !== 'roll') setPaused(false);
+  });
+
+  function updateTexts() {
+    $('ctrlText').textContent = lastPointer === 'touch'
+      ? 'Drag to move, swipe up to roll. Curve the swipe to hook.'
+      : 'Left and Right to move and aim, Space or click to set each step.';
+  }
+
+  function syncOptions() {
+    for (const seg of document.querySelectorAll('.seg')) {
+      const key = seg.dataset.key;
+      for (const b of seg.querySelectorAll('button')) {
+        const on = String(opts[key]) === b.dataset.v;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+    }
+    $('optPlayers').style.display = opts.mode === 'pass' ? '' : 'none';
+    $('optDiff').style.display = opts.mode === 'cpu' ? '' : 'none';
+    updateTexts();
+  }
+
+  for (const seg of document.querySelectorAll('.seg')) {
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const key = seg.dataset.key, v = b.dataset.v;
+      opts[key] = key === 'players' ? Number(v) : v;
+      saveOpts();
+      syncOptions();
+    });
+  }
+
+  // ---------- Input ----------
+  function canAim() { return state === 'setup' && human() && !paused; }
+  function canSkip() { return !paused && (state === 'settle' || state === 'result' || state === 'sweep' || state === 'return' || (state === 'roll' && world.firstHit >= 0)); }
+
+  function viewPoint(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  function setLastPointer(kind) {
+    if (lastPointer !== kind) { lastPointer = kind; updateTexts(); }
+  }
+
+  // Inches per screen pixel along the foul line, for dragging the stance.
+  function foulScale() { return proj(1, 0, 0).x - proj(0, 0, 0).x; }
+
+  cv.addEventListener('pointerdown', (e) => {
+    try { window.focus(); } catch (_) {}
+    setLastPointer(e.pointerType === 'mouse' ? 'mouse' : 'touch');
+    if (e.button === 2) { backStep(); return; }
+    if (canSkip()) { ffwd = true; return; }
+    if (!canAim()) return;
+    const p = viewPoint(e);
+    gest = { id: e.pointerId, type: '?', sx: p.x, sy: p.y, pts: [{ x: p.x, y: p.y, t: performance.now() }], stand: setup.stand, mouse: e.pointerType === 'mouse' };
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  cv.addEventListener('pointermove', (e) => {
+    const p = viewPoint(e);
+    if (gest && e.pointerId === gest.id) {
+      if (!canAim()) { gest = null; return; }
+      gest.pts.push({ x: p.x, y: p.y, t: performance.now() });
+      if (gest.pts.length > 240) gest.pts.splice(1, 1);
+      const dx = p.x - gest.sx, dy = p.y - gest.sy;
+      if (gest.type === '?' && Math.hypot(dx, dy) > 10) {
+        gest.type = Math.abs(dx) > Math.abs(dy) ? 'move' : dy < 0 ? 'swipe' : 'none';
+      }
+      if (gest.type === 'move') {
+        const k = Math.max(0.5, foulScale());
+        setup.stand = clamp(Math.round(gest.stand - dx / k / BOARD), 2, 38);
+      } else if (gest.type === 'swipe') {
+        setup.swipe = { angle: swipeAngle(gest) };
+      }
+      return;
+    }
+    if (e.pointerType === 'mouse' && canAim()) {
+      setLastPointer('mouse');
+      hoverAim(p.x, p.y);
+    }
+  });
+
+  function hoverAim(x, y) {
+    const s = setup;
+    if (s.step === 0) {
+      // across the foul line, wherever the pointer is up the screen
+      const wx = (x - proj(0, 0, 0).x) / Math.max(0.5, foulScale());
+      s.stand = clamp(Math.round(Core.xBoard(wx)), 2, 38);
+    } else if (s.step === 1) {
+      const g = unproject(x, y, 0);
+      if (!g) return;
+      const x0 = standX(s);
+      const ang = clamp(Math.atan2(g.x - x0, Math.max(40, g.y)), -0.12, 0.12);
+      s.target = clamp(Math.round(Core.xBoard(x0 + Math.tan(ang) * ARROW_Y) * 2) / 2, 1, 39);
+    }
+  }
+
+  function swipeAngle(g) {
+    const a = g.pts[0], b = g.pts[g.pts.length - 1];
+    const al = Math.atan2(b.x - a.x, -(b.y - a.y));
+    return clamp(al * 0.085, -0.075, 0.075);
+  }
+
+  function endGesture(e, cancel) {
+    if (!gest || e.pointerId !== gest.id) return;
+    const g = gest;
+    gest = null;
+    if (setup) setup.swipe = null;
+    if (cancel || !canAim()) return;
+    if (g.type === '?') { if (g.mouse && setup.step <= 1) { const p = viewPoint(e); hoverAim(p.x, p.y); } lockStep(); return; }
+    if (g.type !== 'swipe') return;
+    const a = g.pts[0], b = g.pts[g.pts.length - 1];
+    const up = a.y - b.y;
+    const dur = (b.t - a.t) / 1000;
+    if (up < Math.max(40, VH * 0.1) || dur > 1.6) return;
+    // speed over the last tenth of a second
+    let k = g.pts.length - 1;
+    while (k > 0 && b.t - g.pts[k].t < 100) k--;
+    const q = g.pts[k];
+    const v = (q.y - b.y) / Math.max(0.016, (b.t - q.t) / 1000);
+    const vAll = up / Math.max(0.05, dur);
+    const speed = Math.max(v, vAll * 0.8) / VH;
+    // curve: how far the path bows out from the straight line
+    const cx = b.x - a.x, cy = b.y - a.y, len = Math.hypot(cx, cy);
+    let dev = 0;
+    for (const p of g.pts) {
+      const d = (cx * (p.y - a.y) - cy * (p.x - a.x)) / len;
+      if (Math.abs(d) > Math.abs(dev)) dev = d;
+    }
+    const s = setup;
+    const angle = swipeAngle(g);
+    s.power = clamp((speed - 0.8) / 3.2, 0, 1);
+    s.hook = clamp((dev / len) * 4.5, -1, 1);
+    if (Math.abs(s.hook) < 0.06) s.hook = 0;
+    s.target = Core.xBoard(standX(s) + Math.tan(angle) * ARROW_Y);
+    s.step = 3;
+    throwBall({ x: standX(s), angle, power: s.power, hook: s.hook });
+  }
+
+  cv.addEventListener('pointerup', (e) => endGesture(e, false));
+  cv.addEventListener('pointercancel', (e) => endGesture(e, true));
+
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    const code = e.code || '';
+    const onButton = e.target && e.target.tagName === 'BUTTON';
+    if (code.startsWith('Arrow') || code === 'Space') e.preventDefault();
+    const left = code === 'ArrowLeft' || code === 'KeyA', right = code === 'ArrowRight' || code === 'KeyD';
+    if (left || right) {
+      setLastPointer('mouse');
+      if (canAim()) {
+        const d = left ? 1 : -1;      // boards count from the right
+        if (setup.step === 0) moveStand(d);
+        else if (setup.step === 1) moveTarget(d / 2);
+      }
+      return;
+    }
+    if (e.repeat) return;
+    if (code === 'Space' || code === 'Enter' || code === 'NumpadEnter') {
+      if (onButton) return;
+      setLastPointer('mouse');
+      if (state === 'title') newGame();
+      else if (state === 'over') { if (overT > 0.6) newGame(); }
+      else if (paused) setPaused(false);
+      else if (canAim()) lockStep();
+      else if (canSkip()) ffwd = true;
+      return;
+    }
+    if (code === 'Backspace') { backStep(); return; }
+    if (code === 'KeyP' || e.key === 'Escape') {
+      if (paused) setPaused(false); else setPaused(true, 'user');
+    }
+  });
+
+  $('btnPlay').addEventListener('click', () => { if (state === 'title') newGame(); });
+  $('btnResume').addEventListener('click', () => setPaused(false));
+  $('btnPauseMode').addEventListener('click', toTitle);
+  $('btnAgain').addEventListener('click', () => { if (state === 'over') newGame(); });
+  $('btnMode').addEventListener('click', () => { if (state === 'over') toTitle(); });
+  pauseBtn.addEventListener('click', () => setPaused(true, 'user'));
+
+  window.addEventListener('resize', resize);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+
+  // ---------- Main loop ----------
+  let last = performance.now(), btnShown = false;
+  function frame(now) {
+    let dt = (now - last) / 1000;
+    last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 0.1) dt = 0.1;
+    if (!paused) update(dt);
+    const wantBtn = playing() && !paused;
+    if (wantBtn !== btnShown) { btnShown = wantBtn; pauseBtn.classList.toggle('on', wantBtn); }
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Boot ----------
+  resize();
+  syncOptions();
+
+  let started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    requestAnimationFrame((t) => { last = t; frame(t); });
+    V.ready();
+  }
+  try {
+    const f = document.fonts;
+    Promise.all([f.load('300 84px ' + FONT_D), f.load('400 13px ' + FONT), f.load('600 11px ' + FONT)])
+      .catch(() => {}).then(() => f.ready).then(start, start);
+    setTimeout(start, 2500);
+  } catch (_) { start(); }
+})();
+</script>
+</body>
+</html>
