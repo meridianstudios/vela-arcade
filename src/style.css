@@ -21,6 +21,8 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html { scrollbar-color: #2a2d33 var(--bg); }
+::selection { background: var(--vela); color: #000; }
 body {
   font-family: var(--font);
   background: var(--bg);
@@ -307,7 +309,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .pf-at { display: block; margin-top: 10px; font-size: 14px; color: var(--text-3); }
 .pf-tags { display: flex; flex-wrap: wrap; margin-top: 12px; }
 .pf-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.pf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px; margin: 28px 0 44px; }
+.pf-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 4px; margin: 28px 0 44px; }
 .pf-tile {
   display: flex; flex-direction: column; gap: 12px; min-height: 140px; padding: 18px;
   background: var(--bg-2); transition: background-color 0.15s var(--ease);
@@ -437,6 +439,7 @@ a.pf-tile:hover { background: var(--tile); }
 
 .shelf { padding-top: 32px; }
 .shelf h2 { display: block; color: var(--text-2); }
+.shelf > .grid:first-child { margin-top: 0; }
 .shelf h2 .count { margin-left: 10px; color: var(--text-3); }
 .shelf + .shelf { border-top: 1px solid var(--line); }
 .grid {
@@ -457,9 +460,9 @@ a.card:hover .art { --tile: var(--vela); background: var(--vela); color: #000; }
 a.card:hover .art svg { transform: scale(1.06); }
 a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease); }
 .card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; flex: 1; gap: 5px; }
-.card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card-top { display: flex; flex-direction: column; gap: 6px; }
 .card-top h3 { font-family: var(--font-display); font-weight: 600; font-size: 17px; line-height: 1.25; flex: 1 1 auto; min-width: 0; }
-.card-top .label { flex: 0 0 auto; max-width: 50%; text-align: right; line-height: 1.35; }
+.card-top .label { line-height: 1.35; }
 .card-meta { margin-top: auto; padding-top: 10px; }
 .card-meta .best { color: var(--vela-2); }
 /* Corner flags on a tile's art: New on the left, players in it on the right. */
@@ -513,7 +516,8 @@ a.card:hover .flag { background: #000; color: var(--vela-2); }
 .about-text { font-size: 15px; max-width: 640px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px; margin-top: 22px; font-size: 14px; color: var(--text-2); }
 .facts dt { font-weight: 600; font-size: 11px; line-height: 21px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
-.rules { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); max-width: 640px; }
+.rules { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+.rules section { max-width: 640px; }
 .rules > .label { display: block; margin-bottom: 18px; }
 .rules section + section { margin-top: 18px; }
 .rules h3 { font-family: var(--font-display); font-weight: 600; font-size: 15px; margin-bottom: 8px; }
@@ -551,9 +555,9 @@ a.card:hover .flag { background: #000; color: var(--vela-2); }
 .log-tiles a:hover { background: var(--tile); }
 .log-tiles a:hover .art { --tile: var(--vela); background: var(--vela); color: #000; }
 .log-tiles strong { font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.log-changes { list-style: none; padding: 0; border-top: 1px solid var(--line); }
-.log-changes li { padding: 12px 0 12px 20px; border-bottom: 1px solid var(--line); font-size: 15px; color: var(--text-2); position: relative; }
-.log-changes li::before { content: ""; position: absolute; left: 0; top: 19px; width: 8px; height: 2px; background: var(--vela); }
+.log-changes { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.log-changes li { position: relative; padding-left: 20px; font-size: 15px; line-height: 1.55; color: var(--text-2); }
+.log-changes li::before { content: ""; position: absolute; left: 0; top: 0.78em; width: 8px; height: 2px; background: var(--vela); }
 
 /* ── online ─────────────────────────────────────────────────── */
 .online { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 40px 0 48px; }
@@ -635,8 +639,7 @@ a.card:hover .flag { background: #000; color: var(--vela-2); }
   .shelf { padding-top: 24px; }
   .grid { gap: 6px; margin: 12px 0 32px; }
   .card-body { padding: 10px 11px 12px; }
-  .card-top { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .card-top .label { max-width: none; text-align: left; }
+  .card-top { gap: 4px; }
   .card-top h3 { font-size: 15px; }
   .player-bar { padding: 0 4px; gap: 6px; }
   .player-title .art.mini { display: none; }

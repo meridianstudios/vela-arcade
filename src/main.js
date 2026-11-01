@@ -119,15 +119,16 @@ function card(g, i) {
 let activeTag = 'All'
 
 // Third-party games (anything with `via`) get their own shelf, after ours.
+// Shelves are only named when there is more than one.
 const SHELVES = [
   { title: 'Vela originals', games: GAMES.filter((g) => !g.via) },
   { title: 'Embedded games', games: GAMES.filter((g) => g.via) },
-]
-const shelf = ({ title, games }) => games.length ? `
-      <section class="shelf">
-        <h2 class="label">${title}<span class="count">${games.filter(playable).length}</span></h2>
+].filter((x) => x.games.length)
+const shelf = ({ title, games }) => `
+      <section class="shelf">${SHELVES.length > 1 ? `
+        <h2 class="label">${title}<span class="count">${games.filter(playable).length}</span></h2>` : ''}
         <div class="grid">${games.map(card).join('')}</div>
-      </section>` : ''
+      </section>`
 
 function renderHome() {
   document.title = 'Vela Arcade'

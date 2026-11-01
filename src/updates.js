@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.9.2',
+    date: '2026-11-01',
+    games: [],
+    changes: [
+      'Cleaner tiles, profiles and update notes, and a dark scrollbar.',
+    ],
+  },
+  {
     version: '1.9.1',
     date: '2026-11-01',
     games: [],
