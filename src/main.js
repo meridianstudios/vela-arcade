@@ -2,7 +2,7 @@ import './style.css'
 import { GAMES, TAGS, bySlug, playable } from './games.js'
 import { UPDATES, CURRENT_VERSION } from './updates.js'
 import { RULES } from './rules.js'
-import { startHeartbeat, countOnline, visitTotals } from './online.js'
+import { startHeartbeat, whoIsOnline, visitTotals, setGame } from './online.js'
 import * as Account from './account.js'
 
 const app = document.getElementById('app')
@@ -42,13 +42,30 @@ const art = (g, cls = '') =>
 // The Vela mark, the owner's own picture.
 const VELA_MARK = '<svg viewBox="10.16 9.77 79.68 86.23" aria-hidden="true"><polygon class="mk-o" points="40,9.77 10.16,27 10.16,73 50,96 89.84,73 89.84,27 60,9.77 60,21.32 79.84,32.78 79.84,67.22 50,84.45 20.16,67.22 20.16,32.78 40,21.32"/><polygon class="mk-i" points="30,38.65 40,32.9 40,55.1 50,60.9 60,55.1 60,32.9 70,38.65 70,60.9 50,72.4 30,60.9"/></svg>'
 
+// Game icons are drawn on a 64 grid but not all of them sit in its middle.
+// In a picture or a tag the frame moves so the icon's shape is centred.
+const boxes = {}
+function iconSVG(g) {
+  if (!boxes[g.slug]) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 64 64')
+    svg.style.cssText = 'position:absolute;width:64px;height:64px;visibility:hidden'
+    svg.innerHTML = `<g>${g.art}</g>`
+    document.body.append(svg)
+    const b = svg.firstChild.getBBox()
+    svg.remove()
+    boxes[g.slug] = `${(b.x + b.width / 2 - 32).toFixed(2)} ${(b.y + b.height / 2 - 32).toFixed(2)} 64 64`
+  }
+  return `<svg viewBox="${boxes[g.slug]}" aria-hidden="true">${g.art}</svg>`
+}
+
 // An account's picture: a game's icon (or the first letter) on its colour.
 function avatarHTML(p, cls = '') {
   const g = p.avatar && p.avatar !== 'vela' && bySlug(p.avatar)
   const color = Account.okColor(p.color) ? p.color : Account.COLORS[0]
   const inner = p.avatar === 'vela' ? VELA_MARK : g
-    ? `<svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>`
-    : esc(((p.display || p.name || '?').trim()[0] || '?').toUpperCase())
+    ? iconSVG(g)
+    : `<span class="av-l">${esc(((p.display || p.name || '?').trim()[0] || '?').toUpperCase())}</span>`
   return `<span class="av ${cls}${color === Account.OWNER_COLOR ? ' dark' : ''}" style="--av:${color}">${inner}</span>`
 }
 
@@ -58,7 +75,7 @@ const STAFF_TAGS = { owner: 'Owner', founder: 'Founder', developer: 'Developer',
 function tagHTML(t, place) {
   if (STAFF_TAGS[t]) return `<span class="tag ${t}">${STAFF_TAGS[t]}</span>`
   const g = bySlug(t)
-  return g && place ? `<span class="rec${place > 1 ? ' lo' : ''}" title="No. ${place} in ${esc(g.title)}"><svg viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg>#${place}</span>` : ''
+  return g && place ? `<span class="rec${place > 1 ? ' lo' : ''}" title="No. ${place} in ${esc(g.title)}">${iconSVG(g)}#${place}</span>` : ''
 }
 const placeIn = (ranks, slug, id) => ((ranks && ranks[slug]) || []).indexOf(id) + 1
 function tagsHTML(p, ranks, cls = '') {
@@ -74,11 +91,17 @@ function whoHTML(p, ranks) {
   return `<a class="who" href="/u/${esc(p.name)}" data-link>${avatarHTML(p, 'sm')}<span class="who-name${p.flair ? ' orange' : ''}">${esc(p.display || p.name)}</span>${tagsHTML(p, ranks)}</a>`
 }
 
+// Games from the latest release that added any, marked New for two weeks.
+const NEW = (() => {
+  const u = UPDATES.find((x) => x.games.length)
+  return new Set(u && Date.now() - Date.parse(u.date) < 14 * 864e5 ? u.games : [])
+})()
+
 function card(g, i) {
   const best = g.scores ? bestFor(g.slug) : 0
   const soon = !playable(g)
   const inner = `
-    ${art(g)}
+    ${art(g)}${NEW.has(g.slug) && !soon ? '<span class="flag">New</span>' : ''}
     <div class="card-body">
       <div class="card-top">
         <h3>${esc(g.title)}</h3>
@@ -137,6 +160,28 @@ function renderHome() {
     </div>
   `
   applyFilter()
+  showPlaying()
+}
+
+// How many people are in each game right now, on its tile. One read serves
+// the lobby for half a minute, however often it is drawn.
+let playing = null
+async function playingNow(fresh = false) {
+  if (fresh || !playing || Date.now() - playing.at > 30000) {
+    const who = await whoIsOnline()
+    if (who) playing = { at: Date.now(), games: who.games }
+  }
+  return playing ? playing.games : {}
+}
+async function showPlaying() {
+  const games = await playingNow()
+  app.querySelectorAll('.card[data-slug]').forEach((el) => {
+    const n = games[el.dataset.slug] || 0
+    let flag = el.querySelector('.flag.live')
+    if (!n) { if (flag) flag.remove(); return }
+    if (!flag) { flag = document.createElement('span'); flag.className = 'flag live'; el.append(flag) }
+    flag.innerHTML = `<i></i>${fmt(n)} playing`
+  })
 }
 
 function applyFilter() {
@@ -341,8 +386,14 @@ function renderPlay(slug) {
   document.title = `${g.title} · Vela Arcade`
   document.body.classList.add('is-playing')
   markPlayed(slug)
+  setGame(slug)
 
-  const more = GAMES.filter((x) => x.slug !== slug && playable(x)).slice(0, 5)
+  // More games: the ones sharing the most tags with this one.
+  const shared = (x) => x.tags.filter((t) => g.tags.includes(t)).length
+  const more = GAMES.filter((x) => x.slug !== slug && playable(x))
+    .map((x, i) => ({ x, n: shared(x), i }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .slice(0, 5).map(({ x }) => x)
   const external = g.kind === 'embed'
   // An invite link (/play/chess?room=ABC123) passes its query on to the game.
   // GameDistribution credits ad revenue to the page named in gd_sdk_referrer_url.
@@ -353,16 +404,20 @@ function renderPlay(slug) {
   app.innerHTML = `
     <section class="player">
       <div class="player-bar">
-        <a class="icon-btn" href="/" data-link aria-label="Back to all games">
+        <a class="icon-btn" href="/" data-link id="back" aria-label="Back to all games">
           <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
         </a>
         <div class="player-title">
           ${art(g, 'mini')}
           <h1>${esc(g.title)}</h1>
+          <span class="label live" id="live" hidden></span>
         </div>
         <div class="player-actions">
           <button class="icon-btn fav${isFav(slug) ? ' on' : ''}" id="fav" aria-label="Favourite" aria-pressed="${isFav(slug)}" title="Favourite">
             <svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button class="icon-btn" id="share" aria-label="Share" title="Share">
+            <svg viewBox="0 0 24 24"><path d="M9 15l6-6M11 6l1.5-1.5a4 4 0 0 1 5.7 5.7L16.5 12M13 18l-1.5 1.5a4 4 0 0 1-5.7-5.7L7.5 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
           </button>
           <button class="icon-btn" id="restart" aria-label="Reload game" title="Reload">
             <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>
@@ -441,6 +496,29 @@ function renderPlay(slug) {
   stage.addEventListener('pointerdown', focusFrame)
 
   if (hasBoard(g)) showBoard(g)
+
+  // Players in this game, counting this one, once there is someone else.
+  setTimeout(async () => {
+    const n = (await playingNow(true))[slug] || 0
+    const live = document.getElementById('live')
+    if (live && n > 1) { live.innerHTML = `<i></i>${fmt(n)} playing`; live.hidden = false }
+  }, 1500)
+
+  // Phones get the share sheet; elsewhere the link is copied.
+  const shareBtn = document.getElementById('share')
+  shareBtn.addEventListener('click', async () => {
+    const link = location.origin + '/play/' + slug
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+      navigator.share({ title: g.title, url: link }).catch(() => {})
+      return
+    }
+    try { await navigator.clipboard.writeText(link) } catch { return }
+    const icon = shareBtn.innerHTML
+    shareBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/></svg>'
+    shareBtn.title = 'Copied'
+    shareBtn.classList.add('done')
+    setTimeout(() => { shareBtn.innerHTML = icon; shareBtn.title = 'Share'; shareBtn.classList.remove('done') }, 1600)
+  })
 
   document.getElementById('fav').addEventListener('click', (e) => {
     toggleFav(slug)
@@ -527,13 +605,26 @@ function renderOnline() {
         <div><strong id="online-today">&ndash;</strong><span class="label">Players today</span></div>
         <div><strong id="online-all">&ndash;</strong><span class="label">Players all time</span></div>
       </section>
+      <section class="online-games" id="online-games" hidden>
+        <span class="label">Playing now</span>
+        <div class="more" id="online-list"></div>
+      </section>
     </div>`
   const show = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n == null ? '–' : fmt(n) }
   const refresh = async () => {
     if (!document.getElementById('online-num')) { clearInterval(onlineTimer); onlineTimer = null; return }
     if (document.hidden) return
-    const [n, totals] = await Promise.all([countOnline(), visitTotals()])
-    show('online-num', n)
+    const [who, totals] = await Promise.all([whoIsOnline(), visitTotals()])
+    show('online-num', who && who.total)
+    const list = Object.entries((who && who.games) || {})
+      .map(([slug, n]) => [bySlug(slug), n]).filter(([x]) => x && playable(x))
+      .sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title))
+    document.getElementById('online-games').hidden = !list.length
+    document.getElementById('online-list').innerHTML = list.map(([x, n]) => `
+      <a href="/play/${x.slug}" data-link>
+        ${art(x, 'mini')}
+        <span><strong>${esc(x.title)}</strong><em>${fmt(n)} playing</em></span>
+      </a>`).join('')
     show('online-today', totals.today)
     show('online-all', totals.allTime)
   }
@@ -1052,6 +1143,7 @@ function route() {
   else if (/^\/owner(\/\w+)?\/?$/.test(location.pathname)) renderOwner(location.pathname.split('/')[2])
   else if (/^\/u\/\w+\/?$/.test(location.pathname)) renderProfile(location.pathname.split('/')[2])
   else renderMissing()
+  if (!play) setGame()
   const here = '/' + (location.pathname.split('/')[1] || '')
   document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))
   // Tiles stagger in on their own; everything else eases up as one page.
@@ -1061,7 +1153,7 @@ function route() {
 
 function navigate(href, { keepSearch = false } = {}) {
   if (!keepSearch) searchInput.value = ''
-  history.pushState(null, '', href)
+  history.pushState({ from: location.pathname }, '', href)
   route()
   if (!keepSearch) window.scrollTo(0, 0)
 }
@@ -1070,7 +1162,9 @@ document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]')
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
   e.preventDefault()
-  if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'))
+  // From a game opened in the lobby, back goes back, to the same place in it.
+  if (a.id === 'back' && history.state && history.state.from === '/') history.back()
+  else if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'))
 })
 window.addEventListener('popstate', route)
 

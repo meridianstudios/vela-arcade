@@ -1,8 +1,9 @@
 /* Players online, counted through the Realtime Database's REST API: no SDK,
  * just fetch, so it costs the lobby almost nothing to load.
  *
- * Each open, visible tab writes online/<id> = { at: server time } once a
- * minute; the id is random and kept per browser. Anyone whose last write is
+ * Each open, visible tab writes online/<id> = { at: server time, game } once
+ * a minute, and again whenever it opens or leaves a game; the id is random and
+ * kept per browser, and game is the slug being played, if any. Anyone whose last write is
  * newer than WINDOW_MS counts as online. The database rules only allow reads
  * ordered by time and capped at MAX entries, and only accept the server's own
  * clock as the timestamp.
@@ -53,13 +54,14 @@ const url = (path, query = '') => `${DB}/${path}.json${NS}${query ? (NS ? '&' : 
 // Server time minus this device's clock, learned from each heartbeat's reply,
 // so the count does not depend on the viewer's clock being right.
 let offset = 0
+let game = ''
 
 async function beat(id) {
   if (document.hidden) return
   try {
     const res = await fetch(url(`online/${id}`), {
       method: 'PUT',
-      body: JSON.stringify({ at: { '.sv': 'timestamp' } }),
+      body: JSON.stringify({ at: { '.sv': 'timestamp' }, ...(game ? { game } : {}) }),
     })
     if (res.ok) {
       const { at } = await res.json()
@@ -115,14 +117,25 @@ export function startHeartbeat() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick() })
 }
 
-/* Resolves to the number of players online, or null if it cannot be reached. */
-export async function countOnline() {
+/* The game this tab is playing ('' for none). A change goes out at once, so
+ * counts follow players between games without waiting for the next minute. */
+export function setGame(slug = '') {
+  if (slug === game) return
+  game = slug
+  if (started) beat(myId())
+}
+
+/* Resolves to { total, games } (players online, and how many are in each
+ * game by slug), or null if it cannot be reached. */
+export async function whoIsOnline() {
   const since = Date.now() + offset - WINDOW_MS
   try {
     const res = await fetch(url('online', `orderBy=${encodeURIComponent('"at"')}&startAt=${Math.floor(since)}&limitToLast=${MAX}`))
     if (!res.ok) return null
-    const data = await res.json()
-    return data ? Object.keys(data).length : 0
+    const rows = Object.values((await res.json()) || {})
+    const games = {}
+    for (const r of rows) if (r && typeof r.game === 'string') games[r.game] = (games[r.game] || 0) + 1
+    return { total: rows.length, games }
   } catch {
     return null
   }

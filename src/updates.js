@@ -6,6 +6,19 @@
  */
 export const UPDATES = [
   {
+    version: '1.9',
+    date: '2026-11-01',
+    games: [],
+    changes: [
+      'Live player counts: tiles, game pages and the Online page show how many people are in each game right now.',
+      'New games are marked New in the lobby for two weeks.',
+      'Share on a game page copies its link, or opens the share sheet on a phone.',
+      'More games on a game page are games like the one you are on.',
+      'The back arrow on a game takes you to the same spot in the lobby.',
+      'Profile pictures are centred, the top bar lines up, and tiles on phones put the player count under the name.',
+    ],
+  },
+  {
     version: '1.8.1',
     date: '2026-11-01',
     games: [],

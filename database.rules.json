@@ -13,6 +13,9 @@
         "at": {
           ".validate": "newData.val() === now"
         },
+        "game": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-z0-9-]{1,40}$/)"
+        },
         "$other": {
           ".validate": false
         }

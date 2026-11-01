@@ -66,7 +66,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .nav-link {
   position: relative; display: flex; align-items: center; height: var(--nav-h); margin: 0 0 0 8px;
-  font-size: 14px; font-weight: 600; color: var(--text-3); transition: color 0.15s var(--ease);
+  font-size: 14px; font-weight: 600; line-height: 20px; color: var(--text-3); transition: color 0.15s var(--ease);
 }
 .nav-link::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
@@ -110,6 +110,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   background: var(--av, var(--vela)); color: #fff; font: 600 13px/1 var(--font);
 }
 .av svg { width: 72%; height: 72%; }
+/* Capitals sit low in the line box; this centres the letter itself. */
+.av-l { transform: translateY(-0.065em); }
 .av.sm { width: 22px; height: 22px; font-size: 11px; }
 .av.pick { width: 40px; height: 40px; font-size: 16px; }
 .av.lg { width: 56px; height: 56px; font-size: 24px; }
@@ -427,7 +429,7 @@ a.pf-tile:hover { background: var(--tile); }
   gap: 8px; margin: 16px 0 48px;
 }
 .card {
-  display: flex; flex-direction: column; min-width: 0;
+  position: relative; display: flex; flex-direction: column; min-width: 0;
   background: var(--bg-2);
   animation: tile-in 0.45s var(--ease) both;
   animation-delay: calc(var(--i, 0) * 35ms);
@@ -445,6 +447,18 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 .card-top .label { flex: 0 0 auto; max-width: 50%; text-align: right; line-height: 1.35; }
 .card-meta { margin-top: auto; padding-top: 10px; }
 .card-meta .best { color: var(--vela-2); }
+/* Corner flags on a tile's art: New on the left, players in it on the right. */
+.flag {
+  position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 7px;
+  background: var(--vela); color: #000; font: 700 10px/1 var(--font); letter-spacing: 0.08em; text-transform: uppercase;
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+a.card:hover .flag { background: #000; color: var(--vela-2); }
+.flag.live { left: auto; right: 0; background: rgba(0, 0, 0, 0.55); color: var(--text); font-variant-numeric: tabular-nums; }
+.live i { width: 6px; height: 6px; flex-shrink: 0; background: var(--vela); }
+.player-title .live { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; }
+.icon-btn.done { color: var(--vela); }
+.online-games { display: flex; flex-direction: column; gap: 12px; max-width: 640px; margin: -32px 0 72px; }
 .card.is-soon { background: transparent; outline: 1px solid var(--line); outline-offset: -1px; }
 .card.is-soon .art { background: transparent; color: var(--text-3); }
 .card.is-soon h3 { color: var(--text-2); }
@@ -578,6 +592,7 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .online-totals { margin-bottom: 48px; }
   .online-totals div { padding: 16px; }
   .online-totals strong { font-size: 40px; }
+  .online-games { margin: -16px 0 48px; }
   /* The footer links to Updates, so the bar keeps room for Leaderboards and Rules. */
   .nav-link[href="/updates"] { display: none; }
   /* The account menu links to the Owner panel too. */
@@ -602,7 +617,8 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
   .shelf { padding-top: 24px; }
   .grid { gap: 6px; margin: 12px 0 32px; }
   .card-body { padding: 10px 11px 12px; }
-  .card-top { flex-direction: column; gap: 4px; }
+  .card-top { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .card-top .label { max-width: none; text-align: left; }
   .card-top h3 { font-size: 15px; }
   .player-bar { padding: 0 4px; gap: 6px; }
   .player-title .art.mini { display: none; }
