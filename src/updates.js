@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.7.2',
+    date: '2026-11-01',
+    games: [],
+    changes: [
+      'Scores that showed up on two accounts from the same device are fixed, and a device with more than one account no longer passes scores between them.',
+    ],
+  },
+  {
     version: '1.7.1',
     date: '2026-10-31',
     games: [],

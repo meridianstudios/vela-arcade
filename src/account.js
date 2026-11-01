@@ -87,8 +87,13 @@ function localBests() {
 const BESTS_OF = 'vela:bests-of'
 const STASH = 'vela:bests:'
 function useBestsOf(uid) {
-  const was = storage.get(BESTS_OF) || ''
+  const mark = storage.get(BESTS_OF)
+  const was = mark || ''
   if (was === uid) return false
+  // A device from before bests were kept per account, with more than one
+  // account on it, cannot tell whose bests it holds: they are nobody's, and
+  // each account gets its own back from its profile.
+  if (mark === null && uid && saved().length > 1) for (const slug of Object.keys(localBests())) storage.del(BEST + slug)
   if (was) {
     const mine = localBests()
     storage.set(STASH + was, JSON.stringify(mine))
@@ -286,6 +291,8 @@ async function sync() {
     } else await createProfile()
     emit()
     const mine = localBests()
+    // A record an owner removed comes off this device too.
+    for (const [slug, n] of Object.entries(mine)) if (n <= (cleared[slug] || 0) && !(cloud[slug] >= n)) { storage.del(BEST + slug); delete mine[slug] }
     const up = {}
     for (const [slug, n] of Object.entries(mine)) if (postable(slug, n)) up[slug] = n
     for (const [slug, n] of Object.entries(cloud)) if (n > (mine[slug] || 0)) storage.set(BEST + slug, String(n))
