@@ -1,0 +1,1570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0c0f">
+<title>Draw and Guess</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.35);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --g: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { touch-action: manipulation; }
+  button, input, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- shared controls ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 2.9em; padding: 0 1.1em; min-width: 0;
+    border-radius: 0; border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.74em var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible, .tile:focus-visible, .ib:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn.big { height: 3.6em; font-size: 0.8em; }
+  .lab {
+    display: block;
+    font: 600 0.7em/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .field {
+    width: 100%; height: 2.9em; padding: 0 0.8em;
+    background: var(--surface); border: 1px solid var(--outline); border-radius: 0;
+    outline: none;
+    transition: border-color 150ms var(--ease);
+  }
+  .field:focus { border-color: var(--brand); }
+  .field[readonly] { color: var(--muted); }
+  .field.code { text-transform: uppercase; letter-spacing: 0.2em; font-weight: 600; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0; height: 2.5em; min-width: 0;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: transparent; cursor: pointer;
+    font-weight: 600; font-size: 0.86em; font-variant-numeric: tabular-nums;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .seg button + button { margin-left: -1px; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.06); }
+  .seg button.on { background: var(--brand); border-color: var(--brand); position: relative; z-index: 1; }
+  .seg.locked button { pointer-events: none; }
+  .seg.locked button:not(.on) { color: var(--faint); }
+  .err { margin: 0; min-height: 1.3em; color: var(--brand-hover); font-size: 0.86em; }
+  .note { margin: 0; color: var(--muted); font-size: 0.85em; }
+
+  /* ---------- menu ---------- */
+  .menu {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .panel { width: min(100%, 24em); margin: auto 0; display: flex; flex-direction: column; gap: 0.6em; }
+  .panel h1 {
+    margin: 0 0 0.05em;
+    font: 300 2.6em/1 var(--font-display);
+    display: flex; align-items: center; gap: 0.32em;
+  }
+  .panel h1::before { content: ""; width: 0.3em; height: 0.3em; background: var(--brand); flex: none; margin-top: 0.06em; }
+  .panel .sub { margin: 0 0 0.6em; color: var(--muted); font-size: 0.92em; line-height: 1.45; }
+  .panel .lab { margin-top: 0.4em; }
+  .tile {
+    display: flex; align-items: center; gap: 0.9em;
+    height: 3.6em; padding: 0 1.1em;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: var(--surface);
+    font: 600 1em var(--font); text-align: left;
+    cursor: pointer;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .tile::after { content: ""; margin-left: auto; width: 0.5em; height: 0.5em; border: solid var(--muted); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .tile:hover { background: var(--surface-2); border-color: var(--brand); }
+  .tile:active { transform: scale(0.985); }
+  .tile.primary { background: var(--brand); border-color: var(--brand); }
+  .tile.primary::after { border-color: #fff; }
+  .tile.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .tile:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+  .tile small { font-weight: 400; color: var(--muted); }
+  .tile.primary small { color: rgba(255, 255, 255, 0.85); }
+  .rowb { display: flex; gap: 0.5em; }
+  .rowb .field { flex: 1 1 auto; min-width: 0; }
+  .busy { pointer-events: none; opacity: 0.6; }
+
+  /* ---------- game layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    display: grid;
+    grid-template-columns: clamp(160px, 17vw, 230px) minmax(0, 1fr) clamp(230px, 24vw, 320px);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "bar bar bar" "players stage chat";
+    gap: var(--g); padding: var(--g);
+  }
+  .app.narrow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "bar bar" "stage stage" "players chat";
+    gap: 6px; padding: 6px;
+  }
+
+  .bar {
+    grid-area: bar;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.8em;
+    height: 52px; padding: 0 0.5em 0 0;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .narrow .bar { height: 46px; gap: 0.5em; }
+  .clock {
+    display: flex; align-items: center; gap: 0.7em; height: 100%;
+  }
+  .clock b {
+    display: grid; place-items: center;
+    width: 52px; height: 100%;
+    background: var(--surface-2); border-right: 1px solid var(--line);
+    font: 300 1.6em/1 var(--font-display); font-variant-numeric: tabular-nums;
+    transition: background 180ms var(--ease), color 180ms var(--ease);
+  }
+  .narrow .clock b { width: 46px; font-size: 1.4em; }
+  .clock b.low { background: var(--brand); color: #fff; }
+  .clock b.low.pulse { animation: pulse 400ms var(--ease); }
+  @keyframes pulse { 0% { transform: scale(1.12); } 100% { transform: none; } }
+  .clock span { font: 600 0.7em/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .narrow .clock span { display: none; }
+  .word {
+    display: flex; align-items: center; justify-content: center; gap: 0.32em;
+    min-width: 0; overflow: hidden; white-space: nowrap;
+  }
+  .word .lt {
+    display: inline-grid; place-items: end center;
+    width: 0.9em; height: 1.35em;
+    border-bottom: 2px solid var(--text);
+    font: 600 1.25em/1 var(--font); text-transform: uppercase;
+  }
+  .word .lt.sp { border-bottom-color: transparent; width: 0.45em; }
+  .word .lt.mk { border-bottom-color: transparent; width: 0.5em; }
+  .word .lt.new { color: var(--brand-hover); animation: drop 300ms var(--ease); }
+  @keyframes drop { 0% { transform: translateY(-40%); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .narrow .word .lt { width: 0.75em; font-size: 1.05em; }
+  .word .full { font: 300 1.6em/1 var(--font-display); }
+  .narrow .word .full { font-size: 1.3em; }
+  .word .len { margin-left: 0.5em; font-size: 0.8em; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .word .msg { font: 600 0.7em/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  .bar-r { display: flex; gap: 4px; }
+  .ib {
+    display: grid; place-items: center;
+    width: 36px; height: 36px; padding: 0;
+    border: 1px solid transparent; border-radius: 0; background: transparent;
+    color: var(--muted); cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .ib:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .ib svg { width: 20px; height: 20px; }
+  .ib.done { color: var(--brand-hover); }
+
+  /* ---------- players ---------- */
+  .players {
+    grid-area: players;
+    display: flex; flex-direction: column;
+    min-height: 0; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line);
+    scrollbar-width: thin; scrollbar-color: #2a2d33 transparent;
+  }
+  .pl {
+    position: relative;
+    display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto; align-items: center; column-gap: 0.4em;
+    min-height: 3.2em; padding: 0.35em 0.7em 0.35em 0.2em;
+    border-bottom: 1px solid var(--line);
+    cursor: default;
+    transition: background 200ms var(--ease);
+  }
+  .narrow .pl { min-height: 2.6em; grid-template-columns: 1.8em minmax(0, 1fr) auto; padding: 0.25em 0.5em 0.25em 0.1em; }
+  .pl.other { cursor: pointer; }
+  .pl.other:hover { background: var(--surface-2); }
+  .pl .rk { text-align: center; font: 600 0.78em var(--font); color: var(--faint); font-variant-numeric: tabular-nums; }
+  .pl .nm { min-width: 0; display: flex; flex-direction: column; gap: 0.1em; }
+  .pl .nm b { font-weight: 600; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl .nm span { font-size: 0.78em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pl.me .nm b::after { content: "You"; margin-left: 0.6em; font: 600 0.72em var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-hover); }
+  .pl .ic { width: 1.25em; height: 1.25em; color: var(--muted); }
+  .pl .ic svg { width: 100%; height: 100%; display: block; }
+  .pl.ok { background: rgba(234, 84, 38, 0.16); }
+  .pl.ok .ic { color: var(--brand-hover); }
+  .pl.drawing { box-shadow: inset 3px 0 0 var(--brand); }
+  .pl.drawing .ic { color: var(--text); }
+  .pl.flash { animation: flash 700ms var(--ease); }
+  @keyframes flash { 0% { background: var(--brand); } 100% { background: rgba(234, 84, 38, 0.16); } }
+  .pl .gain {
+    position: absolute; right: 2.4em; top: 50%;
+    font: 600 0.82em var(--font); color: var(--brand-hover);
+    animation: rise 1100ms var(--ease) forwards;
+    pointer-events: none;
+  }
+  @keyframes rise { 0% { transform: translateY(-20%); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-140%); opacity: 0; } }
+  .pl .kick {
+    grid-column: 2 / -1; margin-top: 0.35em; height: 2.3em; font-size: 0.66em;
+  }
+
+  /* ---------- stage ---------- */
+  .stage {
+    grid-area: stage; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: var(--g);
+    min-height: 0; min-width: 0;
+  }
+  .app:not(.narrow) .stage { justify-content: center; }
+  .narrow .stage { gap: 6px; }
+  .board {
+    position: relative; flex: none;
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--line);
+    touch-action: none;
+    overflow: hidden;
+  }
+  .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .board.can { cursor: none; }
+  .board.can.fill { cursor: crosshair; }
+  .cursor {
+    position: absolute; left: 0; top: 0; z-index: 2;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+  }
+  .ov {
+    position: absolute; left: 0; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1em;
+    background: rgba(11, 12, 15, 0.9);
+    overflow-y: auto;
+    opacity: 0; transition: opacity 220ms var(--ease);
+    pointer-events: none;
+  }
+  .ov.show { opacity: 1; pointer-events: auto; }
+  .ov.wide { background: var(--surface); border: 1px solid var(--line); align-items: flex-start; padding: 1.4em; }
+  .narrow .ov.wide { padding: 0.9em; }
+  .ov .box { width: min(100%, 30em); margin: auto; transform: translateY(14px); transition: transform 300ms var(--ease); }
+  .ov.show .box { transform: none; }
+  .ov h2 { margin: 0; font: 300 2em/1.1 var(--font-display); }
+  .ov .k { margin: 0 0 0.35em; }
+  .ov .bigw { margin: 0.05em 0 0.5em; font: 300 3em/1.05 var(--font-display); color: #fff; text-transform: capitalize; overflow-wrap: anywhere; }
+  .narrow .ov h2 { font-size: 1.5em; }
+  .narrow .ov .bigw { font-size: 2.2em; }
+  .narrow .ov { padding: 0.7em; font-size: 0.9em; }
+  .ov .who { font: 300 1.7em/1.2 var(--font-display); text-align: center; }
+  .ov .who small { display: block; margin-top: 0.4em; font: 600 0.42em var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5em; margin-top: 0.9em; }
+  .choices .btn { height: 3.6em; font-size: 0.85em; letter-spacing: 0.06em; text-transform: none; font-size: 1em; white-space: normal; text-align: center; line-height: 1.15; padding: 0 0.5em; }
+  .narrow .choices { grid-template-columns: 1fr; }
+  .narrow .choices .btn { height: 2.8em; }
+  .ov .rows { margin-top: 0.4em; border-top: 1px solid var(--line); }
+  .ov .rw { display: flex; align-items: center; gap: 0.8em; padding: 0.45em 0; border-bottom: 1px solid var(--line); font-size: 0.92em; }
+  .ov .rw .n { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .ov .rw .v { font: 300 1.3em/1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .ov .rw .v.z { color: var(--faint); }
+  .ov .rw .tag { font: 600 0.72em var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .ov .rw.first .n { color: var(--text); font-weight: 600; }
+  .ov .rw.first .v { color: var(--brand-hover); }
+  .ov .rw .p { width: 1.6em; color: var(--faint); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .podium { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: end; gap: 0.5em; margin: 0.9em 0 0.4em; }
+  .podium .st { display: flex; flex-direction: column; align-items: center; gap: 0.35em; min-width: 0; }
+  .podium .st b { max-width: 100%; font-weight: 600; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .podium .st span { font-size: 0.8em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .podium .blk { width: 100%; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); font: 300 1.8em/1 var(--font-display); color: var(--muted); animation: grow 600ms var(--ease) both; transform-origin: bottom; }
+  .podium .s1 .blk { height: 4.4em; font-size: 2em; height: 2.6em; background: var(--brand); border-color: var(--brand); color: #fff; animation-delay: 300ms; }
+  .podium .s2 .blk { height: 2.3em; animation-delay: 150ms; }
+  .podium .s3 .blk { height: 1.7em; }
+  @keyframes grow { 0% { transform: scaleY(0); } 100% { transform: none; } }
+  .ov .acts { display: flex; gap: 0.5em; margin-top: 1em; flex-wrap: wrap; }
+  .ov .acts .btn { flex: 1 1 8em; }
+  .wait { display: flex; align-items: center; gap: 0.6em; margin-top: 1em; color: var(--muted); font-size: 0.9em; }
+  .wait i { width: 0.55em; height: 0.55em; background: var(--brand); flex: none; animation: blink 1.2s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* lobby settings */
+  .set { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75em 0.9em; margin-top: 0.9em; }
+  .set > div { display: flex; flex-direction: column; gap: 0.4em; min-width: 0; }
+  .set .wide { grid-column: 1 / -1; }
+  .set textarea {
+    width: 100%; height: 4.6em; resize: none; padding: 0.55em 0.7em;
+    background: var(--surface); border: 1px solid var(--outline); border-radius: 0; outline: none;
+    font-size: 0.9em; line-height: 1.4;
+  }
+  .set textarea:focus { border-color: var(--brand); }
+  .set textarea[readonly] { color: var(--muted); }
+  .check { display: flex; align-items: center; gap: 0.6em; font-size: 0.88em; color: var(--muted); cursor: pointer; width: fit-content; }
+  .check input { appearance: none; width: 1.15em; height: 1.15em; margin: 0; border: 1px solid var(--outline); background: transparent; cursor: pointer; display: grid; place-items: center; }
+  .check input:checked { background: var(--brand); border-color: var(--brand); }
+  .check input:checked::after { content: ""; width: 0.32em; height: 0.6em; border: solid #fff; border-width: 0 2px 2px 0; transform: translateY(-0.08em) rotate(45deg); }
+  .check input:disabled { cursor: default; }
+  .narrow .set { grid-template-columns: 1fr; gap: 0.6em; }
+
+  /* ---------- tools ---------- */
+  .tools {
+    flex: none;
+    display: flex; align-items: center; gap: 10px;
+    max-width: 100%;
+  }
+  .tools { flex-wrap: wrap; justify-content: center; }
+  .narrow .tools { gap: 6px; }
+  .curc { display: none; }
+  .pal { display: grid; grid-template-columns: repeat(13, 22px); grid-auto-rows: 22px; flex: none; box-shadow: 0 0 0 1px var(--line); }
+  .narrow .pal { width: 100%; grid-template-columns: repeat(13, minmax(0, 1fr)); grid-auto-rows: 20px; }
+  .pal button { border: 0; padding: 0; border-radius: 0; cursor: pointer; position: relative; }
+  .pal button.on { z-index: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-hover); }
+  .grp { display: flex; flex: none; }
+  .grp button {
+    display: grid; place-items: center;
+    width: 40px; height: 44px; padding: 0;
+    border: 1px solid var(--outline); border-radius: 0; background: transparent;
+    color: var(--muted); cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .narrow .grp button { width: 38px; height: 38px; }
+  .grp button + button { margin-left: -1px; }
+  .grp button:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+  .grp button.on { background: var(--brand); border-color: var(--brand); color: #fff; position: relative; z-index: 1; }
+  .grp button svg { width: 20px; height: 20px; }
+  .grp .dot { background: currentColor; border-radius: 50%; }
+
+  /* ---------- chat ---------- */
+  .chat {
+    grid-area: chat;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .log {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    padding: 0.35em 0;
+    font-size: 0.9em; line-height: 1.35;
+    scrollbar-width: thin; scrollbar-color: #2a2d33 transparent;
+    user-select: text; -webkit-user-select: text;
+  }
+  .narrow .log { font-size: 0.84em; }
+  .log p { margin: 0; padding: 0.22em 0.8em; overflow-wrap: anywhere; }
+  .log p b { font-weight: 600; margin-right: 0.35em; }
+  .log p.sys { color: var(--muted); font-weight: 600; font-size: 0.92em; }
+  .log p.hit { color: #fff; background: rgba(234, 84, 38, 0.2); font-weight: 600; }
+  .log p.turn { color: var(--brand-hover); font-weight: 600; }
+  .log p.close { color: var(--brand-hover); font-weight: 600; font-size: 0.92em; }
+  .log p.sec { color: var(--brand-hover); }
+  .log p.sec b { color: var(--brand-hover); }
+  .say { flex: none; border-top: 1px solid var(--line); }
+  .say input {
+    width: 100%; height: 2.9em; padding: 0 0.8em;
+    background: transparent; border: 0; border-radius: 0; outline: none;
+    font-size: 16px;
+  }
+  .say input::placeholder { color: var(--faint); }
+  .say input:focus { background: var(--surface-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="menu" id="menu">
+  <div class="panel">
+    <h1>Draw and Guess</h1>
+    <p class="sub">Draw the word you pick. Type guesses in the chat while others draw.</p>
+    <span class="lab">Your name</span>
+    <input class="field" id="nameIn" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Player">
+    <button class="tile primary" type="button" id="quickBtn">Quick play <small>Public game</small></button>
+    <button class="tile" type="button" id="createBtn">Private room</button>
+    <span class="lab">Join a room</span>
+    <div class="rowb">
+      <input class="field code" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="Code">
+      <button class="btn" type="button" id="joinBtn" style="height:auto">Join</button>
+    </div>
+    <p class="err" id="menuErr"></p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <header class="bar">
+    <div class="clock"><b id="clock"></b><span id="roundLabel"></span></div>
+    <div class="word" id="word"></div>
+    <div class="bar-r">
+      <button class="ib" type="button" id="inviteBtn" title="Copy invite link" aria-label="Copy invite link"></button>
+      <button class="ib" type="button" id="soundBtn" title="Sound" aria-label="Sound"></button>
+      <button class="ib" type="button" id="leaveBtn" title="Leave" aria-label="Leave"></button>
+    </div>
+  </header>
+  <aside class="players" id="players"></aside>
+  <main class="stage" id="stage">
+    <div class="board" id="board">
+      <canvas id="cv"></canvas>
+      <div class="cursor" id="cursor" hidden></div>
+    </div>
+    <div class="ov" id="ov"><div class="box" id="ovBox"></div></div>
+    <div class="tools" id="tools" hidden>
+      <div class="curc" id="curc"></div>
+      <div class="pal" id="pal"></div>
+      <div class="grp" id="sizes"></div>
+      <div class="grp" id="toolBtns"></div>
+      <div class="grp" id="editBtns"></div>
+    </div>
+  </main>
+  <section class="chat">
+    <div class="log" id="log" aria-live="polite"></div>
+    <form class="say" id="say" autocomplete="off"><input id="sayIn" maxlength="100" enterkeyhint="send" spellcheck="false" aria-label="Guess or chat"></form>
+  </section>
+</div>
+
+<script src="../_shared/bridge.js" data-game="draw-and-guess"></script>
+<script src="words.js"></script>
+<script type="module">
+const $ = (id) => document.getElementById(id)
+const W = 800, H = 600
+const PICK_MS = 15000, SHOW_MS = 6000, END_MS = 15000, START_MS = 8000
+const PALETTE = [
+  '#ffffff', '#c1c1c1', '#ef130b', '#ff7100', '#ffe400', '#00cc00', '#00ff91', '#00b2ff', '#231fd3', '#a300ba', '#df69a7', '#ffac8e', '#a0522d',
+  '#000000', '#505050', '#740b07', '#c23800', '#e8a200', '#005510', '#00785d', '#00569e', '#0e0865', '#550069', '#873554', '#cc774d', '#63300d',
+]
+const SIZES = [4, 10, 20, 36]
+const DEFAULTS = { rounds: 3, time: 80, hints: 2, max: 8, pub: false, only: false, words: '' }
+const WORDS = [...new Set(window.DRAW_WORDS || [])]
+
+const ICON = {
+  pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  brush: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19z"/></svg>',
+  eraser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 20l-5-5L14 5l6 6-9 9z"/><path d="M9 20h11M7 12l6 6"/></svg>',
+  fill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M11 3l8 8-7 7-8-8z"/><path d="M4 10h15"/><path d="M20 15c1.2 1.6 1.8 2.7 1.8 3.4a1.8 1.8 0 0 1-3.6 0c0-.7.6-1.8 1.8-3.4z" fill="currentColor" stroke="none"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-2" transform="translate(0 -5)"/></svg>',
+  clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  linkOk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  soundOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  soundOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>',
+  leave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4H5v16h9"/><path d="M10 12h10M16 8l4 4-4 4"/></svg>',
+}
+
+/* ---------- storage ---------- */
+const store = {
+  get(k) { try { return localStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch {} },
+}
+const session = {
+  get(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'null') } catch { return null } },
+  set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)) } catch {} },
+}
+
+/* ---------- words ---------- */
+const plain = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+// What gets compared: letters and digits only, so "hot dog", "hotdog" and
+// "Hot-Dog" are the same guess.
+const keyOf = (s) => plain(s).replace(/[^a-z0-9]/g, '')
+const cleanWord = (s) => plain(s).replace(/[^a-z0-9' -]/g, '').replace(/\s+/g, ' ').trim()
+function customWords(s) {
+  return [...new Set(String(s || '').split(/[,\n]/).map(cleanWord).filter((w) => keyOf(w).length >= 1 && w.length <= 30))].slice(0, 300)
+}
+// Every string one edit away from the word: the database checks a guess
+// against this list to say it is close, without anyone seeing the word.
+function nearSet(k) {
+  const A = 'abcdefghijklmnopqrstuvwxyz', out = {}
+  const add = (v) => { if (v && v !== k) out[v] = true }
+  for (let i = 0; i < k.length; i++) {
+    add(k.slice(0, i) + k.slice(i + 1))
+    for (const c of A) add(k.slice(0, i) + c + k.slice(i + 1))
+  }
+  for (let i = 0; i <= k.length; i++) for (const c of A) add(k.slice(0, i) + c + k.slice(i))
+  for (let i = 0; i < k.length - 1; i++) add(k.slice(0, i) + k[i + 1] + k[i] + k.slice(i + 2))
+  return out
+}
+const BAD = /(fuck|shit|cunt|nigg|fag|bitch|whore|slut|rape|nazi|hitler|penis|vagina|porn|dick|cock|pussy|retard|kys)[a-z]*/gi
+const mask = (s) => String(s).replace(BAD, (m) => '*'.repeat(m.length))
+
+/* ---------- sound ---------- */
+const Sound = {
+  on: store.get('vela:draw:sound') !== '0',
+  ctx: null,
+  tone(f, at, dur, type = 'sine', vol = 0.07) {
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at
+    o.type = type; o.frequency.value = f
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02)
+  },
+  play(kind) {
+    if (!this.on) return
+    try {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)()
+      if (this.ctx.state === 'suspended') this.ctx.resume()
+      const T = (f, a, d, ty, v) => this.tone(f, a, d, ty, v)
+      if (kind === 'join') T(660, 0, 0.12)
+      else if (kind === 'leave') T(440, 0, 0.14)
+      else if (kind === 'hit') { T(784, 0, 0.12, 'triangle', 0.1); T(1175, 0.09, 0.22, 'triangle', 0.1) }
+      else if (kind === 'other') { T(988, 0, 0.1, 'triangle', 0.06) }
+      else if (kind === 'turn') { T(523, 0, 0.12, 'triangle', 0.09); T(659, 0.1, 0.12, 'triangle', 0.09); T(784, 0.2, 0.22, 'triangle', 0.09) }
+      else if (kind === 'tick') T(1400, 0, 0.04, 'square', 0.025)
+      else if (kind === 'end') { T(392, 0, 0.18, 'triangle', 0.08); T(330, 0.14, 0.3, 'triangle', 0.08) }
+      else if (kind === 'win') [523, 659, 784, 1047].forEach((f, i) => T(f, i * 0.11, 0.3, 'triangle', 0.09))
+      else if (kind === 'close') T(880, 0, 0.08, 'sine', 0.05)
+    } catch {}
+  },
+}
+function soundIcon() { $('soundBtn').innerHTML = Sound.on ? ICON.soundOn : ICON.soundOff }
+
+/* ---------- state ---------- */
+let Rooms = null, DB = null
+const S = {
+  db: null, me: null, code: null, name: '',
+  s: null, p: {}, g: null,
+  off: [], inkOff: [], inkT: null,
+  ops: new Map(),
+  word: null,        // { t, d, k } while I am drawing
+  guessed: null,     // { t, d } once I guessed this turn
+  reveal: {},        // turn -> word, once shown
+  used: new Set(),
+  choices: null,
+  offset: 0,
+  tx: {},
+  names: {},
+  loaded: false,
+}
+const serverNow = () => Date.now() + S.offset
+const R = (path) => DB.ref(S.db, `draw/rooms/${S.code}${path ? '/' + path : ''}`)
+const nameOf = (u) => (S.p[u] && S.p[u].n) || S.names[u] || 'Player'
+
+function present() {
+  const kick = (S.g && S.g.kick) || {}
+  return Object.entries(S.p)
+    .filter(([u, v]) => v && v.on && !kick[u])
+    .map(([uid, v]) => ({ uid, n: v.n, j: v.j || 0 }))
+    .sort((a, b) => a.j - b.j || (a.uid < b.uid ? -1 : 1))
+}
+const isPresent = (u) => present().some((p) => p.uid === u)
+const hostUid = () => (present()[0] || {}).uid
+const amHost = () => hostUid() === S.me
+const scoreOf = (u) => ((S.g && S.g.sc && S.g.sc[u]) || 0) + ((S.g && S.g.ph === 'draw' && S.g.ok && S.g.ok[u]) || 0)
+
+/* ---------- connect ---------- */
+async function connect() {
+  if (S.db) return
+  if (!Rooms) throw new Error('offline')
+  const app = await Rooms.firebaseApp()
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  S.db = DB.getDatabase(app, local ? 'https://demo-vela-arcade-default-rtdb.firebaseio.com' : 'https://vela-arcade-default-rtdb.firebaseio.com')
+  if (local) DB.connectDatabaseEmulator(S.db, '127.0.0.1', 9000)
+  S.me = await Rooms.signIn()
+  DB.onValue(DB.ref(S.db, '.info/serverTimeOffset'), (snap) => { S.offset = snap.val() || 0 })
+}
+
+const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => ALPHABET[b % ALPHABET.length]).join('')
+const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+
+class Nope extends Error {}
+
+async function create(pub) {
+  await connect()
+  for (let i = 0; i < 5; i++) {
+    const code = newCode()
+    const have = await DB.get(DB.ref(S.db, `draw/rooms/${code}/s`))
+    if (have.exists()) continue
+    await DB.update(DB.ref(S.db, `draw/rooms/${code}`), {
+      s: { ...DEFAULTS, pub },
+      g: { ph: 'lobby', t: 0, tk: '0', r: 0 },
+      [`p/${S.me}`]: { n: S.name, on: true, j: DB.serverTimestamp() },
+    })
+    await enter(code)
+    return
+  }
+  throw new Nope('Could not make a room. Try again.')
+}
+
+async function join(code) {
+  await connect()
+  code = normCode(code)
+  if (code.length !== 6) throw new Nope('No room with that code.')
+  const [s, p, g] = await Promise.all(['s', 'p', 'g'].map((k) => DB.get(DB.ref(S.db, `draw/rooms/${code}/${k}`))))
+  if (!s.exists()) throw new Nope('No room with that code.')
+  const players = p.val() || {}, game = g.val() || {}
+  if (game.kick && game.kick[S.me]) throw new Nope('You were kicked from that room.')
+  const mine = players[S.me]
+  const count = Object.entries(players).filter(([u, v]) => v && v.on && u !== S.me && !(game.kick && game.kick[u])).length
+  if (count >= s.val().max) throw new Nope('That room is full.')
+  if (mine) await DB.update(DB.ref(S.db, `draw/rooms/${code}/p/${S.me}`), { n: S.name, on: true })
+  else await DB.set(DB.ref(S.db, `draw/rooms/${code}/p/${S.me}`), { n: S.name, on: true, j: DB.serverTimestamp() })
+  await enter(code)
+}
+
+async function quickPlay() {
+  await connect()
+  let list = []
+  try {
+    const snap = await DB.get(DB.ref(S.db, 'draw/open'))
+    const now = serverNow()
+    for (const [code, v] of Object.entries(snap.val() || {})) {
+      if (!v || now - v.at > 60000) DB.remove(DB.ref(S.db, `draw/open/${code}`)).catch(() => {})
+      else if (now - v.at < 45000 && v.n > 0 && v.n < v.m) list.push([code, v])
+    }
+  } catch {}
+  list.sort((a, b) => b[1].n - a[1].n)
+  for (const [code] of list) {
+    try { await join(code); return } catch {}
+  }
+  await create(true)
+}
+
+/* ---------- in a room ---------- */
+async function enter(code) {
+  S.code = code
+  S.p = {}; S.g = null; S.s = null; S.loaded = false
+  S.word = session.get(`vela:draw:word:${code}`)
+  S.guessed = null; S.reveal = {}; S.choices = null; S.tx = {}
+  $('log').innerHTML = ''
+  history.replaceState(null, '', location.pathname + (location.search.includes('room=') ? '' : location.search))
+  store.set('vela:draw:last', JSON.stringify({ code, at: Date.now() }))
+
+  const meRef = R(`p/${S.me}`)
+  DB.onDisconnect(DB.ref(S.db, `draw/rooms/${code}/p/${S.me}/on`)).set(false)
+  S.off.push(DB.onValue(DB.ref(S.db, '.info/connected'), (snap) => {
+    if (!snap.val() || S.code !== code) return
+    DB.onDisconnect(DB.ref(S.db, `draw/rooms/${code}/p/${S.me}/on`)).set(false)
+    if (S.p[S.me] && !S.p[S.me].on) DB.update(meRef, { on: true }).catch(() => {})
+  }))
+  S.off.push(DB.onValue(R('s'), (snap) => {
+    if (!snap.exists()) { if (S.code === code) exitRoom('That room has closed.'); return }
+    S.s = { ...DEFAULTS, ...snap.val() }
+    render()
+  }))
+  S.off.push(DB.onValue(R('p'), (snap) => {
+    const next = snap.val() || {}
+    if (S.loaded && Object.keys(S.p).length) diffPlayers(S.p, next)
+    S.p = next
+    for (const [u, v] of Object.entries(next)) if (v && v.n) S.names[u] = v.n
+    if (S.code && !next[S.me] && S.loaded) { exitRoom('You left the room.'); return }
+    render()
+  }))
+  S.off.push(DB.onValue(R('g'), (snap) => {
+    const next = snap.val()
+    if (!next) return
+    const prev = S.g
+    S.g = next
+    onGame(prev, next)
+    render()
+  }))
+  S.off.push(DB.onChildAdded(DB.query(R('chat'), DB.limitToLast(40)), (snap) => addChat(snap.val())))
+
+  showApp()
+  await Promise.all(['s', 'p', 'g'].map((k) => DB.get(R(k)).catch(() => null)))
+  S.loaded = true
+  sys(S.s && S.s.pub ? 'You joined a public game' : `You joined room ${code}`)
+  if (S.g && S.g.ph === 'show') readWord(S.g.t)
+  render()
+}
+
+function exitRoom(msg) {
+  S.off.forEach((f) => { try { f() } catch {} }); S.off = []
+  S.inkOff.forEach((f) => { try { f() } catch {} }); S.inkOff = []; S.inkT = null
+  if (S.db && S.code) DB.onDisconnect(DB.ref(S.db, `draw/rooms/${S.code}/p/${S.me}/on`)).cancel().catch(() => {})
+  S.code = null; S.s = null; S.g = null; S.p = {}; S.ops.clear()
+  store.set('vela:draw:last', '')
+  $('app').hidden = true
+  $('menu').hidden = false
+  $('menuErr').textContent = msg || ''
+}
+
+async function leave() {
+  const code = S.code
+  if (!code) return
+  const others = present().filter((p) => p.uid !== S.me)
+  exitRoom('')
+  try {
+    if (!others.length) await DB.update(DB.ref(S.db, 'draw'), { [`rooms/${code}`]: null, [`open/${code}`]: null })
+    else await DB.remove(DB.ref(S.db, `draw/rooms/${code}/p/${S.me}`))
+  } catch {}
+}
+
+/* ---------- turns ----------
+ * Any player's device can move the game on (a turn running out, everyone
+ * guessing, the drawer leaving) through a transaction that checks the turn and
+ * phase it expected, so two devices doing it at once is harmless. The host
+ * goes first; the others step in a moment later if nothing happened. */
+function tx(key, fn) {
+  if (!S.code) return Promise.resolve()
+  const at = Date.now()
+  if (S.tx[key] && at - S.tx[key] < 1500) return Promise.resolve()
+  S.tx[key] = at
+  return DB.runTransaction(R('g'), (cur) => {
+    if (!cur) return cur
+    const out = fn(cur)
+    return out === undefined ? undefined : out
+  }).catch(() => {})
+}
+
+function nextTurn(cur, now) {
+  const pr = present()
+  const base = { ...cur, ok: null, hint: null, gain: null, vk: null }
+  if (pr.length < 2) return { ...base, ph: 'end', ends: now + END_MS }
+  let r = cur.r || 1, dr = cur.dr || {}
+  let next = pr.find((p) => !dr[p.uid])
+  if (!next) {
+    if (r >= S.s.rounds) return { ...base, ph: 'end', ends: now + END_MS }
+    r += 1; dr = {}; next = pr[0]
+  }
+  const t = (cur.t || 0) + 1
+  return { ...base, ph: 'pick', r, d: next.uid, dr: { ...dr, [next.uid]: 1 }, t, tk: String(t), ends: now + PICK_MS }
+}
+const startGame = (cur, now) => nextTurn({ ...cur, r: 1, dr: null, sc: null, gain: null }, now)
+function endTurn(cur, now) {
+  const guessers = present().filter((p) => p.uid !== cur.d)
+  const ok = cur.ok || {}
+  const sum = Object.values(ok).reduce((a, b) => a + b, 0)
+  const dp = guessers.length ? Math.round(sum / guessers.length / 5) * 5 : 0
+  const sc = { ...(cur.sc || {}) }, gain = { ...ok }
+  for (const [u, v] of Object.entries(ok)) sc[u] = (sc[u] || 0) + v
+  if (cur.d) { sc[cur.d] = (sc[cur.d] || 0) + dp; gain[cur.d] = dp }
+  return { ...cur, ph: 'show', ends: now + SHOW_MS, sc, gain }
+}
+const toLobby = (cur) => ({ ph: 'lobby', t: cur.t || 0, tk: String(cur.t || 0), r: 0, kick: cur.kick || null })
+// Earlier and faster guesses score more: up to 500 for the first guess
+// straight away, at least 50.
+function points(cur) {
+  const f = Math.max(0, Math.min(1, (cur.ends - serverNow()) / (S.s.time * 1000)))
+  const order = Object.keys(cur.ok || {}).length
+  return Math.round((50 + 350 * f + Math.max(0, 100 - 25 * order)) / 5) * 5
+}
+
+function tick() {
+  const g = S.g, s = S.s
+  if (!g || !s || !S.code || !S.loaded) return
+  const now = serverNow(), pr = present(), host = amHost()
+  const late = (at) => now >= at + (host ? 0 : 1500)
+  const k = `${g.ph}:${g.t}`
+  if (g.ph === 'lobby') {
+    if (s.pub) {
+      if (pr.length >= 2 && !g.ends && host) tx('arm' + k, (c) => (c.ph === 'lobby' && !c.ends ? { ...c, ends: now + START_MS } : undefined))
+      else if (pr.length < 2 && g.ends && host) tx('disarm' + k, (c) => (c.ph === 'lobby' ? { ...c, ends: null } : undefined))
+      else if (g.ends && late(g.ends) && pr.length >= 2) tx('start' + k, (c) => (c.ph === 'lobby' && c.ends && c.t === g.t ? startGame(c, now) : undefined))
+    }
+  } else if (g.ph === 'pick') {
+    if (g.d === S.me && now >= g.ends && S.choices && !S.choosing) choose(S.choices[0])
+    else if (now >= g.ends + 4000 || (!isPresent(g.d) && late(0))) tx('skip' + k, (c) => (c.ph === 'pick' && c.t === g.t ? nextTurn(c, now) : undefined))
+  } else if (g.ph === 'draw') {
+    const guessers = pr.filter((p) => p.uid !== g.d), ok = g.ok || {}
+    const all = guessers.length > 0 && guessers.every((p) => ok[p.uid] != null)
+    if (late(g.ends) || !isPresent(g.d) || all || guessers.length === 0) tx('end' + k, (c) => (c.ph === 'draw' && c.t === g.t ? endTurn(c, now) : undefined))
+    else if (g.d === S.me) revealHints(now)
+  } else if (g.ph === 'show') {
+    if (late(g.ends)) tx('next' + k, (c) => (c.ph === 'show' && c.t === g.t ? nextTurn(c, now) : undefined))
+  } else if (g.ph === 'end') {
+    if (s.pub && late(g.ends)) tx('lobby' + k, (c) => (c.ph === 'end' && c.t === g.t ? toLobby(c) : undefined))
+  }
+  if (s.pub && host) advertise(pr.length)
+}
+
+let lastAd = { at: 0, key: '' }
+function advertise(n) {
+  const ph = S.g.ph === 'lobby' ? 'lobby' : 'play'
+  const key = `${n}:${ph}:${S.s.max}`
+  if (key === lastAd.key && Date.now() - lastAd.at < 20000) return
+  lastAd = { at: Date.now(), key }
+  DB.set(DB.ref(S.db, `draw/open/${S.code}`), { n, m: S.s.max, ph, at: DB.serverTimestamp() }).catch(() => {})
+}
+
+/* The drawer picks a word. It goes where only the database's rules can see it
+ * until the turn is over; guesses are checked by trying to write them next to
+ * it, which the rules allow only when they match. */
+async function choose(word) {
+  const g = S.g
+  if (!g || g.ph !== 'pick' || g.d !== S.me || S.choosing) return
+  S.choosing = true
+  const t = g.t, d = cleanWord(word), k = keyOf(d)
+  let ok = true
+  try { await DB.set(R(`w/${t}`), { k, d }) } catch { ok = false }
+  if (!ok) {
+    const saved = session.get(`vela:draw:word:${S.code}`)
+    if (!saved || saved.t !== t) { S.choosing = false; return }
+  } else {
+    S.word = { t, d, k }
+    session.set(`vela:draw:word:${S.code}`, S.word)
+    if (k.length >= 4) await DB.set(R(`near/${t}`), nearSet(k)).catch(() => {})
+  }
+  S.tx['go' + t] = 0
+  await tx('go' + t, (c) => (c.ph === 'pick' && c.t === t && c.d === S.me
+    ? { ...c, ph: 'draw', hint: S.word.d.replace(/[a-z0-9]/g, '_'), ends: serverNow() + S.s.time * 1000, ok: null }
+    : undefined))
+  S.choosing = false
+}
+
+function revealHints(now) {
+  const g = S.g, w = S.word
+  if (!w || w.t !== g.t || !g.hint || S.hintBusy) return
+  const letters = [...w.d].filter((ch) => /[a-z0-9]/.test(ch)).length
+  const n = Math.min(S.s.hints | 0, Math.floor(letters / 2))
+  if (!n) return
+  const el = 1 - (g.ends - now) / (S.s.time * 1000)
+  let want = 0
+  for (let i = 1; i <= n; i++) if (el >= i / (n + 1)) want = i
+  const hidden = [...g.hint].map((ch, i) => (ch === '_' ? i : -1)).filter((i) => i >= 0)
+  if (letters - hidden.length >= want || !hidden.length) return
+  const i = hidden[Math.floor(Math.random() * hidden.length)]
+  S.hintBusy = true
+  DB.set(R('g/hint'), g.hint.slice(0, i) + w.d[i] + g.hint.slice(i + 1)).catch(() => {}).finally(() => { S.hintBusy = false })
+}
+
+function pickChoices() {
+  const custom = customWords(S.s.words)
+  const pool = S.s.only && custom.length >= 3 ? custom : WORDS
+  const out = []
+  let guard = 0
+  while (out.length < 3 && guard++ < 400) {
+    const from = custom.length && !S.s.only && Math.random() < 0.5 ? custom : pool
+    const w = from[Math.floor(Math.random() * from.length)]
+    if (!out.includes(w) && (!S.used.has(w) || guard > 200)) out.push(w)
+  }
+  return out
+}
+
+/* ---------- reacting to the game ---------- */
+function onGame(prev, g) {
+  const fresh = !prev || prev.t !== g.t
+  if (g.t !== S.inkT) watchInk(g.t)
+  if (fresh) {
+    S.guessed = null
+    if (S.word && S.word.t !== g.t && g.ph === 'pick') S.word = null
+  }
+  if (!S.loaded) return
+  const changed = !prev || prev.ph !== g.ph || prev.t !== g.t
+  if (changed && g.ph === 'pick') {
+    if (g.d === S.me) {
+      S.choices = pickChoices()
+      Sound.play('turn')
+      // After the database has moved on too; until then the old turn is still current there.
+      setTimeout(() => { if (S.g && S.g.t === g.t) cleanup(g.t) }, 2500)
+    } else S.choices = null
+    if (g.r !== (prev && prev.r) && g.r) sys(`Round ${g.r} of ${S.s.rounds}`, 'turn')
+  }
+  if (changed && g.ph === 'draw') {
+    sys(g.d === S.me ? 'You are drawing now' : `${nameOf(g.d)} is drawing now`, 'turn')
+    if (g.d !== S.me && matchMedia('(pointer: fine)').matches) $('sayIn').focus({ preventScroll: true })
+  }
+  if (g.ph === 'draw' && prev && prev.t === g.t) {
+    const before = prev.ok || {}
+    for (const u of Object.keys(g.ok || {})) {
+      if (before[u] != null) continue
+      sys(u === S.me ? 'You guessed the word' : `${nameOf(u)} guessed the word`, 'hit')
+      Sound.play(u === S.me ? 'hit' : 'other')
+      flashPlayer(u, g.ok[u])
+    }
+  }
+  if (changed && g.ph === 'show') {
+    Sound.play('end')
+    readWord(g.t)
+  }
+  if (changed && g.ph === 'end') {
+    const top = ranking()[0]
+    if (top && prev && prev.ph !== 'lobby') { sys(`${top.uid === S.me ? 'You' : top.n} won`, 'turn'); Sound.play(top.uid === S.me ? 'win' : 'end') }
+  }
+  if (changed && g.ph === 'lobby' && prev && prev.ph !== 'lobby') S.used.clear()
+  if (g.kick && g.kick[S.me]) { exitRoom('You were kicked from that room.'); return }
+  if (g.kick && prev) for (const u of Object.keys(g.kick)) if (!(prev.kick && prev.kick[u])) sys(`${nameOf(u)} was kicked`)
+}
+
+// The turn can end on this device a moment before the database agrees, and
+// until then the word is still locked, so try a few times.
+async function readWord(t) {
+  for (let i = 0; i < 12 && S.code; i++) {
+    try {
+      const snap = await DB.get(R(`w/${t}`))
+      if (snap.exists()) {
+        const d = snap.val().d
+        S.reveal[t] = d; S.used.add(d)
+        sys(`The word was ${d}`, 'turn')
+        render()
+        return
+      }
+      if (S.g && S.g.t !== t) return
+    } catch {}
+    await new Promise((r) => setTimeout(r, 150 + i * 100))
+  }
+}
+
+// The new drawer clears the last turn's drawing and word.
+function cleanup(t) {
+  const p = t - 1
+  if (p < 1) return
+  for (const path of ['ink', `w/${p}`, `near/${p}`, `hit/${p}`, `close/${p}`]) DB.remove(R(path)).catch(() => {})
+}
+
+function diffPlayers(a, b) {
+  const on = (m, u) => m[u] && m[u].on
+  for (const u of Object.keys(b)) if (on(b, u) && !on(a, u) && u !== S.me) { sys(`${b[u].n} joined`); Sound.play('join') }
+  for (const u of Object.keys(a)) if (on(a, u) && !on(b, u) && u !== S.me) { sys(`${a[u].n} left`); Sound.play('leave') }
+}
+
+// Players in the room, best first. Anyone who left keeps their score in the
+// game state, so it is there again if they come back.
+function ranking() {
+  return present().map((p) => ({ uid: p.uid, n: p.n, s: scoreOf(p.uid) }))
+    .sort((a, b) => b.s - a.s || (a.n < b.n ? -1 : 1))
+}
+
+/* ---------- guessing and chat ---------- */
+let lastSay = 0
+async function say(text) {
+  text = text.replace(/\s+/g, ' ').trim().slice(0, 100)
+  if (!text || !S.code || !S.g) return
+  const now = Date.now()
+  // Too fast: hand the text back rather than lose it.
+  if (now - lastSay < 300) { if (!$('sayIn').value) $('sayIn').value = text; return }
+  lastSay = now
+  const g = S.g, me = S.me, k = keyOf(text)
+  const drawing = g.ph === 'draw'
+  const guessing = drawing && g.d !== me && !(g.ok && g.ok[me] != null)
+  if (guessing && k) {
+    const t = g.t
+    let hit = false
+    try { await DB.set(R(`hit/${t}/${me}`), k); hit = true } catch {}
+    if (hit) {
+      S.guessed = { t, d: fromHint(g.hint, k) }
+      tx('ok' + t, (c) => (c.ph === 'draw' && c.t === t && !(c.ok && c.ok[me] != null) ? { ...c, ok: { ...(c.ok || {}), [me]: points(c) } } : undefined))
+      render()
+      return
+    }
+    post(text, false)
+    const len = (g.hint || '').replace(/[^_a-z0-9]/g, '').length
+    if (len >= 4 && Math.abs(k.length - len) <= 1) {
+      try { await DB.set(R(`close/${t}/${me}`), k); sys(`${text} is close`, 'close'); Sound.play('close') } catch {}
+    }
+    return
+  }
+  // The drawer and anyone who already guessed may not say the word.
+  const word = (g.d === me && S.word && S.word.t === g.t && S.word.k) || (S.guessed && S.guessed.t === g.t && keyOf(S.guessed.d))
+  if (drawing && word && k.includes(word)) { sys('You cannot say the word', 'close'); return }
+  post(text, drawing && g.d !== me)
+}
+function fromHint(hint, k) {
+  let j = 0
+  return [...(hint || '')].map((ch) => (/[_a-z0-9]/.test(ch) ? k[j++] || '' : ch)).join('')
+}
+function post(text, secret) {
+  DB.push(R('chat'), { u: S.me, n: S.name, x: text, a: DB.serverTimestamp(), ...(secret ? { s: 1 } : {}) }).catch(() => {})
+}
+
+function addChat(m) {
+  if (!m || !m.x) return
+  // Messages from players who already guessed only reach others who did, and the drawer.
+  if (m.s && m.u !== S.me) {
+    const g = S.g
+    const inner = g && g.ph === 'draw' && (g.d === S.me || (g.ok && g.ok[S.me] != null))
+    if (g && g.ph === 'draw' && !inner) return
+  }
+  const p = document.createElement('p')
+  if (m.s) p.className = 'sec'
+  const b = document.createElement('b')
+  b.textContent = mask(m.n || 'Player') + ':'
+  p.append(b, document.createTextNode(mask(m.x)))
+  appendLog(p)
+}
+function sys(text, kind = 'sys') {
+  const p = document.createElement('p')
+  p.className = kind === 'sys' ? 'sys' : kind
+  p.textContent = mask(text)
+  appendLog(p)
+}
+function appendLog(el) {
+  const log = $('log')
+  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40
+  log.append(el)
+  while (log.childElementCount > 150) log.firstElementChild.remove()
+  if (stick) log.scrollTop = log.scrollHeight
+}
+
+/* ---------- canvas ---------- */
+const cv = $('cv'), ctx = cv.getContext('2d', { willReadFrequently: true })
+let K = 1
+function sizeCanvas() {
+  const k = (window.devicePixelRatio || 1) > 1.4 ? 2 : 1
+  if (k === K && cv.width === W * k) return
+  K = k
+  cv.width = W * K; cv.height = H * K
+  redraw()
+}
+function clearCanvas() {
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, cv.width, cv.height)
+}
+const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+function drawOp(o) {
+  const color = PALETTE[o.c] || '#000000'
+  if (o.f) { floodFill(o.x, o.y, color); return }
+  const pts = String(o.p || '').split(',').map(Number)
+  if (pts.length < 2) return
+  ctx.setTransform(K, 0, 0, K, 0, 0)
+  ctx.strokeStyle = ctx.fillStyle = color
+  if (pts.length === 2) {
+    ctx.beginPath(); ctx.arc(pts[0], pts[1], o.w / 2, 0, Math.PI * 2); ctx.fill()
+    return
+  }
+  ctx.lineWidth = o.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.beginPath(); ctx.moveTo(pts[0], pts[1])
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1])
+  ctx.stroke()
+}
+function redraw() {
+  clearCanvas()
+  for (const key of [...S.ops.keys()].sort()) drawOp(S.ops.get(key))
+}
+let redrawQueued = false
+function queueRedraw() {
+  if (redrawQueued) return
+  redrawQueued = true
+  requestAnimationFrame(() => { redrawQueued = false; redraw() })
+}
+// Scanline fill with some tolerance, then one pixel more around the edge so
+// the soft rim of a line does not leave a halo.
+function floodFill(x, y, hex) {
+  const w = cv.width, h = cv.height
+  x = Math.floor(x * K); y = Math.floor(y * K)
+  if (x < 0 || y < 0 || x >= w || y >= h) return
+  const img = ctx.getImageData(0, 0, w, h), d = img.data
+  const [fr, fg, fb] = rgb(hex)
+  const i0 = (y * w + x) * 4, tr = d[i0], tg = d[i0 + 1], tb = d[i0 + 2]
+  if (Math.abs(tr - fr) + Math.abs(tg - fg) + Math.abs(tb - fb) < 6) return
+  const diff = (p) => Math.abs(d[p * 4] - tr) + Math.abs(d[p * 4 + 1] - tg) + Math.abs(d[p * 4 + 2] - tb)
+  const seen = new Uint8Array(w * h)
+  const paint = (p) => { seen[p] = 1; d[p * 4] = fr; d[p * 4 + 1] = fg; d[p * 4 + 2] = fb; d[p * 4 + 3] = 255 }
+  const TOL = 90
+  const can = (p) => !seen[p] && diff(p) <= TOL
+  const stack = [x, y]
+  const edge = []
+  while (stack.length) {
+    const sy = stack.pop(), sx = stack.pop()
+    let lx = sx, rx = sx
+    const row = sy * w
+    if (!can(row + sx)) continue
+    while (lx > 0 && can(row + lx - 1)) lx--
+    while (rx < w - 1 && can(row + rx + 1)) rx++
+    let up = false, down = false
+    for (let i = lx; i <= rx; i++) {
+      paint(row + i)
+      if (sy > 0) { const q = row - w + i; const c = can(q); if (c && !up) { stack.push(i, sy - 1); up = true } else if (!c) { up = false; if (!seen[q]) edge.push(q) } }
+      if (sy < h - 1) { const q = row + w + i; const c = can(q); if (c && !down) { stack.push(i, sy + 1); down = true } else if (!c) { down = false; if (!seen[q]) edge.push(q) } }
+    }
+    if (lx > 0 && !seen[row + lx - 1]) edge.push(row + lx - 1)
+    if (rx < w - 1 && !seen[row + rx + 1]) edge.push(row + rx + 1)
+  }
+  for (const p of edge) if (!seen[p] && diff(p) < 420) paint(p)
+  ctx.putImageData(img, 0, 0)
+}
+
+function watchInk(t) {
+  S.inkOff.forEach((f) => { try { f() } catch {} })
+  S.inkOff = []; S.inkT = t; S.ops.clear(); clearCanvas()
+  if (!t) return
+  const r = R(`ink/${t}`)
+  S.inkOff.push(DB.onChildAdded(r, (snap) => {
+    if (S.ops.has(snap.key)) return
+    S.ops.set(snap.key, snap.val())
+    if (!redrawQueued) drawOp(snap.val())
+  }))
+  S.inkOff.push(DB.onChildRemoved(r, (snap) => { if (S.ops.delete(snap.key)) queueRedraw() }))
+}
+
+/* ---------- drawing ---------- */
+const tool = { kind: 'brush', c: 13, w: 1 }
+let stroke = null, flushTimer = 0
+const canDraw = () => S.g && S.g.ph === 'draw' && S.g.d === S.me && S.word && S.word.t === S.g.t
+function point(e) {
+  const r = cv.getBoundingClientRect()
+  return [Math.round(Math.max(0, Math.min(W, (e.clientX - r.left) / r.width * W))), Math.round(Math.max(0, Math.min(H, (e.clientY - r.top) / r.height * H)))]
+}
+const nextSeq = () => 1 + Math.max(0, ...[...S.ops.values()].map((o) => o.s || 0))
+function sendOp(op) {
+  const ref = DB.push(R(`ink/${S.g.t}`))
+  S.ops.set(ref.key, op)
+  DB.set(ref, op).catch(() => {})
+}
+function flush() {
+  if (!stroke || !stroke.buf.length) return
+  const pts = [...stroke.tail, ...stroke.buf]
+  sendOp({ s: stroke.s, c: stroke.c, w: stroke.w, p: pts.join(',') })
+  stroke.tail = stroke.buf.slice(-2)
+  stroke.buf = []
+}
+function segment(a, b) {
+  ctx.setTransform(K, 0, 0, K, 0, 0)
+  ctx.strokeStyle = ctx.fillStyle = PALETTE[stroke.c]
+  if (!a) { ctx.beginPath(); ctx.arc(b[0], b[1], stroke.w / 2, 0, Math.PI * 2); ctx.fill(); return }
+  ctx.lineWidth = stroke.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke()
+}
+const board = $('board')
+board.addEventListener('pointerdown', (e) => {
+  window.focus()
+  if (!canDraw() || !e.isPrimary || e.button > 0) return
+  e.preventDefault()
+  const [x, y] = point(e)
+  if (tool.kind === 'fill') {
+    const op = { s: nextSeq(), f: 1, c: tool.c, x, y }
+    floodFill(x, y, PALETTE[op.c])
+    sendOp(op)
+    return
+  }
+  board.setPointerCapture(e.pointerId)
+  stroke = { s: nextSeq(), c: tool.kind === 'eraser' ? 0 : tool.c, w: SIZES[tool.w], tail: [], buf: [x, y], last: [x, y] }
+  segment(null, [x, y])
+  clearInterval(flushTimer)
+  flushTimer = setInterval(flush, 45)
+})
+board.addEventListener('pointermove', (e) => {
+  moveCursor(e)
+  if (!stroke) return
+  const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]
+  for (const ev of (list.length ? list : [e])) {
+    const p = point(ev)
+    if (Math.abs(p[0] - stroke.last[0]) + Math.abs(p[1] - stroke.last[1]) < 2) continue
+    segment(stroke.last, p)
+    stroke.last = p
+    stroke.buf.push(p[0], p[1])
+  }
+  if (stroke.buf.length > 300) flush()
+})
+function endStroke() {
+  if (!stroke) return
+  flush()
+  stroke = null
+  clearInterval(flushTimer)
+}
+board.addEventListener('pointerup', endStroke)
+board.addEventListener('pointercancel', endStroke)
+board.addEventListener('pointerleave', () => { $('cursor').hidden = true })
+function moveCursor(e) {
+  const c = $('cursor')
+  if (!canDraw() || tool.kind === 'fill' || e.pointerType === 'touch') { c.hidden = true; return }
+  const r = board.getBoundingClientRect(), size = SIZES[tool.w] * r.width / W
+  c.hidden = false
+  c.style.width = c.style.height = `${size}px`
+  c.style.transform = `translate(${e.clientX - r.left - size / 2}px, ${e.clientY - r.top - size / 2}px)`
+}
+function undo() {
+  if (!canDraw() || stroke) return
+  let top = 0
+  for (const o of S.ops.values()) top = Math.max(top, o.s || 0)
+  if (!top) return
+  const patch = {}
+  for (const [k, o] of [...S.ops]) if (o.s === top) { patch[k] = null; S.ops.delete(k) }
+  DB.update(R(`ink/${S.g.t}`), patch).catch(() => {})
+  redraw()
+}
+function clearAll() {
+  if (!canDraw() || !S.ops.size) return
+  S.ops.clear(); clearCanvas()
+  DB.remove(R(`ink/${S.g.t}`)).catch(() => {})
+}
+
+function buildTools() {
+  $('pal').innerHTML = PALETTE.map((c, i) => `<button type="button" data-c="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')
+  $('sizes').innerHTML = SIZES.map((s, i) => `<button type="button" data-w="${i}" aria-label="Size ${i + 1}"><span class="dot" style="width:${[4, 8, 13, 19][i]}px;height:${[4, 8, 13, 19][i]}px"></span></button>`).join('')
+  $('toolBtns').innerHTML = `<button type="button" data-t="brush" title="Brush (B)" aria-label="Brush">${ICON.brush}</button><button type="button" data-t="eraser" title="Eraser (E)" aria-label="Eraser">${ICON.eraser}</button><button type="button" data-t="fill" title="Fill (F)" aria-label="Fill">${ICON.fill}</button>`
+  $('editBtns').innerHTML = `<button type="button" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">${ICON.undo}</button><button type="button" id="clearBtn" title="Clear" aria-label="Clear">${ICON.clear}</button>`
+  $('pal').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b) return; tool.c = +b.dataset.c; if (tool.kind === 'eraser') tool.kind = 'brush'; syncTools() })
+  $('sizes').addEventListener('click', (e) => { const b = e.target.closest('[data-w]'); if (!b) return; tool.w = +b.dataset.w; if (tool.kind === 'fill') tool.kind = 'brush'; syncTools() })
+  $('toolBtns').addEventListener('click', (e) => { const b = e.target.closest('[data-t]'); if (!b) return; tool.kind = b.dataset.t; syncTools() })
+  $('undoBtn').addEventListener('click', undo)
+  $('clearBtn').addEventListener('click', clearAll)
+  syncTools()
+}
+function syncTools() {
+  for (const b of $('pal').children) b.classList.toggle('on', +b.dataset.c === tool.c && tool.kind !== 'eraser')
+  for (const b of $('sizes').children) b.classList.toggle('on', +b.dataset.w === tool.w && tool.kind !== 'fill')
+  for (const b of $('toolBtns').children) b.classList.toggle('on', b.dataset.t === tool.kind)
+  $('curc').style.background = tool.kind === 'eraser' ? '#ffffff' : PALETTE[tool.c]
+  board.classList.toggle('fill', tool.kind === 'fill')
+}
+document.addEventListener('keydown', (e) => {
+  if (!canDraw() || document.activeElement === $('sayIn') || e.target.closest('textarea, input')) return
+  const key = e.key.toLowerCase()
+  if ((e.ctrlKey || e.metaKey) && key === 'z') { e.preventDefault(); undo(); return }
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (key === 'b') tool.kind = 'brush'
+  else if (key === 'e') tool.kind = 'eraser'
+  else if (key === 'f') tool.kind = 'fill'
+  else if (key >= '1' && key <= '4') tool.w = +key - 1
+  else return
+  syncTools()
+})
+
+/* ---------- rendering ---------- */
+function showApp() {
+  $('menu').hidden = true
+  $('app').hidden = false
+  layout()
+}
+
+function layout() {
+  const app = $('app')
+  const narrow = innerWidth < 860 || innerWidth < innerHeight * 1.1
+  app.classList.toggle('narrow', narrow)
+  const stage = $('stage'), tools = $('tools')
+  const th = tools.hidden ? 0 : tools.offsetHeight + (narrow ? 6 : 8)
+  let w
+  if (narrow) {
+    const room = innerHeight - 46 - 12 - th - 170
+    w = Math.min(stage.clientWidth, Math.max(220, room) * 4 / 3)
+  } else {
+    w = Math.min(stage.clientWidth, (stage.clientHeight - th) * 4 / 3)
+  }
+  w = Math.max(160, Math.floor(w))
+  board.style.width = `${w}px`
+  board.style.height = `${Math.round(w * 0.75)}px`
+  stage.style.minHeight = narrow && $('ov').classList.contains('wide') ? `${Math.max(0, innerHeight - 58 - 150)}px` : ''
+  sizeCanvas()
+  placeOverlay()
+}
+function placeOverlay() {
+  const ov = $('ov')
+  if (ov.classList.contains('wide')) Object.assign(ov.style, { left: '0px', top: '0px', width: '100%', height: '100%' })
+  else Object.assign(ov.style, { left: `${board.offsetLeft}px`, top: `${board.offsetTop}px`, width: `${board.offsetWidth}px`, height: `${board.offsetHeight}px` })
+}
+addEventListener('resize', () => { if (!$('app').hidden) layout() })
+
+let ovKey = ''
+function render() {
+  if (!S.code || !S.g || !S.s) return
+  const g = S.g
+  renderPlayers()
+  renderBar()
+  const drawer = canDraw()
+  if ($('tools').hidden === drawer) { $('tools').hidden = !drawer; layout() }
+  board.classList.toggle('can', drawer)
+  if (!drawer) $('cursor').hidden = true
+  const input = $('sayIn')
+  input.placeholder = g.ph === 'draw' && g.d !== S.me && !(g.ok && g.ok[S.me] != null) ? 'Type your guess' : 'Chat'
+  $('inviteBtn').hidden = !!S.s.pub
+  renderOverlay()
+}
+
+function renderPlayers() {
+  const g = S.g, rows = ranking()
+  const box = $('players')
+  const open = box.dataset.open || ''
+  box.innerHTML = rows.map((r, i) => {
+    const ok = g.ph === 'draw' && g.ok && g.ok[r.uid] != null
+    const drawing = (g.ph === 'draw' || g.ph === 'pick') && g.d === r.uid
+    const votes = Object.keys((g.vk && g.vk[r.uid]) || {}).length
+    const cls = ['pl', r.uid === S.me ? 'me' : 'other', ok ? 'ok' : '', drawing ? 'drawing' : ''].join(' ')
+    const kick = open === r.uid && r.uid !== S.me && present().length > 2
+      ? `<button class="btn kick" type="button" data-kick="${r.uid}">${g.vk && g.vk[r.uid] && g.vk[r.uid][S.me] ? 'Voted' : 'Vote to kick'} ${votes}/${kickNeed()}</button>` : ''
+    return `<div class="${cls}" data-u="${r.uid}"><span class="rk">${i + 1}</span><span class="nm"><b>${esc(mask(r.n))}</b><span>${r.s} points</span></span><span class="ic">${drawing ? ICON.pencil : ok ? ICON.check : ''}</span>${kick}</div>`
+  }).join('')
+}
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+function flashPlayer(u, pts) {
+  requestAnimationFrame(() => {
+    const row = $('players').querySelector(`[data-u="${u}"]`)
+    if (!row) return
+    row.classList.add('flash')
+    const s = document.createElement('span')
+    s.className = 'gain'; s.textContent = `+${pts}`
+    row.append(s)
+  })
+}
+const kickNeed = () => Math.max(2, Math.ceil((present().length - 1) / 2))
+$('players').addEventListener('click', (e) => {
+  const kick = e.target.closest('[data-kick]')
+  if (kick) {
+    const u = kick.dataset.kick, need = kickNeed()
+    tx('vk' + u + Date.now(), (c) => {
+      const vk = { ...(c.vk || {}) }
+      const mine = { ...(vk[u] || {}) }
+      if (mine[S.me]) delete mine[S.me]; else mine[S.me] = 1
+      vk[u] = mine
+      const out = { ...c, vk }
+      if (Object.keys(mine).length >= need) out.kick = { ...(c.kick || {}), [u]: 1 }
+      return out
+    })
+    return
+  }
+  const row = e.target.closest('.pl.other')
+  if (!row) return
+  $('players').dataset.open = $('players').dataset.open === row.dataset.u ? '' : row.dataset.u
+  renderPlayers()
+})
+
+function renderBar() {
+  const g = S.g, s = S.s
+  $('roundLabel').textContent = g.ph === 'lobby' ? (s.pub ? 'Public game' : `Room ${S.code}`) : g.ph === 'end' ? 'Game over' : `Round ${g.r} of ${s.rounds}`
+  const box = $('word')
+  let key, html
+  if (g.ph === 'draw') {
+    const mine = g.d === S.me && S.word && S.word.t === g.t ? S.word.d : S.guessed && S.guessed.t === g.t ? S.guessed.d : null
+    if (mine) { key = 'full:' + mine; html = `<span class="full">${esc(mine)}</span>` }
+    else {
+      const hint = g.hint || ''
+      key = 'hint:' + hint
+      const lens = hint.split(' ').map((w) => w.replace(/[^_a-z0-9]/g, '').length).join(' ')
+      const prev = box.dataset.hint || ''
+      html = [...hint].map((ch, i) => {
+        if (ch === ' ') return '<span class="lt sp"></span>'
+        if (!/[_a-z0-9]/.test(ch)) return `<span class="lt mk">${esc(ch)}</span>`
+        const isNew = ch !== '_' && prev[i] === '_'
+        return `<span class="lt${isNew ? ' new' : ''}">${ch === '_' ? '' : ch}</span>`
+      }).join('') + `<span class="len">${lens}</span>`
+      box.dataset.hint = hint
+    }
+  } else if (g.ph === 'show') {
+    const w = S.reveal[g.t]
+    key = 'show:' + (w || '')
+    html = w ? `<span class="full">${esc(w)}</span>` : ''
+  } else if (g.ph === 'pick') {
+    key = 'pick:' + g.d
+    html = `<span class="msg">${g.d === S.me ? 'Choose a word' : `${esc(mask(nameOf(g.d)))} is choosing`}</span>`
+  } else {
+    key = g.ph
+    html = `<span class="msg">${g.ph === 'lobby' ? 'Waiting to start' : 'Results'}</span>`
+  }
+  if (box.dataset.key !== key) { box.dataset.key = key; box.innerHTML = html }
+}
+
+function clockTick() {
+  if (!S.code || !S.g) return
+  const g = S.g, el = $('clock')
+  let secs = ''
+  if (g.ends && (g.ph !== 'lobby' || S.s.pub)) secs = Math.max(0, Math.ceil((g.ends - serverNow()) / 1000))
+  if (String(secs) !== el.textContent) {
+    el.textContent = secs
+    const low = g.ph === 'draw' && secs !== '' && secs <= 10
+    el.classList.toggle('low', low)
+    if (low && secs > 0) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); Sound.play('tick') }
+    if (g.ph === 'lobby' || g.ph === 'end' || g.ph === 'pick') renderOverlay(true)
+  }
+}
+
+function renderOverlay(timerOnly) {
+  const g = S.g, s = S.s, ov = $('ov'), box = $('ovBox')
+  const secs = g.ends ? Math.max(0, Math.ceil((g.ends - serverNow()) / 1000)) : 0
+  const pr = present()
+  let key = '', html = null
+  if (g.ph === 'lobby') {
+    key = `lobby:${amHost()}:${JSON.stringify(s)}:${pr.length}:${s.pub ? g.ends || 0 : ''}:${s.pub ? secs : ''}`
+    html = lobbyHTML(pr, secs)
+  } else if (g.ph === 'pick') {
+    if (g.d === S.me && !S.choices) S.choices = pickChoices()
+    key = `pick:${g.t}:${g.d === S.me}:${(S.choices || []).join()}`
+    html = g.d === S.me
+      ? `<p class="lab k">Round ${g.r} of ${s.rounds}</p><h2>Choose a word</h2><div class="choices">${(S.choices || []).map((w) => `<button class="btn" type="button" data-word="${esc(w)}">${esc(w)}</button>`).join('')}</div>`
+      : `<div class="who">${esc(mask(nameOf(g.d)))} is choosing a word<small>Round ${g.r} of ${s.rounds}</small></div>`
+  } else if (g.ph === 'show') {
+    const w = S.reveal[g.t]
+    key = `show:${g.t}:${w || ''}`
+    const gain = g.gain || {}
+    const rows = Object.entries(gain).map(([u, v]) => ({ u, v, n: nameOf(u) }))
+    for (const p of pr) if (!(p.uid in gain)) rows.push({ u: p.uid, v: 0, n: p.n })
+    rows.sort((a, b) => b.v - a.v)
+    const everyone = pr.length > 1 && pr.filter((p) => p.uid !== g.d).every((p) => gain[p.uid])
+    html = `<p class="lab k">${everyone ? 'Everyone guessed it' : 'The word was'}</p><p class="bigw">${w ? esc(w) : '&nbsp;'}</p>
+      <div class="rows">${rows.map((r) => `<div class="rw"><span class="n">${esc(mask(r.n))}</span>${r.u === g.d ? '<span class="tag">Drawer</span>' : ''}<span class="v${r.v ? '' : ' z'}">+${r.v}</span></div>`).join('')}</div>`
+  } else if (g.ph === 'end') {
+    const rk = ranking()
+    key = `end:${g.t}:${s.pub ? secs : ''}:${rk.map((r) => r.uid + r.s).join()}`
+    const st = (r, i) => r ? `<div class="st s${i + 1}"><b>${esc(mask(r.n))}</b><span>${r.s}</span><div class="blk">${i + 1}</div></div>` : '<div class="st"></div>'
+    html = `<h2>Results</h2><div class="podium">${st(rk[1], 1)}${st(rk[0], 0)}${st(rk[2], 2)}</div>
+      <div class="rows">${rk.slice(3).map((r, i) => `<div class="rw"><span class="p">${i + 4}</span><span class="n">${esc(mask(r.n))}</span><span class="v">${r.s}</span></div>`).join('')}</div>
+      ${s.pub ? `<div class="wait"><i></i>Next game in ${secs}</div>`
+        : '<div class="acts"><button class="btn primary big" type="button" id="againBtn">Play again</button></div>'}`
+  }
+  if (timerOnly && key === ovKey) return
+  if (html == null) {
+    ov.classList.remove('show'); ovKey = ''
+    if (ov.classList.contains('wide')) { ov.classList.remove('wide'); layout() }
+    return
+  }
+  if (key === ovKey) return
+  // Keep a half-typed word list while the host edits it.
+  const focused = document.activeElement && document.activeElement.id === 'wordsIn'
+  if (focused && g.ph === 'lobby') return
+  ovKey = key
+  box.innerHTML = html
+  const wide = g.ph === 'lobby' || g.ph === 'end'
+  if (wide !== ov.classList.contains('wide')) { ov.classList.toggle('wide', wide); layout() }
+  ov.classList.add('show')
+}
+
+function lobbyHTML(pr, secs) {
+  const s = S.s, host = amHost() && !s.pub
+  const seg = (name, values, fmt = (v) => v) => `<div class="seg${host ? '' : ' locked'}" data-set="${name}">${values.map((v) => `<button type="button" data-v="${v}" class="${s[name] === v ? 'on' : ''}">${fmt(v)}</button>`).join('')}</div>`
+  if (s.pub) {
+    return `<h2>Public game</h2><p class="note" style="margin-top:0.4em">${pr.length} of ${s.max} players</p>
+      <div class="wait"><i></i>${pr.length < 2 ? 'Waiting for players' : `Starting in ${secs}`}</div>`
+  }
+  const link = Rooms.inviteUrl('draw-and-guess', S.code)
+  return `<h2>Room ${S.code}</h2>
+    <div class="set">
+      <div><span class="lab">Rounds</span>${seg('rounds', [2, 3, 4, 5, 6])}</div>
+      <div><span class="lab">Draw time</span>${seg('time', [60, 80, 100, 120])}</div>
+      <div><span class="lab">Hints</span>${seg('hints', [0, 1, 2, 3])}</div>
+      <div><span class="lab">Players</span>${seg('max', [4, 6, 8, 10])}</div>
+      <div class="wide"><span class="lab">Custom words</span><textarea id="wordsIn" maxlength="4000" spellcheck="false" placeholder="Separated by commas"${host ? '' : ' readonly'}>${esc(s.words || '')}</textarea>
+        <label class="check"><input type="checkbox" id="onlyIn"${s.only ? ' checked' : ''}${host ? '' : ' disabled'}>Custom words only</label></div>
+      <div class="wide"><span class="lab">Invite link</span><div class="rowb"><input class="field" id="linkIn" readonly value="${esc(link)}"><button class="btn" type="button" id="copyBtn" style="height:auto">Copy</button></div></div>
+    </div>
+    ${host
+      ? `<div class="acts"><button class="btn primary big" type="button" id="startBtn"${pr.length < 2 ? ' disabled' : ''}>${pr.length < 2 ? 'Waiting for players' : 'Start'}</button></div>`
+      : `<div class="wait"><i></i>Waiting for ${esc(mask(nameOf(hostUid())))} to start</div>`}`
+}
+
+let wordsTimer = 0
+$('ovBox').addEventListener('click', (e) => {
+  const b = e.target.closest('button')
+  if (!b) return
+  if (b.dataset.word) { choose(b.dataset.word); return }
+  const seg = b.closest('[data-set]')
+  if (seg && amHost() && !S.s.pub) {
+    DB.set(R(`s/${seg.dataset.set}`), +b.dataset.v).catch(() => {})
+    return
+  }
+  if (b.id === 'startBtn') {
+    if (present().length < 2) return
+    tx('start' + S.g.t, (c) => (c.ph === 'lobby' ? startGame(c, serverNow()) : undefined))
+  } else if (b.id === 'againBtn') {
+    tx('again' + S.g.t, (c) => (c.ph === 'end' ? toLobby(c) : undefined))
+  } else if (b.id === 'copyBtn') copyLink(b)
+})
+$('ovBox').addEventListener('input', (e) => {
+  if (e.target.id !== 'wordsIn' || !amHost()) return
+  clearTimeout(wordsTimer)
+  const v = e.target.value.slice(0, 4000)
+  wordsTimer = setTimeout(() => DB.set(R('s/words'), v).catch(() => {}), 500)
+})
+$('ovBox').addEventListener('focusout', (e) => { if (e.target.id === 'wordsIn') setTimeout(() => { ovKey = ''; renderOverlay() }, 600) })
+$('ovBox').addEventListener('change', (e) => {
+  if (e.target.id === 'onlyIn' && amHost()) DB.set(R('s/only'), e.target.checked).catch(() => {})
+})
+
+async function copyLink(btn) {
+  const url = Rooms.inviteUrl('draw-and-guess', S.code)
+  try { await navigator.clipboard.writeText(url) } catch {
+    const i = $('linkIn'); if (i) { i.select(); document.execCommand('copy') }
+  }
+  if (btn.id === 'inviteBtn') { btn.innerHTML = ICON.linkOk; btn.classList.add('done'); setTimeout(() => { btn.innerHTML = ICON.link; btn.classList.remove('done') }, 1400) }
+  else { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy' }, 1400) }
+}
+
+/* ---------- wiring ---------- */
+$('say').addEventListener('submit', (e) => {
+  e.preventDefault()
+  const v = $('sayIn').value
+  $('sayIn').value = ''
+  say(v)
+})
+$('inviteBtn').innerHTML = ICON.link
+$('inviteBtn').addEventListener('click', (e) => copyLink(e.currentTarget))
+$('leaveBtn').innerHTML = ICON.leave
+$('leaveBtn').addEventListener('click', leave)
+soundIcon()
+$('soundBtn').addEventListener('click', () => { Sound.on = !Sound.on; store.set('vela:draw:sound', Sound.on ? '1' : '0'); soundIcon() })
+buildTools()
+
+function menuName() {
+  const v = $('nameIn').value.replace(/\s+/g, ' ').trim().slice(0, 20)
+  if (!$('nameIn').readOnly) store.set('vela:draw:name', v)
+  return Rooms ? Rooms.playerName(v || 'Player') : v || 'Player'
+}
+async function go(btn, fn) {
+  $('menuErr').textContent = ''
+  const panel = btn.closest('.panel')
+  panel.classList.add('busy')
+  try {
+    if (!Rooms) throw new Nope('Online play is not available right now.')
+    S.name = menuName()
+    await connect()
+    S.name = menuName()
+    await fn()
+  } catch (err) {
+    $('menuErr').textContent = err instanceof Nope ? err.message : 'Could not connect. Try again.'
+    if (!(err instanceof Nope)) console.warn('draw and guess', err)
+  } finally { panel.classList.remove('busy') }
+}
+$('quickBtn').addEventListener('click', (e) => go(e.currentTarget, quickPlay))
+$('createBtn').addEventListener('click', (e) => go(e.currentTarget, () => create(false)))
+$('joinBtn').addEventListener('click', (e) => go(e.currentTarget, () => join($('codeIn').value)))
+$('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click() })
+$('codeIn').addEventListener('input', (e) => { const v = normCode(e.target.value); if (v !== e.target.value) e.target.value = v })
+
+// Wrong and not-close guesses are writes the database refuses on purpose;
+// keep its warnings about those out of the console.
+const warn = console.warn.bind(console)
+console.warn = (...args) => {
+  const m = typeof args[0] === 'string' ? args[0] + (args[1] || '') : ''
+  if (/permission_denied/.test(m) && /\/(hit|close|w)\//.test(m)) return
+  warn(...args)
+}
+
+setInterval(() => { tick(); clockTick() }, 200)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); render() } })
+
+;(async () => {
+  $('nameIn').value = store.get('vela:draw:name') || ''
+  try {
+    ;[Rooms, DB] = await Promise.all([
+      import('../_shared/rooms.js'),
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js'),
+    ])
+  } catch { Rooms = null }
+  if (!Rooms || !Rooms.available) {
+    for (const id of ['quickBtn', 'createBtn', 'joinBtn']) $(id).disabled = true
+    $('menuErr').textContent = Rooms ? 'Online play is not set up yet.' : 'Online play is not available right now.'
+  }
+  if (window.Vela) Vela.ready()
+  const code = Rooms && Rooms.codeFromUrl()
+  if (code) {
+    $('codeIn').value = code
+    // Straight in with a known name; otherwise let them type one first.
+    if (store.get('vela:draw:name') || $('nameIn').readOnly) go($('joinBtn'), () => join(code))
+    else {
+      $('joinBtn').classList.add('primary'); $('quickBtn').classList.remove('primary')
+      $('nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click() })
+      $('nameIn').focus()
+    }
+  } else if (Rooms && Rooms.available) {
+    // A reload drops you back into the room you were in.
+    let last = null
+    try { last = JSON.parse(store.get('vela:draw:last') || 'null') } catch {}
+    if (last && last.code && Date.now() - last.at < 2 * 3600 * 1000) {
+      await go($('joinBtn'), () => join(last.code))
+      if (!S.code) $('menuErr').textContent = ''
+    }
+  }
+})()
+</script>
+</body>
+</html>

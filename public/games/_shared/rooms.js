@@ -25,6 +25,8 @@
  *                                    (server time, so device clocks do not matter)
  *   Rooms.inviteUrl(game, code)      a link that opens the game straight into the room
  *   Rooms.codeFromUrl()              the ?room= code this page was opened with, if any
+ *   await Rooms.firebaseApp()        the signed-in Firebase app (Realtime Database games)
+ *   Rooms.playerName(typed)          the name a player gets: the account's while signed in
  *   await Rooms.leave(code)          host deletes the room; a guest drops their seat
  *                                    in the lobby, or is marked in room.left mid-game
  *
@@ -126,6 +128,10 @@ export function signIn() {
 // The name that goes in the room: the account's while playing on it.
 const nameFor = (typed) => cleanName(onAccount ? ACCOUNT.display : typed)
 export const uid = () => (auth && auth.currentUser ? auth.currentUser.uid : null)
+// For games that keep their state in the Realtime Database on the same app,
+// signed in as the same player.
+export async function firebaseApp() { await signIn(); return auth.app }
+export const playerName = (typed) => nameFor(typed)
 
 const roomRef = (code) => doc(db, 'rooms', code)
 // No 0/O, 1/I/L: codes get read out loud and typed on phones.

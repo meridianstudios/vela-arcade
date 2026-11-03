@@ -3,6 +3,29 @@
  * true to how the game here actually plays, not to some other house rule.
  */
 export const RULES = {
+  'draw-and-guess': [
+    { h: 'A turn', items: [
+      'The drawer picks one of three words and draws it before the clock runs out. Everyone else types guesses in the chat.',
+      'Only letters and numbers count, so capitals, spaces and hyphens do not matter.',
+      'A guess one letter away from the word is marked close. Only you see that.',
+      'The turn ends when the time is up or everyone has guessed. Then the word is shown.',
+    ] },
+    { h: 'Scoring', items: [
+      'A right guess scores up to 500: more the sooner you get it and the earlier you are among the guessers, and never less than 50.',
+      "The drawer scores the guessers' points added up and divided by the number of players guessing, so the more people get it, the more the drawer scores.",
+      'Everyone draws once a round. The most points after the last round wins.',
+    ] },
+    { h: 'Chat', items: [
+      'Once you have guessed, your messages only reach the drawer and others who have guessed, and neither you nor the drawer can type the word.',
+    ] },
+    { h: 'Rooms', items: [
+      'Quick play puts you in a public game. It starts once two players are in, and new players can join a game already going.',
+      'A private room is set up by the player who has been in it longest: rounds, draw time, hints, the player limit and custom words. Custom words mix in with the usual ones unless Custom words only is on.',
+      "Hints fill in letters as the clock runs down, up to the room's hint setting and never more than half the word.",
+      'With three or more players, tap a player to vote to kick them. Votes from half the other players, and at least two, remove them.',
+    ] },
+  ],
+
   onitama: [
     { h: 'Setup', items: [
       'A 5 by 5 board. Each side has a master in the middle of its back row and four students.',

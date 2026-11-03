@@ -44,6 +44,24 @@ export const CATALOGUE = [
     </g>`,
   },
   {
+    slug: 'draw-and-guess',
+    title: 'Draw and Guess',
+    description:
+      'Each turn one player picks a word and draws it while everyone else types guesses in the chat. Guess sooner to score more; the drawer scores when people get it. Letters fill in as the clock runs down, and a guess one letter off is marked close. Quick play drops you into a public game with whoever is on, or make a private room with your own rounds, draw time, hints and word list.',
+    kind: 'inhouse',
+    src: '/games/draw-and-guess/index.html',
+    tags: ['Multiplayer'],
+    players: '2 to 10 players, online',
+    controls: 'Draw with the mouse or a finger. Type guesses and press Enter. Drawing: B brush, E eraser, F fill, 1 to 4 size, Ctrl+Z undo.',
+    art: `<g fill="currentColor">
+      <path d="M8 10h32v21H21l-8 7v-7H8z"/>
+      <circle cx="16" cy="20.5" r="2.4" style="fill:var(--tile)"/><circle cx="24" cy="20.5" r="2.4" style="fill:var(--tile)"/><circle cx="32" cy="20.5" r="2.4" style="fill:var(--tile)"/>
+      <path d="M47 22l8 8-21 21-8-8z"/>
+      <path d="M24 45l8 8-11 3z" opacity=".55"/>
+      <path d="M50 19l4-4 8 8-4 4z" opacity=".55"/>
+    </g>`,
+  },
+  {
     slug: 'chess',
     title: 'Chess',
     description:
@@ -1294,7 +1312,7 @@ export const CATALOGUE = [
 /* Lobby order: the games most people already know first, the ones they will
  * have to learn last. A game missing from this list goes to the end. */
 export const ORDER = [
-  'chess', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
+  'draw-and-guess', 'chess', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
   'four-in-a-row', 'checkers', 'sea-battle', 'word-guess', 'holdem', 'pong',
   'block-puzzle', 'slots', 'roulette', 'plinko', 'mines', 'crash', 'hangman',
   'yatzy', 'brick-breaker', 'space-shooter', 'memory-match', 'pinball',
