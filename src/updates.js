@@ -6,6 +6,15 @@
  */
 export const UPDATES = [
   {
+    version: '1.12',
+    date: '2026-11-04',
+    games: [],
+    changes: [
+      'Opening a game grows its tile into the game, and going back shrinks it into its tile again. Games start loading when you point at them.',
+      'Vela Arcade installs as an app on a computer or phone: Install app in the footer, or Add to Home Screen.',
+    ],
+  },
+  {
     version: '1.11',
     date: '2026-11-04',
     games: [],

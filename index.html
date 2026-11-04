@@ -10,6 +10,8 @@
   <meta property="og:description" content="Browser games by Vela." />
   <meta name="theme-color" content="#0b0c0f" />
   <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="preload" href="/fonts/selawk.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/fonts/type.css" />
 </head>
@@ -40,6 +42,7 @@
     <div class="wrap foot-inner">
       <span class="label"><a href="https://vela.novalabsos.com" target="_blank" rel="noopener">Vela</a>, a <a href="https://meridian.novalabsos.com" target="_blank" rel="noopener">Meridian</a> studio</span>
       <span class="foot-right">
+        <button class="label install" id="install" hidden>Install app</button>
         <a class="label" id="version" href="/updates" data-link></a>
         <span class="label">&copy; 2026</span>
       </span>

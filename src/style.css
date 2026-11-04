@@ -454,6 +454,8 @@ a.pf-tile:hover { background: var(--tile); }
   transition: background-color 0.25s var(--ease);
 }
 @keyframes tile-in { from { opacity: 0; transform: translateY(14px); } }
+/* Coming back from a game, the tiles are already there for the stage to land in. */
+.morphing .card { animation: none; }
 .card .art { aspect-ratio: 4 / 3; position: relative; }
 a.card:hover { background: var(--tile); }
 a.card:hover .art { --tile: var(--vela); background: var(--vela); color: #000; }
@@ -507,6 +509,12 @@ a.card:hover .flag.rank { background: #000; color: var(--text); }
   display: grid; place-items: center; transition: opacity 0.3s var(--ease), visibility 0.3s;
 }
 .loader.gone { opacity: 0; visibility: hidden; }
+.loader-in { display: flex; flex-direction: column; align-items: center; gap: 36px; }
+.splash-art { display: none; }
+/* After a morph: the game's art on orange, the way its tile looks under the pointer. */
+.loader.splash { background: var(--vela); color: #000; }
+.loader.splash .splash-art { display: block; width: min(28vmin, 150px); aspect-ratio: 1; }
+.loader.splash .loader-dots i { background: #000; }
 /* Windows-style progress: dots running along a line */
 .loader-dots { width: 160px; height: 4px; position: relative; overflow: hidden; }
 .loader-dots i { position: absolute; top: 0; left: 0; width: 4px; height: 4px; background: var(--vela); animation: dot 2s cubic-bezier(0.2, 0.7, 0.8, 0.3) infinite; }
@@ -585,6 +593,9 @@ a.card:hover .flag.rank { background: #000; color: var(--text); }
 .foot-right { display: flex; align-items: center; gap: 20px; }
 .foot-inner a.label { transition: color 0.15s var(--ease); }
 .foot-inner a.label:hover { color: var(--vela-2); }
+.install { padding: 0; background: none; color: var(--vela-2); cursor: pointer; transition: color 0.15s var(--ease); }
+.install:hover { color: var(--text); }
+.install[hidden] { display: none; }
 
 /* ── smaller screens ────────────────────────────────────────── */
 @media (max-width: 1000px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -655,6 +666,16 @@ a.card:hover .flag.rank { background: #000; color: var(--text); }
       .player-actions { padding-left: 4px; }
   body.is-playing .footer { display: none; }
 }
+/* Morphs between a tile and the game stage (main.js). */
+::view-transition-group(*) { animation-duration: 0.45s; animation-timing-function: var(--ease); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.25s; }
+::view-transition-old(vt-art), ::view-transition-new(vt-art) { width: 100%; height: 100%; object-fit: cover; }
+/* A title's box changes shape (a full-width tile heading to a name in the bar),
+   so its text keeps its height and proportions and slides, pinned left. */
+::view-transition-old(vt-title), ::view-transition-new(vt-title) { width: auto; height: 100%; left: 0; right: auto; }
+::view-transition-group(vt-art) { z-index: 60; }
+::view-transition-group(vt-title) { z-index: 61; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

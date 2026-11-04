@@ -474,7 +474,9 @@ function renderPlay(slug) {
         </div>
       </div>
       <div class="stage" id="stage">
-        <div class="loader" id="loader"><div class="loader-dots"><i></i><i></i><i></i><i></i></div></div>
+        <div class="loader${morphing ? ' splash' : ''}" id="loader">
+          <div class="loader-in"><svg class="splash-art" viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg><div class="loader-dots"><i></i><i></i><i></i><i></i></div></div>
+        </div>
         <iframe id="frame" title="${esc(g.title)}" src="${esc(frameSrc)}"
           allow="fullscreen; autoplay; clipboard-write; gamepad"${g.via ? ` sandbox="${THIRD_PARTY_SANDBOX}"` : ''}></iframe>
       </div>
@@ -520,12 +522,16 @@ function renderPlay(slug) {
   const frame = document.getElementById('frame')
   const stage = document.getElementById('stage')
   const loader = document.getElementById('loader')
+  const drawnAt = Date.now()
 
   // In-house games load near-instantly. External ones only tell us the
   // document loaded, and an app like Wildcard still has to boot after that,
   // so hold the loader a moment rather than flashing an empty frame.
+  // After a morph the splash stays up long enough to be seen, not flashed.
+  const splash = loader.classList.contains('splash')
   frame.addEventListener('load', () => {
-    setTimeout(() => loader.classList.add('gone'), external ? 1200 : 0)
+    const hold = Math.max(external ? 1200 : 0, splash ? 650 - (Date.now() - drawnAt) : 0)
+    setTimeout(() => loader.classList.add('gone'), hold)
     focusFrame()
   })
 
@@ -1207,15 +1213,100 @@ function route() {
   document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))
   // Tiles stagger in on their own; everything else eases up as one page.
   const first = app.firstElementChild
-  if (first && !app.querySelector('.grid')) first.classList.add('page-in')
+  if (first && !app.querySelector('.grid') && !morphing) first.classList.add('page-in')
+  onScreen = location.pathname
 }
 
-function navigate(href, { keepSearch = false } = {}) {
+// Each history entry keeps its own scroll position, so back lands where you
+// were even when the page is redrawn inside a morph.
+history.scrollRestoration = 'manual'
+function navigate(href, { keepSearch = false, link = null } = {}) {
   if (!keepSearch) searchInput.value = ''
-  history.pushState({ from: location.pathname }, '', href)
-  route()
-  if (!keepSearch) window.scrollTo(0, 0)
+  history.replaceState({ ...history.state, y: window.scrollY }, '')
+  const path = new URL(href, location.href).pathname
+  morph(path, () => {
+    history.pushState({ from: location.pathname }, '', href)
+    route()
+    if (!keepSearch) window.scrollTo(0, 0)
+  }, link)
 }
+
+/* ── morphs ──────────────────────────────────────────────────────
+   Opening a game, its tile grows into the stage and its name moves into the
+   bar; leaving for the lobby, the stage shrinks back into its tile. Built on
+   same-document view transitions; without them, or with reduced motion, the
+   page just changes. */
+
+let morphing = false
+let onScreen = location.pathname
+const playSlug = (path) => (path.match(/^\/play\/([\w-]+)\/?$/) || [])[1]
+const nameAs = (el, name) => { if (el) el.style.viewTransitionName = name }
+const inView = (el) => {
+  if (!el || !el.offsetParent) return false
+  const r = el.getBoundingClientRect()
+  return r.bottom > 0 && r.top < innerHeight && r.width > 0
+}
+
+function morph(path, update, link) {
+  const opening = playSlug(path)
+  const leaving = !opening && path === '/' && playSlug(onScreen)
+  // Opening: the link that was clicked, or the game's tile if it is on screen
+  // (Random, Enter in search).
+  let from = null
+  if (opening) {
+    from = link && link.querySelector('.art') ? link : app.querySelector(`.card[data-slug="${opening}"]`)
+    if (!inView(from)) from = null
+  }
+  const can = document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!can || !(from || leaving) || document.fullscreenElement) return update()
+
+  if (from) {
+    nameAs(from.querySelector('.art'), 'vt-art')
+    nameAs(from.querySelector('h3, strong'), 'vt-title')
+  } else {
+    nameAs(document.getElementById('stage'), 'vt-art')
+    nameAs(app.querySelector('.player-title h1'), 'vt-title')
+  }
+  morphing = true
+  document.documentElement.classList.add('morphing')
+  const t = document.startViewTransition(() => {
+    update()
+    if (opening) {
+      nameAs(document.getElementById('stage'), 'vt-art')
+      nameAs(app.querySelector('.player-title h1'), 'vt-title')
+    } else {
+      const card = app.querySelector(`.card[data-slug="${leaving}"]`)
+      if (inView(card)) {
+        nameAs(card.querySelector('.art'), 'vt-art')
+        nameAs(card.querySelector('h3'), 'vt-title')
+      }
+    }
+  })
+  // A skipped morph (a second click mid-flight, a hidden tab) still changes the page.
+  t.ready.catch(() => {})
+  t.finished.catch(() => {}).finally(() => {
+    morphing = false
+    document.documentElement.classList.remove('morphing')
+    document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => { el.style.viewTransitionName = '' })
+  })
+}
+
+/* A game's page starts loading as soon as a pointer rests on its link, so
+   the frame often has it by the time the morph lands. */
+const warmed = new Set()
+function warm(e) {
+  const a = e.target.closest && e.target.closest('a[href^="/play/"]')
+  const g = a && bySlug(playSlug(a.getAttribute('href')))
+  if (!g || warmed.has(g.slug) || !playable(g)) return
+  warmed.add(g.slug)
+  const link = document.createElement('link')
+  if (g.kind === 'inhouse') { link.rel = 'prefetch'; link.href = g.src }
+  else { link.rel = 'preconnect'; link.href = new URL(g.src).origin }
+  document.head.append(link)
+}
+document.addEventListener('pointerover', warm, { passive: true })
+document.addEventListener('touchstart', warm, { passive: true })
+document.addEventListener('focusin', warm)
 
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]')
@@ -1223,9 +1314,14 @@ document.addEventListener('click', (e) => {
   e.preventDefault()
   // From a game opened in the lobby, back goes back, to the same place in it.
   if (a.id === 'back' && history.state && history.state.from === '/') history.back()
-  else if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'))
+  else if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'), { link: a })
 })
-window.addEventListener('popstate', route)
+window.addEventListener('popstate', () => {
+  morph(location.pathname, () => {
+    route()
+    window.scrollTo(0, (history.state && history.state.y) || 0)
+  })
+})
 
 /* ── account ─────────────────────────────────────────────────────
    Optional. One quiet button in the bar; nothing else on the site asks. */
@@ -1390,5 +1486,28 @@ document.addEventListener('click', (e) => {
 
 document.getElementById('version').textContent = 'Version ' + CURRENT_VERSION
 startHeartbeat()
+
+/* ── app ─────────────────────────────────────────────────────────
+   The site installs as an app (public/manifest.webmanifest). The service
+   worker is versioned by build, so every deploy starts a fresh cache. Where
+   the browser offers its own install prompt, the footer gets an Install link. */
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js?b=' + __BUILD__).catch(() => {})
+}
+const installEl = document.getElementById('install')
+let installPrompt = null
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  installPrompt = e
+  installEl.hidden = false
+})
+window.addEventListener('appinstalled', () => { installPrompt = null; installEl.hidden = true })
+installEl.addEventListener('click', async () => {
+  if (!installPrompt) return
+  installPrompt.prompt()
+  const { outcome } = await installPrompt.userChoice
+  if (outcome === 'accepted') installEl.hidden = true
+  installPrompt = null
+})
 
 route()
