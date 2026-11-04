@@ -2,7 +2,7 @@ import './style.css'
 import { GAMES, TAGS, bySlug, playable } from './games.js'
 import { UPDATES, CURRENT_VERSION } from './updates.js'
 import { RULES } from './rules.js'
-import { startHeartbeat, whoIsOnline, visitTotals, setGame } from './online.js'
+import { startHeartbeat, whoIsOnline, visitTotals, setGame, playCounts } from './online.js'
 import * as Account from './account.js'
 
 const app = document.getElementById('app')
@@ -168,6 +168,7 @@ function renderHome() {
   `
   applyFilter()
   showPlaying()
+  showRanks()
 }
 
 // How many people are in each game right now, on its tile. One read serves
@@ -188,6 +189,40 @@ async function showPlaying() {
     if (!n) { if (flag) flag.remove(); return }
     if (!flag) { flag = document.createElement('span'); flag.className = 'flag live'; el.append(flag) }
     flag.innerHTML = `<i></i>${fmt(n)} playing`
+  })
+}
+
+// The most played games, by players today and all time: a rank flag on the
+// top three tiles and lists on the Online page. One read lasts a minute.
+let plays = null
+async function playsNow() {
+  if (!plays || Date.now() - plays.at > 60000) plays = { at: Date.now(), ...(await playCounts()) }
+  return plays
+}
+// A game needs this many players before it can rank, so one person can't make a #1.
+const MIN_RANKED = 2
+// Games with at least MIN_RANKED players, most first: [game, players, rank]. Ties share a rank.
+function ranked(counts) {
+  const list = Object.entries(counts || {})
+    .map(([slug, n]) => [bySlug(slug), n])
+    .filter(([g, n]) => g && playable(g) && typeof n === 'number' && n >= MIN_RANKED)
+    .sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title))
+  list.forEach((row, i) => row.push(i && row[1] === list[i - 1][1] ? list[i - 1][2] : i + 1))
+  return list
+}
+async function showRanks() {
+  const p = await playsNow()
+  const top = (counts) => Object.fromEntries(ranked(counts).filter((r) => r[2] <= 3).map((r) => [r[0].slug, r[2]]))
+  const day = top(p.today), ever = top(p.allTime)
+  app.querySelectorAll('.card[data-slug]').forEach((el) => {
+    const s = el.dataset.slug
+    // one flag a tile: the better of its two ranks, today when they tie
+    const r = day[s] && (!ever[s] || day[s] <= ever[s]) ? [day[s], 'today'] : ever[s] ? [ever[s], 'all time'] : null
+    const art = el.querySelector('.art')
+    let flag = el.querySelector('.flag.rank')
+    if (!r || !art) { if (flag) flag.remove(); return }
+    if (!flag) { flag = document.createElement('span'); flag.className = 'flag rank'; art.append(flag) }
+    flag.innerHTML = `<b>#${r[0]}</b>${r[1]}`
   })
 }
 
@@ -616,12 +651,17 @@ function renderOnline() {
         <span class="label">Playing now</span>
         <div class="more" id="online-list"></div>
       </section>
+      <section class="online-top" id="online-top" hidden>
+        <div><span class="label">Most played today</span><div class="more" id="top-today"></div></div>
+        <div><span class="label">Most played all time</span><div class="more" id="top-all"></div></div>
+      </section>
     </div>`
   const show = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n == null ? '–' : fmt(n) }
   const refresh = async () => {
     if (!document.getElementById('online-num')) { clearInterval(onlineTimer); onlineTimer = null; return }
     if (document.hidden) return
-    const [who, totals] = await Promise.all([whoIsOnline(), visitTotals()])
+    plays = null
+    const [who, totals, p] = await Promise.all([whoIsOnline(), visitTotals(), playsNow()])
     show('online-num', who && who.total)
     const list = Object.entries((who && who.games) || {})
       .map(([slug, n]) => [bySlug(slug), n]).filter(([x]) => x && playable(x))
@@ -634,6 +674,18 @@ function renderOnline() {
       </a>`).join('')
     show('online-today', totals.today)
     show('online-all', totals.allTime)
+    const top = (counts) => ranked(counts).slice(0, 5).map(([x, n, r]) => `
+      <a href="/play/${x.slug}" data-link>
+        ${art(x, 'mini')}
+        <span><strong>#${r} ${esc(x.title)}</strong><em>${fmt(n)} ${n === 1 ? 'player' : 'players'}</em></span>
+      </a>`).join('')
+    const today = top(p.today), all = top(p.allTime)
+    for (const [id, html] of [['top-today', today], ['top-all', all]]) {
+      const el = document.getElementById(id)
+      el.innerHTML = html
+      el.parentElement.hidden = !html
+    }
+    document.getElementById('online-top').hidden = !today && !all
   }
   clearInterval(onlineTimer)
   // Give this tab's first heartbeat a moment to land so it counts itself.

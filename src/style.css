@@ -454,7 +454,7 @@ a.pf-tile:hover { background: var(--tile); }
   transition: background-color 0.25s var(--ease);
 }
 @keyframes tile-in { from { opacity: 0; transform: translateY(14px); } }
-.card .art { aspect-ratio: 4 / 3; }
+.card .art { aspect-ratio: 4 / 3; position: relative; }
 a.card:hover { background: var(--tile); }
 a.card:hover .art { --tile: var(--vela); background: var(--vela); color: #000; }
 a.card:hover .art svg { transform: scale(1.06); }
@@ -474,9 +474,16 @@ a.card:active { transform: scale(0.985); transition: transform 0.1s var(--ease);
 a.card:hover .flag { background: #000; color: var(--vela-2); }
 .flag.live { left: auto; right: 0; background: rgba(0, 0, 0, 0.55); color: var(--text); font-variant-numeric: tabular-nums; }
 .live i { width: 6px; height: 6px; flex-shrink: 0; background: var(--vela); }
+/* Rank among the most played games, bottom left of the art. */
+.flag.rank { top: auto; bottom: 0; background: rgba(0, 0, 0, 0.55); color: var(--text); gap: 5px; }
+.flag.rank b { color: var(--vela-2); font-weight: 700; }
+a.card:hover .flag.rank { background: #000; color: var(--text); }
 .player-title .live { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; }
 .icon-btn.done { color: var(--vela); }
 .online-games { display: flex; flex-direction: column; gap: 12px; max-width: 640px; margin: -32px 0 72px; }
+.online-top { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; max-width: 640px; margin: -32px 0 72px; }
+.online-top > div { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.online-top > div[hidden] { display: none; }
 .card.is-soon { background: transparent; outline: 1px solid var(--line); outline-offset: -1px; }
 .card.is-soon .art { background: transparent; color: var(--text-3); }
 .card.is-soon h3 { color: var(--text-2); }
@@ -612,6 +619,7 @@ a.card:hover .flag { background: #000; color: var(--vela-2); }
   .online-totals div { padding: 16px; }
   .online-totals strong { font-size: 40px; }
   .online-games { margin: -16px 0 48px; }
+  .online-top { grid-template-columns: 1fr; gap: 28px; margin: -16px 0 48px; }
   /* The footer links to Updates, so the bar keeps room for Leaderboards and Rules. */
   .nav-link[href="/updates"] { display: none; }
   /* The account menu links to the Owner panel too. */

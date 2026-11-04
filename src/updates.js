@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.11',
+    date: '2026-11-04',
+    games: [],
+    changes: [
+      'The most played games get a rank on their tile, like #1 today or #2 all time, and the Online page lists the top five of each.',
+    ],
+  },
+  {
     version: '1.10',
     date: '2026-11-03',
     games: ['draw-and-guess'],

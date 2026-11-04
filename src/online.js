@@ -16,6 +16,10 @@
  * on load, so a tab left open past midnight counts for the new day and a count
  * that failed gets another go a minute later: anyone online is counted today.
  *
+ * Players per game: plays/days/<date>/<slug> and plays/allTime/<slug>, the
+ * same plus-one way. A browser counts for a game once it has spent PLAY_MS in
+ * it, once a day and once ever, so the lobby can rank the most played games.
+ *
  * This lives in the Realtime Database rather than Firestore on purpose: its
  * free tier bills by bandwidth, not per write, so heartbeats never eat into
  * the Firestore quota that online rooms depend on.
@@ -123,6 +127,44 @@ export function setGame(slug = '') {
   if (slug === game) return
   game = slug
   if (started) beat(myId())
+  countPlay(slug)
+}
+
+// A play counts once this browser has been in the game for PLAY_MS, so a quick
+// look at a game is not one.
+const PLAY_MS = 20000
+let playTimer = 0
+const readList = (key) => { try { const v = JSON.parse(store.getItem(key) || 'null'); return v && typeof v === 'object' ? v : null } catch { return null } }
+function countPlay(slug) {
+  clearTimeout(playTimer)
+  if (!slug) return
+  playTimer = setTimeout(async () => {
+    if (game !== slug) return
+    const day = today()
+    const daily = readList('vela:played-day')
+    const todays = daily && daily.day === day && Array.isArray(daily.slugs) ? daily.slugs : []
+    if (!todays.includes(slug) && await addOne(`plays/days/${day}/${slug}`)) {
+      store.setItem('vela:played-day', JSON.stringify({ day, slugs: [...todays, slug] }))
+    }
+    const ever = readList('vela:played-ever') || []
+    if (Array.isArray(ever) && !ever.includes(slug) && await addOne(`plays/allTime/${slug}`)) {
+      store.setItem('vela:played-ever', JSON.stringify([...ever, slug]))
+    }
+  }, PLAY_MS)
+}
+
+/* Resolves to { today, allTime }: players per game by slug, today (US Eastern)
+ * and all time. Either is {} if it cannot be reached. */
+export async function playCounts() {
+  const get = async (path) => {
+    try {
+      const res = await fetch(url(path))
+      const v = res.ok ? await res.json() : null
+      return v && typeof v === 'object' ? v : {}
+    } catch { return {} }
+  }
+  const [todayCounts, allTime] = await Promise.all([get(`plays/days/${today()}`), get('plays/allTime')])
+  return { today: todayCounts, allTime }
 }
 
 /* Resolves to { total, games } (players online, and how many are in each
