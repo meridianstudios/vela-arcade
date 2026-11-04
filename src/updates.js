@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.12.1',
+    date: '2026-11-04',
+    games: [],
+    changes: [
+      'Smoother pages: no fade between pages, tiles no longer replay their animation when you come back or switch filters, and a game opens straight from its tile.',
+    ],
+  },
+  {
     version: '1.12',
     date: '2026-11-04',
     games: [],

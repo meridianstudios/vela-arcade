@@ -226,6 +226,11 @@ async function showRanks() {
   })
 }
 
+// Tiles stagger in on the first lobby of a visit and never again: not when
+// coming back to it, not when a filter shows them again.
+const settle = () => document.documentElement.classList.add('settled')
+setTimeout(settle, 2500)
+
 function applyFilter() {
   const q = searchInput.value.trim().toLowerCase()
   let shown = 0
@@ -254,6 +259,7 @@ app.addEventListener('click', (e) => {
   }
   const tab = e.target.closest('.tab')
   if (!tab) return
+  settle()
   activeTag = tab.dataset.tag
   app.querySelectorAll('.tab').forEach((t) => {
     t.classList.toggle('on', t === tab)
@@ -263,6 +269,7 @@ app.addEventListener('click', (e) => {
 })
 
 searchInput.addEventListener('input', () => {
+  settle()
   if (location.pathname !== '/') navigate('/', { keepSearch: true })
   else applyFilter()
 })
@@ -474,9 +481,7 @@ function renderPlay(slug) {
         </div>
       </div>
       <div class="stage" id="stage">
-        <div class="loader${morphing ? ' splash' : ''}" id="loader">
-          <div class="loader-in"><svg class="splash-art" viewBox="0 0 64 64" aria-hidden="true">${g.art}</svg><div class="loader-dots"><i></i><i></i><i></i><i></i></div></div>
-        </div>
+        <div class="loader" id="loader"><div class="loader-dots"><i></i><i></i><i></i><i></i></div></div>
         <iframe id="frame" title="${esc(g.title)}" src="${esc(frameSrc)}"
           allow="fullscreen; autoplay; clipboard-write; gamepad"${g.via ? ` sandbox="${THIRD_PARTY_SANDBOX}"` : ''}></iframe>
       </div>
@@ -522,16 +527,12 @@ function renderPlay(slug) {
   const frame = document.getElementById('frame')
   const stage = document.getElementById('stage')
   const loader = document.getElementById('loader')
-  const drawnAt = Date.now()
 
   // In-house games load near-instantly. External ones only tell us the
   // document loaded, and an app like Wildcard still has to boot after that,
   // so hold the loader a moment rather than flashing an empty frame.
-  // After a morph the splash stays up long enough to be seen, not flashed.
-  const splash = loader.classList.contains('splash')
   frame.addEventListener('load', () => {
-    const hold = Math.max(external ? 1200 : 0, splash ? 650 - (Date.now() - drawnAt) : 0)
-    setTimeout(() => loader.classList.add('gone'), hold)
+    setTimeout(() => loader.classList.add('gone'), external ? 1200 : 0)
     focusFrame()
   })
 
@@ -1211,9 +1212,6 @@ function route() {
   if (!play) setGame()
   const here = '/' + (location.pathname.split('/')[1] || '')
   document.querySelectorAll('.nav-link').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === here))
-  // Tiles stagger in on their own; everything else eases up as one page.
-  const first = app.firstElementChild
-  if (first && !app.querySelector('.grid') && !morphing) first.classList.add('page-in')
   onScreen = location.pathname
 }
 
@@ -1221,6 +1219,7 @@ function route() {
 // were even when the page is redrawn inside a morph.
 history.scrollRestoration = 'manual'
 function navigate(href, { keepSearch = false, link = null } = {}) {
+  settle()
   if (!keepSearch) searchInput.value = ''
   history.replaceState({ ...history.state, y: window.scrollY }, '')
   const path = new URL(href, location.href).pathname
@@ -1268,7 +1267,6 @@ function morph(path, update, link) {
     nameAs(app.querySelector('.player-title h1'), 'vt-title')
   }
   morphing = true
-  document.documentElement.classList.add('morphing')
   const t = document.startViewTransition(() => {
     update()
     if (opening) {
@@ -1286,7 +1284,6 @@ function morph(path, update, link) {
   t.ready.catch(() => {})
   t.finished.catch(() => {}).finally(() => {
     morphing = false
-    document.documentElement.classList.remove('morphing')
     document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => { el.style.viewTransitionName = '' })
   })
 }
@@ -1317,6 +1314,7 @@ document.addEventListener('click', (e) => {
   else if (a.getAttribute('href') !== location.pathname) navigate(a.getAttribute('href'), { link: a })
 })
 window.addEventListener('popstate', () => {
+  settle()
   morph(location.pathname, () => {
     route()
     window.scrollTo(0, (history.state && history.state.y) || 0)
