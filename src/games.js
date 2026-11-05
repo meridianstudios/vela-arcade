@@ -62,6 +62,27 @@ export const CATALOGUE = [
     </g>`,
   },
   {
+    slug: 'drawing-telephone',
+    title: 'Drawing Telephone',
+    description:
+      'Everyone writes a phrase, then the phrases go round the room: the next player draws the phrase they get, the next writes what they think the drawing shows, and so on. Nobody sees more than the step before theirs. At the end each chain is played back one step at a time, drawings redrawing themselves stroke by stroke, and everyone likes their favourite moments. Make a room and send friends the code or the link.',
+    kind: 'inhouse',
+    src: '/games/drawing-telephone/index.html',
+    tags: ['Multiplayer'],
+    players: '3 to 12 players, online',
+    controls: 'Draw with the mouse or a finger. Type phrases and guesses and press Enter. Drawing: B brush, E eraser, F fill, 1 to 4 size, Ctrl+Z undo.',
+    art: `<g fill="currentColor">
+      <rect x="5" y="8" width="23" height="18"/>
+      <rect x="9" y="13" width="15" height="2.8" style="fill:var(--tile)"/>
+      <rect x="9" y="19" width="10" height="2.8" style="fill:var(--tile)"/>
+      <path d="M30 15.5h4V12l5.5 5-5.5 5v-3.5h-4z"/>
+      <rect x="41" y="8" width="18" height="18"/>
+      <path d="M44 23l4.5-7 3.5 4.5 2-2.5 3 5z" style="fill:var(--tile)"/>
+      <path d="M52 29v19H38.5v4L32 46l6.5-6v4H48V29z" opacity=".55"/>
+      <rect x="5" y="37" width="23" height="18" opacity=".55"/>
+    </g>`,
+  },
+  {
     slug: 'chess',
     title: 'Chess',
     description:
@@ -1312,7 +1333,7 @@ export const CATALOGUE = [
 /* Lobby order: the games most people already know first, the ones they will
  * have to learn last. A game missing from this list goes to the end. */
 export const ORDER = [
-  'draw-and-guess', 'chess', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
+  'draw-and-guess', 'drawing-telephone', 'chess', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
   'four-in-a-row', 'checkers', 'sea-battle', 'word-guess', 'holdem', 'pong',
   'block-puzzle', 'slots', 'roulette', 'plinko', 'mines', 'crash', 'hangman',
   'yatzy', 'brick-breaker', 'space-shooter', 'memory-match', 'pinball',

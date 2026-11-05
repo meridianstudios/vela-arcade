@@ -1,0 +1,1563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0c0f">
+<title>Drawing Telephone</title>
+<link rel="stylesheet" href="/fonts/type.css">
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --surface: #16181c;
+    --surface-2: #1f2227;
+    --line: rgba(255, 255, 255, 0.1);
+    --outline: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+    --faint: rgba(255, 255, 255, 0.35);
+    --brand: #ea5426;
+    --brand-hover: #ff7a4d;
+    --brand-dark: #b83f19;
+    --ease: cubic-bezier(0.1, 0.9, 0.2, 1);
+    --g: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body { touch-action: manipulation; }
+  button, input, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- shared controls ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.55em;
+    height: 2.9em; padding: 0 1.1em; min-width: 0;
+    border-radius: 0; border: 1px solid var(--outline);
+    background: transparent;
+    font: 600 0.74em var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    cursor: pointer; white-space: nowrap;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), color 180ms var(--ease), opacity 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .btn:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible, .tile:focus-visible, .ib:focus-visible { outline: 1px solid var(--brand-hover); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .btn.primary:active { background: var(--brand-dark); border-color: var(--brand-dark); }
+  .btn.big { height: 3.6em; font-size: 0.8em; }
+  .lab {
+    display: block;
+    font: 600 0.7em/1.2 var(--font);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .field {
+    width: 100%; height: 2.9em; padding: 0 0.8em;
+    background: var(--surface); border: 1px solid var(--outline); border-radius: 0;
+    outline: none;
+    transition: border-color 150ms var(--ease);
+  }
+  .field:focus { border-color: var(--brand); }
+  .field[readonly] { color: var(--muted); }
+  .field.code { text-transform: uppercase; letter-spacing: 0.2em; font-weight: 600; }
+  .seg { display: flex; }
+  .seg button {
+    flex: 1 1 0; height: 2.5em; min-width: 0;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: transparent; cursor: pointer;
+    font-weight: 600; font-size: 0.86em; font-variant-numeric: tabular-nums;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .seg button + button { margin-left: -1px; }
+  .seg button:hover { background: rgba(255, 255, 255, 0.06); }
+  .seg button.on { background: var(--brand); border-color: var(--brand); position: relative; z-index: 1; }
+  .seg.locked button { pointer-events: none; }
+  .seg.locked button:not(.on) { color: var(--faint); }
+  .err { margin: 0; min-height: 1.3em; color: var(--brand-hover); font-size: 0.86em; }
+  .note { margin: 0; color: var(--muted); font-size: 0.85em; }
+
+  /* ---------- menu ---------- */
+  .menu {
+    position: fixed; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  .panel { width: min(100%, 24em); margin: auto 0; display: flex; flex-direction: column; gap: 0.6em; }
+  .panel h1 {
+    margin: 0 0 0.05em;
+    font: 300 2.6em/1 var(--font-display);
+    display: flex; align-items: center; gap: 0.32em;
+  }
+  .panel h1::before { content: ""; width: 0.3em; height: 0.3em; background: var(--brand); flex: none; margin-top: 0.06em; }
+  .panel .sub { margin: 0 0 0.6em; color: var(--muted); font-size: 0.92em; line-height: 1.45; }
+  .panel .lab { margin-top: 0.4em; }
+  .tile {
+    display: flex; align-items: center; gap: 0.9em;
+    height: 3.6em; padding: 0 1.1em;
+    border: 1px solid var(--outline); border-radius: 0;
+    background: var(--surface);
+    font: 600 1em var(--font); text-align: left;
+    cursor: pointer;
+    transition: background 180ms var(--ease), border-color 180ms var(--ease), transform 150ms var(--ease);
+  }
+  .tile::after { content: ""; margin-left: auto; width: 0.5em; height: 0.5em; border: solid var(--muted); border-width: 2px 2px 0 0; transform: rotate(45deg); }
+  .tile:hover { background: var(--surface-2); border-color: var(--brand); }
+  .tile:active { transform: scale(0.985); }
+  .tile.primary { background: var(--brand); border-color: var(--brand); }
+  .tile.primary::after { border-color: #fff; }
+  .tile.primary:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+  .tile:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+  .rowb { display: flex; gap: 0.5em; }
+  .rowb .field { flex: 1 1 auto; min-width: 0; }
+  .busy { pointer-events: none; opacity: 0.6; }
+
+  /* ---------- game layout ---------- */
+  .app {
+    position: fixed; inset: 0;
+    display: grid;
+    grid-template-columns: clamp(160px, 17vw, 230px) minmax(0, 1fr) clamp(230px, 24vw, 320px);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "bar bar bar" "players stage chat";
+    gap: var(--g); padding: var(--g);
+  }
+  .app.narrow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "bar bar" "stage stage" "players chat";
+    gap: 6px; padding: 6px;
+  }
+  /* While drawing on a phone, the canvas gets the whole screen under the bar. */
+  .app.narrow.focus { grid-template-rows: auto minmax(0, 1fr) 0; }
+  .app.narrow.focus .players, .app.narrow.focus .chat { display: none; }
+
+  .bar {
+    grid-area: bar;
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.8em;
+    height: 52px; padding: 0 0.5em 0 0;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .narrow .bar { height: 46px; gap: 0.5em; }
+  .clock { display: flex; align-items: center; gap: 0.7em; height: 100%; }
+  .clock b {
+    display: grid; place-items: center;
+    width: 52px; height: 100%;
+    background: var(--surface-2); border-right: 1px solid var(--line);
+    font: 300 1.6em/1 var(--font-display); font-variant-numeric: tabular-nums;
+    transition: background 180ms var(--ease), color 180ms var(--ease);
+  }
+  .narrow .clock b { width: 46px; font-size: 1.4em; }
+  .clock b.low { background: var(--brand); color: #fff; }
+  .clock b.low.pulse { animation: pulse 400ms var(--ease); }
+  @keyframes pulse { 0% { transform: scale(1.12); } 100% { transform: none; } }
+  .clock span { font: 600 0.7em/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .narrow .clock span { display: none; }
+  .msg { min-width: 0; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 0.7em/1.2 var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .msg b { color: var(--text); }
+  .bar-r { display: flex; gap: 4px; }
+  .ib {
+    display: grid; place-items: center;
+    width: 36px; height: 36px; padding: 0;
+    border: 1px solid transparent; border-radius: 0; background: transparent;
+    color: var(--muted); cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .ib:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .ib svg { width: 20px; height: 20px; }
+  .ib.done { color: var(--brand-hover); }
+
+  /* ---------- players ---------- */
+  .players {
+    grid-area: players;
+    display: flex; flex-direction: column;
+    min-height: 0; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line);
+    scrollbar-width: thin; scrollbar-color: #2a2d33 transparent;
+  }
+  .pl {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 0.5em;
+    min-height: 3em; padding: 0.35em 0.7em 0.35em 0.9em;
+    border-bottom: 1px solid var(--line);
+    transition: background 200ms var(--ease);
+  }
+  .narrow .pl { min-height: 2.5em; padding: 0.25em 0.5em 0.25em 0.7em; }
+  .pl .nm { min-width: 0; display: flex; flex-direction: column; gap: 0.1em; }
+  .pl .nm b { font-weight: 600; font-size: 0.92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pl .nm span { font-size: 0.74em; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .pl.me .nm b::after { content: "You"; margin-left: 0.6em; font: 600 0.72em var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-hover); }
+  .pl .ic { width: 1.25em; height: 1.25em; color: var(--muted); }
+  .pl .ic svg { width: 100%; height: 100%; display: block; }
+  .pl.ok { background: rgba(234, 84, 38, 0.16); }
+  .pl.ok .ic { color: var(--brand-hover); }
+  .pl.flash { animation: flash 700ms var(--ease); }
+  @keyframes flash { 0% { background: var(--brand); } 100% { background: rgba(234, 84, 38, 0.16); } }
+
+  /* ---------- stage ---------- */
+  .stage {
+    grid-area: stage; position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: var(--g);
+    min-height: 0; min-width: 0;
+  }
+  .app:not(.narrow) .stage { justify-content: center; }
+  .narrow .stage { gap: 6px; }
+  .task { flex: none; width: 100%; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.35em; text-align: center; }
+  .task b { display: block; max-width: 100%; font: 300 1.9em/1.15 var(--font-display); overflow-wrap: anywhere; }
+  .narrow .task b { font-size: 1.35em; }
+  .task.big b { font-size: 2.4em; }
+  .narrow .task.big b { font-size: 1.7em; }
+  .task.pop b { animation: pop 380ms var(--ease); }
+  @keyframes pop { 0% { transform: translateY(10px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .board {
+    position: relative; flex: none;
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--line);
+    touch-action: none;
+    overflow: hidden;
+  }
+  .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .board.can { cursor: none; }
+  .board.can.fill { cursor: crosshair; }
+  .cursor {
+    position: absolute; left: 0; top: 0; z-index: 2;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.85);
+    pointer-events: none;
+  }
+  .entry { flex: none; width: min(100%, 34em); display: flex; gap: 0.5em; }
+  .entry .field { flex: 1 1 auto; min-width: 0; height: 3.2em; font-size: 16px; }
+  .entry .btn { height: auto; }
+  .ov {
+    position: absolute; left: 0; top: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1em;
+    background: rgba(11, 12, 15, 0.9);
+    overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: #2a2d33 transparent;
+    opacity: 0; transition: opacity 220ms var(--ease);
+    pointer-events: none;
+  }
+  .ov.show { opacity: 1; pointer-events: auto; }
+  .ov.wide { background: var(--surface); border: 1px solid var(--line); align-items: flex-start; padding: 1.4em; }
+  .narrow .ov.wide { padding: 0.9em; }
+  .ov .box { width: min(100%, 30em); margin: auto; transform: translateY(14px); transition: transform 300ms var(--ease); }
+  .ov.show .box { transform: none; }
+  .ov.album .box { width: min(100%, 34em); margin: 0 auto; }
+  .ov h2 { margin: 0; font: 300 2em/1.1 var(--font-display); }
+  .ov .k { margin: 0 0 0.35em; }
+  .narrow .ov h2 { font-size: 1.5em; }
+  .narrow .ov { padding: 0.7em; font-size: 0.9em; }
+  .ov .who { font: 300 1.7em/1.2 var(--font-display); text-align: center; }
+  .ov .who small { display: block; margin-top: 0.4em; font: 600 0.42em var(--font); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .ov .acts { display: flex; gap: 0.5em; margin-top: 1em; flex-wrap: wrap; }
+  .ov .acts .btn { flex: 1 1 8em; }
+  .wait { display: flex; align-items: center; gap: 0.6em; margin-top: 1em; color: var(--muted); font-size: 0.9em; }
+  .wait i { width: 0.55em; height: 0.55em; background: var(--brand); flex: none; animation: blink 1.2s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+  .ov .done-box { text-align: center; }
+  .ov .done-box .wait { justify-content: center; }
+  .ov .done-box .btn { margin-top: 1em; }
+
+  /* lobby settings */
+  .set { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75em 0.9em; margin-top: 0.9em; }
+  .set > div { display: flex; flex-direction: column; gap: 0.4em; min-width: 0; }
+  .set .wide { grid-column: 1 / -1; }
+  .narrow .set { grid-template-columns: 1fr; gap: 0.6em; }
+
+  /* album: a chain shown one step at a time */
+  .ahead { display: flex; align-items: baseline; justify-content: space-between; gap: 1em; margin-bottom: 0.9em; }
+  .ahead h2 { min-width: 0; overflow-wrap: anywhere; }
+  .steps { display: flex; flex-direction: column; gap: 0.6em; }
+  .step { background: var(--surface-2); border: 1px solid var(--line); padding: 0.75em 0.9em 0.9em; animation: step 360ms var(--ease) both; }
+  @keyframes step { 0% { transform: translateY(16px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .step .top { display: flex; align-items: center; gap: 0.6em; margin-bottom: 0.5em; }
+  .step .top .lab { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .step .top .lab b { color: var(--text); }
+  .step .txt { margin: 0; font: 300 1.75em/1.2 var(--font-display); overflow-wrap: anywhere; }
+  .step .txt.none { color: var(--faint); font-size: 1.2em; }
+  .step .pic { position: relative; width: 100%; max-width: 30em; aspect-ratio: 4 / 3; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+  .step .pic canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .like {
+    display: inline-flex; align-items: center; gap: 0.4em; flex: none;
+    height: 2.2em; padding: 0 0.7em;
+    border: 1px solid var(--outline); border-radius: 0; background: transparent;
+    font: 600 0.8em var(--font); font-variant-numeric: tabular-nums; color: var(--muted);
+    cursor: pointer;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease), color 150ms var(--ease), transform 150ms var(--ease);
+  }
+  .like svg { width: 1.15em; height: 1.15em; }
+  .like:hover { border-color: var(--brand); color: var(--text); }
+  .like:active { transform: scale(0.94); }
+  .like.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .like.on svg path { fill: currentColor; }
+  .like.mine { pointer-events: none; border-color: transparent; }
+  .like.bump { animation: bump 320ms var(--ease); }
+  @keyframes bump { 0% { transform: scale(1.18); } 100% { transform: none; } }
+  .afoot { display: flex; gap: 0.5em; margin-top: 1em; flex-wrap: wrap; position: sticky; bottom: -1.4em; padding: 0.8em 0 0.2em; background: var(--surface); }
+  .narrow .afoot { bottom: -0.9em; }
+  .afoot .btn { flex: 1 1 10em; }
+  .afoot .wait { margin-top: 0; }
+  .favs { display: flex; flex-direction: column; gap: 0.6em; margin-top: 0.9em; }
+  .favs .rk { font: 300 1.5em/1 var(--font-display); color: var(--brand-hover); width: 1.3em; flex: none; }
+  .favs .step:first-child { border-color: var(--brand); }
+
+  /* ---------- tools ---------- */
+  .tools { flex: none; display: flex; align-items: center; gap: 10px; max-width: 100%; flex-wrap: wrap; justify-content: center; }
+  .narrow .tools { gap: 6px; }
+  .pal { display: grid; grid-template-columns: repeat(13, 22px); grid-auto-rows: 22px; flex: none; box-shadow: 0 0 0 1px var(--line); }
+  .narrow .pal { width: 100%; grid-template-columns: repeat(13, minmax(0, 1fr)); grid-auto-rows: 20px; }
+  .pal button { border: 0; padding: 0; border-radius: 0; cursor: pointer; position: relative; }
+  .pal button.on { z-index: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-hover); }
+  .grp { display: flex; flex: none; }
+  .grp button {
+    display: grid; place-items: center;
+    width: 40px; height: 44px; padding: 0;
+    border: 1px solid var(--outline); border-radius: 0; background: transparent;
+    color: var(--muted); cursor: pointer;
+    transition: background 150ms var(--ease), color 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .narrow .grp button { width: 38px; height: 38px; }
+  .grp button + button { margin-left: -1px; }
+  .grp button:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+  .grp button.on { background: var(--brand); border-color: var(--brand); color: #fff; position: relative; z-index: 1; }
+  .grp button svg { width: 20px; height: 20px; }
+  .grp .dot { background: currentColor; border-radius: 50%; }
+  .tools .btn.primary { height: 44px; }
+  .narrow .tools .btn.primary { height: 38px; flex: 1 1 auto; }
+
+  /* ---------- chat ---------- */
+  .chat {
+    grid-area: chat;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .log {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    padding: 0.35em 0;
+    font-size: 0.9em; line-height: 1.35;
+    scrollbar-width: thin; scrollbar-color: #2a2d33 transparent;
+    user-select: text; -webkit-user-select: text;
+  }
+  .narrow .log { font-size: 0.84em; }
+  .log p { margin: 0; padding: 0.22em 0.8em; overflow-wrap: anywhere; }
+  .log p b { font-weight: 600; margin-right: 0.35em; }
+  .log p.sys { color: var(--muted); font-weight: 600; font-size: 0.92em; }
+  .log p.turn { color: var(--brand-hover); font-weight: 600; }
+  .say { flex: none; border-top: 1px solid var(--line); }
+  .say input {
+    width: 100%; height: 2.9em; padding: 0 0.8em;
+    background: transparent; border: 0; border-radius: 0; outline: none;
+    font-size: 16px;
+  }
+  .say input::placeholder { color: var(--faint); }
+  .say input:focus { background: var(--surface-2); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="menu" id="menu">
+  <div class="panel">
+    <h1>Drawing Telephone</h1>
+    <p class="sub">Write a phrase, draw the phrase you get, describe the drawing you get. At the end, see how every phrase changed on its way round.</p>
+    <span class="lab">Your name</span>
+    <input class="field" id="nameIn" maxlength="20" autocomplete="off" spellcheck="false" placeholder="Player">
+    <button class="tile primary" type="button" id="createBtn">Create a room</button>
+    <span class="lab">Join a room</span>
+    <div class="rowb">
+      <input class="field code" id="codeIn" maxlength="6" autocomplete="off" spellcheck="false" placeholder="Code">
+      <button class="btn" type="button" id="joinBtn" style="height:auto">Join</button>
+    </div>
+    <p class="err" id="menuErr"></p>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <header class="bar">
+    <div class="clock"><b id="clock"></b><span id="roundLabel"></span></div>
+    <div class="msg" id="msg"></div>
+    <div class="bar-r">
+      <button class="ib" type="button" id="inviteBtn" title="Copy invite link" aria-label="Copy invite link"></button>
+      <button class="ib" type="button" id="soundBtn" title="Sound" aria-label="Sound"></button>
+      <button class="ib" type="button" id="leaveBtn" title="Leave" aria-label="Leave"></button>
+    </div>
+  </header>
+  <aside class="players" id="players"></aside>
+  <main class="stage" id="stage">
+    <div class="task" id="task" hidden></div>
+    <div class="board" id="board" hidden>
+      <canvas id="cv"></canvas>
+      <div class="cursor" id="cursor" hidden></div>
+    </div>
+    <form class="entry" id="entry" autocomplete="off" hidden>
+      <input class="field" id="entryIn" maxlength="80" enterkeyhint="done" spellcheck="false" aria-label="Your answer">
+      <button class="btn" type="button" id="ideaBtn">Idea</button>
+      <button class="btn primary" type="submit" id="entryBtn">Done</button>
+    </form>
+    <div class="tools" id="tools" hidden>
+      <div class="pal" id="pal"></div>
+      <div class="grp" id="sizes"></div>
+      <div class="grp" id="toolBtns"></div>
+      <div class="grp" id="editBtns"></div>
+      <button class="btn primary" type="button" id="drawDone">Done</button>
+    </div>
+    <div class="ov" id="ov"><div class="box" id="ovBox"></div></div>
+  </main>
+  <section class="chat">
+    <div class="log" id="log" aria-live="polite"></div>
+    <form class="say" id="say" autocomplete="off"><input id="sayIn" maxlength="100" enterkeyhint="send" spellcheck="false" placeholder="Chat" aria-label="Chat"></form>
+  </section>
+</div>
+
+<script src="../_shared/bridge.js" data-game="drawing-telephone"></script>
+<script src="ideas.js"></script>
+<script type="module">
+const $ = (id) => document.getElementById(id)
+const W = 800, H = 600
+const PALETTE = [
+  '#ffffff', '#c1c1c1', '#ef130b', '#ff7100', '#ffe400', '#00cc00', '#00ff91', '#00b2ff', '#231fd3', '#a300ba', '#df69a7', '#ffac8e', '#a0522d',
+  '#000000', '#505050', '#740b07', '#c23800', '#e8a200', '#005510', '#00785d', '#00569e', '#0e0865', '#550069', '#873554', '#cc774d', '#63300d',
+]
+const SIZES = [4, 10, 20, 36]
+const DEFAULTS = { draw: 90, write: 45, max: 10, full: true }
+const MIN_PLAYERS = 3
+const GRACE = 1500          // after the clock runs out, time for the last answers to land
+const AUTO_AT = 900         // answers still open this long before the end are sent as they are
+const IDEAS = [...new Set(window.TELE_IDEAS || [])]
+
+const ICON = {
+  pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  brush: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19z"/></svg>',
+  eraser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 20l-5-5L14 5l6 6-9 9z"/><path d="M9 20h11M7 12l6 6"/></svg>',
+  fill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M11 3l8 8-7 7-8-8z"/><path d="M4 10h15"/><path d="M20 15c1.2 1.6 1.8 2.7 1.8 3.4a1.8 1.8 0 0 1-3.6 0c0-.7.6-1.8 1.8-3.4z" fill="currentColor" stroke="none"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12h-2" transform="translate(0 -5)"/></svg>',
+  clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  linkOk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  soundOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  soundOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>',
+  leave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4H5v16h9"/><path d="M10 12h10M16 8l4 4-4 4"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/></svg>',
+}
+
+/* ---------- storage ---------- */
+const store = {
+  get(k) { try { return localStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch {} },
+}
+const session = {
+  get(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'null') } catch { return null } },
+  set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)) } catch {} },
+}
+const BAD = /(fuck|shit|cunt|nigg|fag|bitch|whore|slut|rape|nazi|hitler|penis|vagina|porn|dick|cock|pussy|retard|kys)[a-z]*/gi
+const mask = (s) => String(s).replace(BAD, (m) => '*'.repeat(m.length))
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+const clean = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+const idea = () => IDEAS[Math.floor(Math.random() * IDEAS.length)] || 'a cat driving a bus'
+
+/* ---------- sound ---------- */
+const Sound = {
+  on: store.get('vela:tele:sound') !== '0',
+  ctx: null,
+  tone(f, at, dur, type = 'sine', vol = 0.07) {
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at
+    o.type = type; o.frequency.value = f
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02)
+  },
+  play(kind) {
+    if (!this.on) return
+    try {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)()
+      if (this.ctx.state === 'suspended') this.ctx.resume()
+      const T = (f, a, d, ty, v) => this.tone(f, a, d, ty, v)
+      if (kind === 'join') T(660, 0, 0.12)
+      else if (kind === 'leave') T(440, 0, 0.14)
+      else if (kind === 'turn') { T(523, 0, 0.12, 'triangle', 0.09); T(659, 0.1, 0.12, 'triangle', 0.09); T(784, 0.2, 0.22, 'triangle', 0.09) }
+      else if (kind === 'done') T(988, 0, 0.1, 'triangle', 0.06)
+      else if (kind === 'tick') T(1400, 0, 0.04, 'square', 0.025)
+      else if (kind === 'step') { T(660, 0, 0.09, 'triangle', 0.08); T(880, 0.07, 0.14, 'triangle', 0.08) }
+      else if (kind === 'like') T(1175, 0, 0.1, 'triangle', 0.07)
+      else if (kind === 'end') [523, 659, 784, 1047].forEach((f, i) => T(f, i * 0.11, 0.3, 'triangle', 0.09))
+    } catch {}
+  },
+}
+function soundIcon() { $('soundBtn').innerHTML = Sound.on ? ICON.soundOn : ICON.soundOff }
+
+/* ---------- state ----------
+ * Everything lives in the Realtime Database under tele/rooms/<code>:
+ *   s     settings (draw and write time, max players, full or short game)
+ *   p     players { n name, on, j joined }
+ *   g     the game: ph lobby|play|show|end, t game number (tk the same as a
+ *         string), r round (rk as a string), ord the play order, n players in
+ *         it, R rounds, ends, rv { c, i } the album step on screen
+ *   e     e/<t>/<chain>/<round> = { u, k: 'w' text | 'd' drawing, x | d }
+ *   sub   sub/<t>/<round>/<uid> = true once a player has sent this round
+ *   like  like/<t>/<chain>-<round>/<uid> = true
+ *   chat
+ * Chain c starts with player ord[c]; in round r it is with ord[(c + r) % n],
+ * so every round each player gets the chain the player before them just did. */
+let Rooms = null, DB = null
+const S = {
+  db: null, me: null, code: null, name: '',
+  s: null, p: {}, g: null,
+  off: [], gameOff: [], gameT: null,
+  sub: {}, likes: {},
+  chains: {},          // album: chain -> [{ r, u, k, x, d }]
+  task: null,          // { t, r, c, kind, src, done }
+  ops: [],             // my drawing this round
+  offset: 0, tx: {}, names: {}, loaded: false,
+  rvAt: 0,
+}
+const serverNow = () => Date.now() + S.offset
+const R = (path) => DB.ref(S.db, `tele/rooms/${S.code}${path ? '/' + path : ''}`)
+const nameOf = (u) => (S.p[u] && S.p[u].n) || S.names[u] || 'Player'
+
+function present() {
+  return Object.entries(S.p)
+    .filter(([, v]) => v && v.on)
+    .map(([uid, v]) => ({ uid, n: v.n, j: v.j || 0 }))
+    .sort((a, b) => a.j - b.j || (a.uid < b.uid ? -1 : 1))
+}
+const isPresent = (u) => !!(S.p[u] && S.p[u].on)
+const hostUid = () => (present()[0] || {}).uid
+const amHost = () => hostUid() === S.me
+const ordOf = (g) => {
+  const o = (g && g.ord) || {}
+  return Object.keys(o).sort((a, b) => a - b).map((k) => o[k])
+}
+const kindOf = (r) => (r === 0 ? 'write' : r % 2 ? 'draw' : 'guess')
+const chainFor = (i, r, n) => (((i - r) % n) + n) % n
+const roundsFor = (n, full) => { const all = n % 2 ? n : n - 1; return Math.max(3, full ? all : Math.min(all, 5)) }
+const timeFor = (r) => (kindOf(r) === 'draw' ? S.s.draw : S.s.write) * 1000
+const opsOf = (d) => (Array.isArray(d) ? d.filter(Boolean) : Object.keys(d || {}).sort((a, b) => a - b).map((k) => d[k]))
+
+/* ---------- connect ---------- */
+async function connect() {
+  if (S.db) return
+  if (!Rooms) throw new Error('offline')
+  const app = await Rooms.firebaseApp()
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  S.db = DB.getDatabase(app, local ? 'https://demo-vela-arcade-default-rtdb.firebaseio.com' : 'https://vela-arcade-default-rtdb.firebaseio.com')
+  if (local) DB.connectDatabaseEmulator(S.db, '127.0.0.1', 9000)
+  S.me = await Rooms.signIn()
+  DB.onValue(DB.ref(S.db, '.info/serverTimeOffset'), (snap) => { S.offset = snap.val() || 0 })
+}
+
+const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => ALPHABET[b % ALPHABET.length]).join('')
+const normCode = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+
+class Nope extends Error {}
+
+async function create() {
+  await connect()
+  for (let i = 0; i < 5; i++) {
+    const code = newCode()
+    const have = await DB.get(DB.ref(S.db, `tele/rooms/${code}/s`))
+    if (have.exists()) continue
+    await DB.update(DB.ref(S.db, `tele/rooms/${code}`), {
+      s: { ...DEFAULTS },
+      g: { ph: 'lobby', t: 0, tk: '0', r: 0, rk: '0' },
+      [`p/${S.me}`]: { n: S.name, on: true, j: DB.serverTimestamp() },
+    })
+    await enter(code)
+    return
+  }
+  throw new Nope('Could not make a room. Try again.')
+}
+
+async function join(code) {
+  await connect()
+  code = normCode(code)
+  if (code.length !== 6) throw new Nope('No room with that code.')
+  const [s, p] = await Promise.all(['s', 'p'].map((k) => DB.get(DB.ref(S.db, `tele/rooms/${code}/${k}`))))
+  if (!s.exists()) throw new Nope('No room with that code.')
+  const players = p.val() || {}
+  const mine = players[S.me]
+  const count = Object.entries(players).filter(([u, v]) => v && v.on && u !== S.me).length
+  if (!mine && count >= s.val().max) throw new Nope('That room is full.')
+  if (mine) await DB.update(DB.ref(S.db, `tele/rooms/${code}/p/${S.me}`), { n: S.name, on: true })
+  else await DB.set(DB.ref(S.db, `tele/rooms/${code}/p/${S.me}`), { n: S.name, on: true, j: DB.serverTimestamp() })
+  await enter(code)
+}
+
+/* ---------- in a room ---------- */
+async function enter(code) {
+  S.code = code
+  S.p = {}; S.g = null; S.s = null; S.loaded = false
+  S.task = null; S.ops = []; S.chains = {}; S.tx = {}; S.sub = {}; S.likes = {}; S.gameT = null
+  $('log').innerHTML = ''
+  history.replaceState(null, '', location.pathname + (location.search.includes('room=') ? '' : location.search))
+  store.set('vela:tele:last', JSON.stringify({ code, at: Date.now() }))
+
+  const meRef = R(`p/${S.me}`)
+  DB.onDisconnect(DB.ref(S.db, `tele/rooms/${code}/p/${S.me}/on`)).set(false)
+  S.off.push(DB.onValue(DB.ref(S.db, '.info/connected'), (snap) => {
+    if (!snap.val() || S.code !== code) return
+    DB.onDisconnect(DB.ref(S.db, `tele/rooms/${code}/p/${S.me}/on`)).set(false)
+    if (S.p[S.me] && !S.p[S.me].on) DB.update(meRef, { on: true }).catch(() => {})
+  }))
+  S.off.push(DB.onValue(R('s'), (snap) => {
+    if (!snap.exists()) { if (S.code === code) exitRoom('That room has closed.'); return }
+    S.s = { ...DEFAULTS, ...snap.val() }
+    render()
+  }))
+  S.off.push(DB.onValue(R('p'), (snap) => {
+    const next = snap.val() || {}
+    if (S.loaded && Object.keys(S.p).length) diffPlayers(S.p, next)
+    S.p = next
+    for (const [u, v] of Object.entries(next)) if (v && v.n) S.names[u] = v.n
+    if (S.code && !next[S.me] && S.loaded) { exitRoom('You left the room.'); return }
+    render()
+  }))
+  S.off.push(DB.onValue(R('g'), (snap) => {
+    const next = snap.val()
+    if (!next) return
+    const prev = S.g
+    S.g = next
+    onGame(prev, next)
+    render()
+  }))
+  S.off.push(DB.onChildAdded(DB.query(R('chat'), DB.limitToLast(40)), (snap) => addChat(snap.val())))
+
+  showApp()
+  await Promise.all(['s', 'p', 'g'].map((k) => DB.get(R(k)).catch(() => null)))
+  S.loaded = true
+  sys(`You joined room ${code}`)
+  if (S.g) onGame(null, S.g)
+  render()
+}
+
+function exitRoom(msg) {
+  S.off.forEach((f) => { try { f() } catch {} }); S.off = []
+  S.gameOff.forEach((f) => { try { f() } catch {} }); S.gameOff = []; S.gameT = null
+  if (S.db && S.code) DB.onDisconnect(DB.ref(S.db, `tele/rooms/${S.code}/p/${S.me}/on`)).cancel().catch(() => {})
+  S.code = null; S.s = null; S.g = null; S.p = {}; S.task = null; S.ops = []
+  store.set('vela:tele:last', '')
+  $('app').hidden = true
+  $('menu').hidden = false
+  $('menuErr').textContent = msg || ''
+}
+
+async function leave() {
+  const code = S.code
+  if (!code) return
+  const others = present().filter((p) => p.uid !== S.me)
+  exitRoom('')
+  try {
+    if (!others.length) await DB.remove(DB.ref(S.db, `tele/rooms/${code}`))
+    else await DB.remove(DB.ref(S.db, `tele/rooms/${code}/p/${S.me}`))
+  } catch {}
+}
+
+/* ---------- moving the game on ----------
+ * Any player's device can move the game on (everyone done, the clock out)
+ * through a transaction that checks the round it expected, so two devices
+ * doing it at once is harmless. The host goes first; the others step in a
+ * moment later if nothing happened. */
+function tx(key, fn) {
+  if (!S.code) return Promise.resolve()
+  const at = Date.now()
+  if (S.tx[key] && at - S.tx[key] < 1500) return Promise.resolve()
+  S.tx[key] = at
+  return DB.runTransaction(R('g'), (cur) => {
+    if (!cur) return cur
+    const out = fn(cur)
+    return out === undefined ? undefined : out
+  }).catch(() => {})
+}
+
+function startGame(cur, now) {
+  const pr = present().map((p) => p.uid)
+  for (let i = pr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pr[i], pr[j]] = [pr[j], pr[i]] }
+  const t = (cur.t || 0) + 1
+  return {
+    ph: 'play', t, tk: String(t), r: 0, rk: '0',
+    ord: Object.fromEntries(pr.map((u, i) => [i, u])), n: pr.length, R: roundsFor(pr.length, S.s.full),
+    ends: now + S.s.write * 1000,
+  }
+}
+function nextRound(cur, now) {
+  const r = cur.r + 1
+  if (r >= cur.R) return toAlbum(cur)
+  return { ...cur, r, rk: String(r), ends: now + timeFor(r) }
+}
+const toAlbum = (cur) => ({ ...cur, ph: 'show', ends: null, rv: { c: 0, i: 0 } })
+const toLobby = (cur) => ({ ph: 'lobby', t: cur.t || 0, tk: String(cur.t || 0), r: 0, rk: '0' })
+
+function tick() {
+  const g = S.g, s = S.s
+  if (!g || !s || !S.code || !S.loaded) return
+  const now = serverNow(), host = amHost()
+  const late = (at) => now >= at + (host ? 0 : 1500)
+  if (g.ph === 'play') {
+    const k = `${g.t}:${g.r}`
+    const live = ordOf(g).filter(isPresent)
+    const sub = S.sub[g.r] || {}
+    const all = live.length > 0 && live.every((u) => sub[u])
+    if (live.length < 2 && late(0)) tx('album' + k, (c) => (c.ph === 'play' && c.t === g.t ? toAlbum(c) : undefined))
+    else if (all || late(g.ends + GRACE)) tx('next' + k, (c) => (c.ph === 'play' && c.t === g.t && c.r === g.r ? nextRound(c, now) : undefined))
+    const task = S.task
+    if (task && task.t === g.t && task.r === g.r && !task.done && !task.sending && now >= g.ends - AUTO_AT) submit(true)
+  }
+  if (g.ph === 'show' && g.rv) {
+    loadChain(g.t, g.rv.c)
+    if (g.rv.c + 1 < g.n) loadChain(g.t, g.rv.c + 1)
+  }
+}
+
+/* ---------- reacting to the game ---------- */
+function onGame(prev, g) {
+  if (g.t !== S.gameT) watchGame(g.t)
+  if (!S.loaded) return
+  const changed = !prev || prev.ph !== g.ph || prev.t !== g.t || prev.r !== g.r
+  if (g.ph === 'play' && changed) {
+    if (prev && prev.t !== g.t && prev.ph !== 'play') {
+      sys('The game has started', 'turn')
+      // The room starts each game clean.
+      // Once the database has the new game too; until then the old one is still current there.
+      const old = prev.t
+      if (old && amHost()) setTimeout(() => { for (const k of ['e', 'sub', 'like']) DB.remove(R(`${k}/${old}`)).catch(() => {}) }, 2500)
+    }
+    setupTask(g)
+  }
+  if (g.ph !== 'play') { S.task = null; $('app').classList.remove('focus') }
+  if (g.ph === 'show' && changed) { sys('All rounds done', 'turn'); Sound.play('end') }
+  if (g.ph === 'show' && g.rv && (!prev || !prev.rv || prev.rv.c !== g.rv.c || prev.rv.i !== g.rv.i)) {
+    S.rvAt = Date.now()
+    if (prev && prev.ph === 'show') Sound.play('step')
+  }
+  if (g.ph === 'end' && changed) loadFavourites(g.t)
+}
+
+function watchGame(t) {
+  S.gameOff.forEach((f) => { try { f() } catch {} })
+  S.gameOff = []; S.gameT = t; S.sub = {}; S.likes = {}; S.chains = {}
+  if (!t) return
+  S.gameOff.push(DB.onValue(R(`sub/${t}`), (snap) => {
+    const next = snap.val() || {}
+    const g = S.g
+    if (g && g.ph === 'play' && S.loaded) {
+      const before = S.sub[g.r] || {}, after = next[g.r] || {}
+      for (const u of Object.keys(after)) if (!before[u] && u !== S.me) { flashPlayer(u); Sound.play('done') }
+    }
+    S.sub = next
+    // Back after a reload: what I already sent counts.
+    if (S.task && !S.task.done && (next[S.task.r] || {})[S.me]) { S.task.done = true; renderStage() }
+    renderPlayers()
+    renderOverlay()
+  }))
+  S.gameOff.push(DB.onValue(R(`like/${t}`), (snap) => {
+    S.likes = snap.val() || {}
+    syncLikes()
+  }))
+}
+
+/* My job this round: the chain that just came to me, and what to answer. */
+async function setupTask(g) {
+  const ord = ordOf(g), i = ord.indexOf(S.me)
+  if (i < 0) { S.task = null; render(); return }
+  const c = chainFor(i, g.r, g.n), kind = kindOf(g.r)
+  const task = { t: g.t, r: g.r, c, kind, src: null, done: !!((S.sub[g.r] || {})[S.me]), loading: kind !== 'write' }
+  S.task = task
+  S.ops = (session.get(`vela:tele:ops:${S.code}:${g.t}:${g.r}`) || [])
+  $('entryIn').value = session.get(`vela:tele:txt:${S.code}:${g.t}:${g.r}`) || ''
+  Sound.play('turn')
+  render()
+  if (kind === 'write') { layout(); focusEntry(); return }
+  // What I answer is the newest entry before mine of the other kind; if a
+  // player in between missed their go, it comes from further back.
+  const want = kind === 'draw' ? 'w' : 'd'
+  let src = null
+  for (let tries = 0; tries < 6 && !src; tries++) {
+    try {
+      const snap = await DB.get(R(`e/${g.t}/${c}`))
+      const list = snap.val() || {}
+      for (let r = g.r - 1; r >= 0; r--) {
+        const e = list[r]
+        if (e && e.k === want) { src = e; break }
+      }
+      if (!src && want === 'w' && !list[0]) {
+        // Nobody started this chain, so it starts with an idea.
+        const auto = { u: '', k: 'w', x: idea(), auto: true }
+        try { await DB.set(R(`e/${g.t}/${c}/0`), auto); src = auto } catch {}
+      }
+    } catch {}
+    if (!src && tries < 5) await new Promise((r) => setTimeout(r, 400))
+  }
+  if (S.task !== task) return
+  task.loading = false
+  // A guess with no drawing to guess from turns into a fresh phrase.
+  task.src = src || (want === 'd' ? { k: 'none' } : { k: 'w', x: idea() })
+  render()
+  if (task.kind === 'draw') redrawMine()
+  else { showOps(opsOf(task.src.d)); focusEntry() }
+}
+function focusEntry() {
+  if (matchMedia('(pointer: fine)').matches && !S.task?.done) setTimeout(() => $('entryIn').focus({ preventScroll: true }), 60)
+}
+
+async function submit(auto) {
+  const task = S.task, g = S.g
+  if (!task || !g || task.t !== g.t || task.r !== g.r || task.done || task.sending || task.loading) return
+  let entry
+  if (task.kind === 'draw') {
+    if (!S.ops.length && !auto) { shake($('drawDone')); return }
+    entry = { u: S.me, k: 'd', d: Object.fromEntries(S.ops.map((o, i) => [i, o])) }
+  } else {
+    let x = mask(clean($('entryIn').value))
+    if (!x && !auto) { shake($('entryIn')); return }
+    if (!x && task.kind === 'write') x = idea()
+    entry = { u: S.me, k: 'w', x }
+  }
+  task.sending = true
+  try {
+    await DB.set(R(`e/${task.t}/${task.c}/${task.r}`), entry)
+    await DB.set(R(`sub/${task.t}/${task.r}/${S.me}`), true)
+    task.done = true
+  } catch {}
+  task.sending = false
+  if (task.done && !auto) Sound.play('done')
+  render()
+}
+async function edit() {
+  const task = S.task, g = S.g
+  if (!task || !task.done || !g || g.ph !== 'play' || task.r !== g.r) return
+  if (g.ends - serverNow() < AUTO_AT + 500) return
+  task.done = false
+  render()
+  try { await DB.remove(R(`sub/${task.t}/${task.r}/${S.me}`)) } catch {}
+  if (task.kind !== 'draw') focusEntry()
+}
+function shake(el) { el.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 220, easing: 'ease-out' }) }
+
+/* ---------- album ---------- */
+const loading = new Set()
+async function loadChain(t, c) {
+  if (S.chains[c] || loading.has(`${t}:${c}`)) return
+  loading.add(`${t}:${c}`)
+  try {
+    const snap = await DB.get(R(`e/${t}/${c}`))
+    const v = snap.val() || {}
+    if (S.gameT !== t) return
+    S.chains[c] = Object.keys(v).sort((a, b) => a - b).map((r) => ({ r: +r, ...v[r] })).filter((e) => e && e.k)
+    render()
+  } catch {} finally { loading.delete(`${t}:${c}`) }
+}
+function advance() {
+  const g = S.g
+  if (!g || g.ph !== 'show' || !g.rv) return
+  const list = S.chains[g.rv.c]
+  if (!list) return
+  const { c, i } = g.rv
+  tx(`rv${g.t}:${c}:${i}`, (cur) => {
+    if (cur.ph !== 'show' || cur.t !== g.t || !cur.rv || cur.rv.c !== c || cur.rv.i !== i) return undefined
+    if (i + 1 < list.length) return { ...cur, rv: { c, i: i + 1 } }
+    if (c + 1 < cur.n) return { ...cur, rv: { c: c + 1, i: 0 } }
+    return { ...cur, ph: 'end', rv: null }
+  })
+}
+// The host runs the album. If they stop, anyone can after a while.
+const canAdvance = () => amHost() || Date.now() - S.rvAt > 15000
+
+const likeKey = (c, r) => `${c}-${r}`
+const likeCount = (k) => Object.keys(S.likes[k] || {}).length
+function toggleLike(k) {
+  const g = S.g
+  if (!g || (g.ph !== 'show' && g.ph !== 'end')) return
+  const on = !!(S.likes[k] && S.likes[k][S.me])
+  DB.set(R(`like/${g.t}/${k}/${S.me}`), on ? null : true).catch(() => {})
+  if (!on) Sound.play('like')
+}
+function syncLikes() {
+  for (const b of document.querySelectorAll('.like[data-k]')) {
+    const k = b.dataset.k, n = likeCount(k), on = !!(S.likes[k] && S.likes[k][S.me])
+    const span = b.querySelector('span')
+    if (span.textContent !== String(n)) {
+      span.textContent = n
+      b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump')
+    }
+    b.classList.toggle('on', on)
+  }
+}
+
+let favs = null
+async function loadFavourites(t) {
+  favs = null
+  renderOverlay()
+  try {
+    const snap = await DB.get(R(`like/${t}`))
+    const likes = snap.val() || {}
+    const top = Object.entries(likes).map(([k, v]) => [k, Object.keys(v || {}).length]).filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3)
+    const out = []
+    for (const [k, n] of top) {
+      const [c, r] = k.split('-').map(Number)
+      const e = (S.chains[c] || []).find((x) => x.r === r) || (await DB.get(R(`e/${t}/${c}/${r}`)).catch(() => null))?.val()
+      if (e) out.push({ ...e, c, r, n })
+    }
+    if (S.g && S.g.t === t) { favs = out; renderOverlay(true) }
+  } catch { favs = [] ; renderOverlay(true) }
+}
+
+/* ---------- players and chat ---------- */
+function diffPlayers(a, b) {
+  const on = (m, u) => m[u] && m[u].on
+  for (const u of Object.keys(b)) if (on(b, u) && !on(a, u) && u !== S.me) { sys(`${b[u].n} joined`); Sound.play('join') }
+  for (const u of Object.keys(a)) if (on(a, u) && !on(b, u) && u !== S.me) { sys(`${a[u].n} left`); Sound.play('leave') }
+}
+let lastSay = 0
+function say(text) {
+  text = text.replace(/\s+/g, ' ').trim().slice(0, 100)
+  if (!text || !S.code) return
+  const now = Date.now()
+  if (now - lastSay < 300) { if (!$('sayIn').value) $('sayIn').value = text; return }
+  lastSay = now
+  DB.push(R('chat'), { u: S.me, n: S.name, x: text, a: DB.serverTimestamp() }).catch(() => {})
+}
+function addChat(m) {
+  if (!m || !m.x) return
+  const p = document.createElement('p')
+  const b = document.createElement('b')
+  b.textContent = mask(m.n || 'Player') + ':'
+  p.append(b, document.createTextNode(mask(m.x)))
+  appendLog(p)
+}
+function sys(text, kind = 'sys') {
+  const p = document.createElement('p')
+  p.className = kind
+  p.textContent = mask(text)
+  appendLog(p)
+}
+function appendLog(el) {
+  const log = $('log')
+  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40
+  log.append(el)
+  while (log.childElementCount > 150) log.firstElementChild.remove()
+  if (stick) log.scrollTop = log.scrollHeight
+}
+
+/* ---------- canvas ---------- */
+const cv = $('cv'), ctx = cv.getContext('2d', { willReadFrequently: true })
+let K = 1
+function sizeCanvas() {
+  const k = (window.devicePixelRatio || 1) > 1.4 ? 2 : 1
+  if (k === K && cv.width === W * k) return
+  K = k
+  cv.width = W * K; cv.height = H * K
+  if (S.task && S.task.kind === 'draw') redrawMine()
+  else if (S.task && S.task.src) showOps(opsOf(S.task.src.d))
+}
+function clearTo(c) {
+  c.setTransform(1, 0, 0, 1, 0, 0)
+  c.fillStyle = '#ffffff'
+  c.fillRect(0, 0, c.canvas.width, c.canvas.height)
+}
+const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+// Draws one op at scale k; `upto` stops a stroke after that many points.
+function drawOp(c, k, o, upto = Infinity) {
+  const color = PALETTE[o.c] || '#000000'
+  if (o.f) { floodFill(c, k, o.x, o.y, color); return }
+  const pts = String(o.p || '').split(',').map(Number)
+  if (pts.length < 2) return
+  const n = Math.min(pts.length / 2, upto)
+  c.setTransform(k, 0, 0, k, 0, 0)
+  c.strokeStyle = c.fillStyle = color
+  if (n <= 1) { c.beginPath(); c.arc(pts[0], pts[1], o.w / 2, 0, Math.PI * 2); c.fill(); return }
+  c.lineWidth = o.w; c.lineCap = 'round'; c.lineJoin = 'round'
+  c.beginPath(); c.moveTo(pts[0], pts[1])
+  for (let i = 1; i < n; i++) c.lineTo(pts[i * 2], pts[i * 2 + 1])
+  c.stroke()
+}
+const opLen = (o) => (o.f ? 1 : Math.max(1, String(o.p || '').split(',').length / 2))
+// Scanline fill with some tolerance, then one pixel more around the edge so
+// the soft rim of a line does not leave a halo.
+function floodFill(c, k, x, y, hex) {
+  const w = c.canvas.width, h = c.canvas.height
+  x = Math.floor(x * k); y = Math.floor(y * k)
+  if (x < 0 || y < 0 || x >= w || y >= h) return
+  const img = c.getImageData(0, 0, w, h), d = img.data
+  const [fr, fg, fb] = rgb(hex)
+  const i0 = (y * w + x) * 4, tr = d[i0], tg = d[i0 + 1], tb = d[i0 + 2]
+  if (Math.abs(tr - fr) + Math.abs(tg - fg) + Math.abs(tb - fb) < 6) return
+  const diff = (p) => Math.abs(d[p * 4] - tr) + Math.abs(d[p * 4 + 1] - tg) + Math.abs(d[p * 4 + 2] - tb)
+  const seen = new Uint8Array(w * h)
+  const paint = (p) => { seen[p] = 1; d[p * 4] = fr; d[p * 4 + 1] = fg; d[p * 4 + 2] = fb; d[p * 4 + 3] = 255 }
+  const TOL = 90
+  const can = (p) => !seen[p] && diff(p) <= TOL
+  const stack = [x, y]
+  const edge = []
+  while (stack.length) {
+    const sy = stack.pop(), sx = stack.pop()
+    let lx = sx, rx = sx
+    const row = sy * w
+    if (!can(row + sx)) continue
+    while (lx > 0 && can(row + lx - 1)) lx--
+    while (rx < w - 1 && can(row + rx + 1)) rx++
+    let up = false, down = false
+    for (let i = lx; i <= rx; i++) {
+      paint(row + i)
+      if (sy > 0) { const q = row - w + i; const cn = can(q); if (cn && !up) { stack.push(i, sy - 1); up = true } else if (!cn) { up = false; if (!seen[q]) edge.push(q) } }
+      if (sy < h - 1) { const q = row + w + i; const cn = can(q); if (cn && !down) { stack.push(i, sy + 1); down = true } else if (!cn) { down = false; if (!seen[q]) edge.push(q) } }
+    }
+    if (lx > 0 && !seen[row + lx - 1]) edge.push(row + lx - 1)
+    if (rx < w - 1 && !seen[row + rx + 1]) edge.push(row + rx + 1)
+  }
+  for (const p of edge) if (!seen[p] && diff(p) < 420) paint(p)
+  c.putImageData(img, 0, 0)
+}
+function paint(c, k, ops) { clearTo(c); for (const o of ops) drawOp(c, k, o) }
+const redrawMine = () => paint(ctx, K, S.ops)
+const showOps = (ops) => paint(ctx, K, ops)
+
+// A drawing in the album draws itself again, stroke by stroke.
+function replay(canvas, ops) {
+  const k = canvas.width / W, c = canvas.getContext('2d', { willReadFrequently: true })
+  const total = ops.reduce((a, o) => a + opLen(o), 0)
+  if (!total || matchMedia('(prefers-reduced-motion: reduce)').matches) { paint(c, k, ops); return }
+  const dur = Math.min(2600, 700 + total * 2.2), t0 = performance.now()
+  let doneOps = 0
+  clearTo(c)
+  const frame = (now) => {
+    if (!canvas.isConnected) return
+    let budget = Math.min(1, (now - t0) / dur) * total
+    for (let i = 0; i < doneOps; i++) budget -= opLen(ops[i])
+    // finished ops stay drawn; the one in progress is drawn again up to its point
+    while (doneOps < ops.length && budget >= opLen(ops[doneOps])) { drawOp(c, k, ops[doneOps]); budget -= opLen(ops[doneOps]); doneOps++ }
+    if (doneOps < ops.length && budget > 0 && !ops[doneOps].f) drawOp(c, k, ops[doneOps], Math.max(1, Math.floor(budget)))
+    if (doneOps < ops.length) requestAnimationFrame(frame)
+  }
+  requestAnimationFrame(frame)
+}
+
+/* ---------- drawing ---------- */
+const tool = { kind: 'brush', c: 13, w: 1 }
+let stroke = null
+const canDraw = () => S.task && S.task.kind === 'draw' && !S.task.done && !S.task.loading && S.g && S.g.ph === 'play' && S.task.r === S.g.r
+function point(e) {
+  const r = cv.getBoundingClientRect()
+  return [Math.round(Math.max(0, Math.min(W, (e.clientX - r.left) / r.width * W))), Math.round(Math.max(0, Math.min(H, (e.clientY - r.top) / r.height * H)))]
+}
+const nextSeq = () => 1 + Math.max(0, ...S.ops.map((o) => o.s || 0))
+const saveOps = () => { if (S.task) session.set(`vela:tele:ops:${S.code}:${S.task.t}:${S.task.r}`, S.ops) }
+// A long stroke is kept as pieces of up to 400 points, each starting where
+// the last one ended.
+function endPiece() {
+  if (!stroke || stroke.pts.length < 2) return
+  S.ops.push({ s: stroke.s, c: stroke.c, w: stroke.w, p: stroke.pts.join(',') })
+  stroke.pts = stroke.pts.slice(-2)
+}
+function segment(a, b) {
+  ctx.setTransform(K, 0, 0, K, 0, 0)
+  ctx.strokeStyle = ctx.fillStyle = PALETTE[stroke.c]
+  if (!a) { ctx.beginPath(); ctx.arc(b[0], b[1], stroke.w / 2, 0, Math.PI * 2); ctx.fill(); return }
+  ctx.lineWidth = stroke.w; ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke()
+}
+const board = $('board')
+board.addEventListener('pointerdown', (e) => {
+  window.focus()
+  if (!canDraw() || !e.isPrimary || e.button > 0) return
+  e.preventDefault()
+  const [x, y] = point(e)
+  if (tool.kind === 'fill') {
+    const op = { s: nextSeq(), f: 1, c: tool.c, x, y }
+    floodFill(ctx, K, x, y, PALETTE[op.c])
+    S.ops.push(op); saveOps()
+    return
+  }
+  board.setPointerCapture(e.pointerId)
+  stroke = { s: nextSeq(), c: tool.kind === 'eraser' ? 0 : tool.c, w: SIZES[tool.w], pts: [x, y], last: [x, y] }
+  segment(null, [x, y])
+})
+board.addEventListener('pointermove', (e) => {
+  moveCursor(e)
+  if (!stroke) return
+  const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]
+  for (const ev of (list.length ? list : [e])) {
+    const p = point(ev)
+    if (Math.abs(p[0] - stroke.last[0]) + Math.abs(p[1] - stroke.last[1]) < 2) continue
+    segment(stroke.last, p)
+    stroke.last = p
+    stroke.pts.push(p[0], p[1])
+    if (stroke.pts.length >= 800) endPiece()
+  }
+})
+function endStroke() {
+  if (!stroke) return
+  if (stroke.pts.length === 2 && !S.ops.some((o) => o.s === stroke.s)) S.ops.push({ s: stroke.s, c: stroke.c, w: stroke.w, p: stroke.pts.join(',') })
+  else endPiece()
+  stroke = null
+  saveOps()
+}
+board.addEventListener('pointerup', endStroke)
+board.addEventListener('pointercancel', endStroke)
+board.addEventListener('pointerleave', () => { $('cursor').hidden = true })
+function moveCursor(e) {
+  const c = $('cursor')
+  if (!canDraw() || tool.kind === 'fill' || e.pointerType === 'touch') { c.hidden = true; return }
+  const r = board.getBoundingClientRect(), size = SIZES[tool.w] * r.width / W
+  c.hidden = false
+  c.style.width = c.style.height = `${size}px`
+  c.style.transform = `translate(${e.clientX - r.left - size / 2}px, ${e.clientY - r.top - size / 2}px)`
+}
+function undo() {
+  if (!canDraw() || stroke) return
+  const top = Math.max(0, ...S.ops.map((o) => o.s || 0))
+  if (!top) return
+  S.ops = S.ops.filter((o) => o.s !== top)
+  saveOps(); redrawMine()
+}
+function clearAll() {
+  if (!canDraw() || !S.ops.length) return
+  S.ops = []; saveOps(); redrawMine()
+}
+
+function buildTools() {
+  $('pal').innerHTML = PALETTE.map((c, i) => `<button type="button" data-c="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')
+  $('sizes').innerHTML = SIZES.map((s, i) => `<button type="button" data-w="${i}" aria-label="Size ${i + 1}"><span class="dot" style="width:${[4, 8, 13, 19][i]}px;height:${[4, 8, 13, 19][i]}px"></span></button>`).join('')
+  $('toolBtns').innerHTML = `<button type="button" data-t="brush" title="Brush (B)" aria-label="Brush">${ICON.brush}</button><button type="button" data-t="eraser" title="Eraser (E)" aria-label="Eraser">${ICON.eraser}</button><button type="button" data-t="fill" title="Fill (F)" aria-label="Fill">${ICON.fill}</button>`
+  $('editBtns').innerHTML = `<button type="button" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo">${ICON.undo}</button><button type="button" id="clearBtn" title="Clear" aria-label="Clear">${ICON.clear}</button>`
+  $('pal').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b) return; tool.c = +b.dataset.c; if (tool.kind === 'eraser') tool.kind = 'brush'; syncTools() })
+  $('sizes').addEventListener('click', (e) => { const b = e.target.closest('[data-w]'); if (!b) return; tool.w = +b.dataset.w; if (tool.kind === 'fill') tool.kind = 'brush'; syncTools() })
+  $('toolBtns').addEventListener('click', (e) => { const b = e.target.closest('[data-t]'); if (!b) return; tool.kind = b.dataset.t; syncTools() })
+  $('undoBtn').addEventListener('click', undo)
+  $('clearBtn').addEventListener('click', clearAll)
+  syncTools()
+}
+function syncTools() {
+  for (const b of $('pal').children) b.classList.toggle('on', +b.dataset.c === tool.c && tool.kind !== 'eraser')
+  for (const b of $('sizes').children) b.classList.toggle('on', +b.dataset.w === tool.w && tool.kind !== 'fill')
+  for (const b of $('toolBtns').children) b.classList.toggle('on', b.dataset.t === tool.kind)
+  board.classList.toggle('fill', tool.kind === 'fill')
+}
+document.addEventListener('keydown', (e) => {
+  if (!canDraw() || e.target.closest('textarea, input')) return
+  const key = e.key.toLowerCase()
+  if ((e.ctrlKey || e.metaKey) && key === 'z') { e.preventDefault(); undo(); return }
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (key === 'b') tool.kind = 'brush'
+  else if (key === 'e') tool.kind = 'eraser'
+  else if (key === 'f') tool.kind = 'fill'
+  else if (key >= '1' && key <= '4') tool.w = +key - 1
+  else return
+  syncTools()
+})
+
+/* ---------- rendering ---------- */
+function showApp() {
+  $('menu').hidden = true
+  $('app').hidden = false
+  layout()
+}
+
+function layout() {
+  const app = $('app')
+  const narrow = innerWidth < 860 || innerWidth < innerHeight * 1.1
+  app.classList.toggle('narrow', narrow)
+  const stage = $('stage')
+  if (!board.hidden) {
+    const gap = narrow ? 6 : 8
+    const extra = ['task', 'tools', 'entry'].reduce((a, id) => a + ($(id).hidden ? 0 : $(id).offsetHeight + gap), 0)
+    let w
+    if (narrow && !app.classList.contains('focus')) {
+      const room = innerHeight - 46 - 12 - extra - 150
+      w = Math.min(stage.clientWidth, Math.max(220, room) * 4 / 3)
+    } else {
+      w = Math.min(stage.clientWidth, (stage.clientHeight - extra) * 4 / 3)
+    }
+    w = Math.max(160, Math.floor(w))
+    board.style.width = `${w}px`
+    board.style.height = `${Math.round(w * 0.75)}px`
+    sizeCanvas()
+  }
+  const ov = $('ov')
+  stage.style.minHeight = narrow && ov.classList.contains('wide') ? `${Math.max(0, innerHeight - 58 - 150)}px` : ''
+  placeOverlay()
+}
+function placeOverlay() {
+  const ov = $('ov')
+  if (ov.classList.contains('wide') || board.hidden) Object.assign(ov.style, { left: '0px', top: '0px', width: '100%', height: '100%' })
+  else Object.assign(ov.style, { left: `${board.offsetLeft}px`, top: `${board.offsetTop}px`, width: `${board.offsetWidth}px`, height: `${board.offsetHeight}px` })
+}
+addEventListener('resize', () => { if (!$('app').hidden) layout() })
+
+let stageKey = ''
+function render() {
+  if (!S.code || !S.g || !S.s) return
+  renderPlayers()
+  renderBar()
+  renderStage()
+  renderOverlay()
+}
+
+// The task area: what came to me, the board, and where I answer.
+function renderStage() {
+  const g = S.g, task = g.ph === 'play' ? S.task : null
+  const kind = task && !task.loading ? task.kind : null
+  const key = task ? `${task.t}:${task.r}:${kind}:${task.loading}:${task.src && task.src.k}` : 'none'
+  const drawing = kind === 'draw'
+  $('tools').hidden = !(drawing && !task.done)
+  board.classList.toggle('can', canDraw())
+  if (!canDraw()) $('cursor').hidden = true
+  $('entry').hidden = !(kind === 'write' || kind === 'guess') || task.done
+  $('ideaBtn').hidden = kind !== 'write'
+  $('app').classList.toggle('focus', drawing && !task.done)
+  if (key === stageKey) { layout(); return }
+  stageKey = key
+  const t = $('task')
+  if (!task) { t.hidden = true; board.hidden = true; layout(); return }
+  t.hidden = false
+  t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop')
+  t.classList.toggle('big', kind === 'write' || kind === 'draw')
+  if (task.loading) {
+    t.innerHTML = `<span class="lab">Round ${task.r + 1} of ${g.R}</span><b>&nbsp;</b>`
+    board.hidden = true
+  } else if (kind === 'write') {
+    t.innerHTML = `<span class="lab">Round 1 of ${g.R}</span><b>Write a phrase for someone to draw</b>`
+    $('entryIn').placeholder = 'A cat driving a bus'
+    board.hidden = true
+  } else if (kind === 'draw') {
+    t.innerHTML = `<span class="lab">Draw this</span><b>${esc(mask(task.src.x || ''))}</b>`
+    board.hidden = false
+  } else if (task.src && task.src.k === 'none') {
+    t.innerHTML = `<span class="lab">No drawing reached you, so start a new one</span><b>Write a phrase for someone to draw</b>`
+    $('entryIn').placeholder = 'A cat driving a bus'
+    $('ideaBtn').hidden = false
+    board.hidden = true
+  } else {
+    t.innerHTML = `<span class="lab">Round ${task.r + 1} of ${g.R}</span><b>What is this?</b>`
+    $('entryIn').placeholder = 'Describe the drawing'
+    board.hidden = false
+  }
+  layout()
+  if (!board.hidden) { if (kind === 'draw') redrawMine(); else showOps(opsOf(task.src && task.src.d)) }
+}
+
+function renderPlayers() {
+  const g = S.g
+  if (!g) return
+  const box = $('players'), host = hostUid()
+  const ord = g.ph === 'play' ? ordOf(g) : []
+  const sub = (g.ph === 'play' && S.sub[g.r]) || {}
+  box.innerHTML = present().map((p) => {
+    const playing = ord.includes(p.uid), ok = playing && sub[p.uid]
+    const status = g.ph === 'play' ? (ok ? 'Done' : playing ? (kindOf(g.r) === 'draw' ? 'Drawing' : 'Writing') : 'Watching') : p.uid === host ? 'Host' : ''
+    const cls = ['pl', p.uid === S.me ? 'me' : '', ok ? 'ok' : ''].join(' ')
+    return `<div class="${cls}" data-u="${p.uid}"><span class="nm"><b>${esc(mask(p.n))}</b>${status ? `<span>${status}</span>` : ''}</span><span class="ic">${ok ? ICON.check : playing ? ICON.pencil : ''}</span></div>`
+  }).join('')
+}
+function flashPlayer(u) {
+  requestAnimationFrame(() => {
+    const row = $('players').querySelector(`[data-u="${u}"]`)
+    if (row) row.classList.add('flash')
+  })
+}
+
+function renderBar() {
+  const g = S.g
+  $('roundLabel').textContent = g.ph === 'lobby' ? `Room ${S.code}` : g.ph === 'play' ? `Round ${g.r + 1} of ${g.R}` : g.ph === 'show' ? `Album ${(g.rv ? g.rv.c : 0) + 1} of ${g.n}` : 'Game over'
+  let html
+  if (g.ph === 'play') {
+    const live = ordOf(g).filter(isPresent), sub = S.sub[g.r] || {}
+    const done = live.filter((u) => sub[u]).length
+    html = `${['Write', 'Draw', 'Guess'][kindOf(g.r) === 'write' ? 0 : kindOf(g.r) === 'draw' ? 1 : 2]} &middot; <b>${done}</b> of ${live.length} done`
+  } else html = g.ph === 'lobby' ? 'Waiting to start' : g.ph === 'show' ? 'Albums' : 'Favourites'
+  if ($('msg').innerHTML !== html) $('msg').innerHTML = html
+}
+
+function clockTick() {
+  if (!S.code || !S.g) return
+  const g = S.g, el = $('clock')
+  let secs = ''
+  if (g.ph === 'play' && g.ends) secs = Math.max(0, Math.ceil((g.ends - serverNow()) / 1000))
+  if (String(secs) !== el.textContent) {
+    el.textContent = secs
+    const low = secs !== '' && secs <= 10
+    el.classList.toggle('low', low)
+    const mine = S.task && !S.task.done
+    if (low && secs > 0) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); if (mine) Sound.play('tick') }
+  }
+}
+
+let ovKey = ''
+function renderOverlay(force) {
+  const g = S.g, s = S.s, ov = $('ov'), box = $('ovBox')
+  if (!g || !s) return
+  const pr = present()
+  let key = '', html = null, mode = ''
+  if (g.ph === 'lobby') {
+    mode = 'wide'
+    key = `lobby:${amHost()}:${JSON.stringify(s)}:${pr.length}:${hostUid()}`
+    html = lobbyHTML(pr)
+  } else if (g.ph === 'play') {
+    const task = S.task
+    if (!task) {
+      mode = 'wide'
+      key = `watch:${g.t}:${g.r}`
+      html = `<div class="who">A game is on<small>You can play in the next one. Round ${g.r + 1} of ${g.R}</small></div>`
+    } else if (task.done) {
+      const live = ordOf(g).filter(isPresent), sub = S.sub[g.r] || {}
+      const left = live.filter((u) => !sub[u]).length
+      mode = board.hidden ? 'wide' : ''
+      key = `done:${g.t}:${g.r}:${left}:${mode}`
+      html = `<div class="done-box"><h2>Sent</h2><div class="wait"><i></i>${left ? `Waiting for ${left} ${left === 1 ? 'player' : 'players'}` : 'Next round'}</div><button class="btn" type="button" id="editBtn">Change it</button></div>`
+    }
+  } else if (g.ph === 'show') {
+    renderAlbum()
+    return
+  } else if (g.ph === 'end') {
+    mode = 'wide'
+    key = `end:${g.t}:${favs ? favs.length : 'x'}:${amHost()}`
+    html = endHTML()
+  }
+  if (html == null) {
+    // Gone at once: a fading panel would sit over the next round's task.
+    if (ov.classList.contains('show')) {
+      ov.style.transition = 'none'
+      ov.classList.remove('show', 'wide', 'album'); ovKey = ''
+      void ov.offsetWidth; ov.style.transition = ''
+      layout()
+    }
+    return
+  }
+  if (key === ovKey && !force) return
+  ovKey = key
+  box.innerHTML = html
+  ov.classList.remove('album')
+  if ((mode === 'wide') !== ov.classList.contains('wide')) ov.classList.toggle('wide', mode === 'wide')
+  ov.classList.add('show')
+  layout()
+  if (g.ph === 'end') drawFavourites()
+}
+
+function lobbyHTML(pr) {
+  const s = S.s, host = amHost()
+  const seg = (name, values, fmt = (v) => v) => `<div class="seg${host ? '' : ' locked'}" data-set="${name}">${values.map((v) => `<button type="button" data-v="${v}" class="${s[name] === v ? 'on' : ''}">${fmt(v)}</button>`).join('')}</div>`
+  const link = Rooms.inviteUrl('drawing-telephone', S.code)
+  const rounds = roundsFor(Math.max(MIN_PLAYERS, pr.length), s.full)
+  return `<h2>Room ${S.code}</h2>
+    <p class="note" style="margin-top:0.4em">${pr.length} ${pr.length === 1 ? 'player' : 'players'} &middot; ${rounds} rounds</p>
+    <div class="set">
+      <div><span class="lab">Draw time</span>${seg('draw', [60, 90, 120])}</div>
+      <div><span class="lab">Write time</span>${seg('write', [30, 45, 60])}</div>
+      <div><span class="lab">Length</span><div class="seg${host ? '' : ' locked'}" data-set="full"><button type="button" data-v="0" class="${s.full ? '' : 'on'}">Short</button><button type="button" data-v="1" class="${s.full ? 'on' : ''}">Full</button></div></div>
+      <div><span class="lab">Players</span>${seg('max', [6, 8, 10, 12])}</div>
+      <div class="wide"><span class="lab">Invite link</span><div class="rowb"><input class="field" id="linkIn" readonly value="${esc(link)}"><button class="btn" type="button" id="copyBtn" style="height:auto">Copy</button></div></div>
+    </div>
+    ${host
+      ? `<div class="acts"><button class="btn primary big" type="button" id="startBtn"${pr.length < MIN_PLAYERS ? ' disabled' : ''}>${pr.length < MIN_PLAYERS ? `Needs ${MIN_PLAYERS} players` : 'Start'}</button></div>`
+      : `<div class="wait"><i></i>Waiting for ${esc(mask(nameOf(hostUid())))} to start</div>`}`
+}
+
+function stepHTML(e, c, i, list) {
+  const who = e.auto ? 'An idea' : esc(mask(nameOf(e.u)))
+  // A phrase after a phrase is a fresh start (no drawing reached that player).
+  const verb = e.k === 'd' ? 'drew' : i === 0 || (list[i - 1] && list[i - 1].k === 'w') ? 'wrote' : 'guessed'
+  const k = likeKey(c, e.r)
+  const mine = e.u === S.me
+  const n = likeCount(k), on = !!(S.likes[k] && S.likes[k][S.me])
+  const like = e.auto ? '' : `<button class="like${on ? ' on' : ''}${mine ? ' mine' : ''}" type="button" data-k="${k}" aria-label="Like">${ICON.heart}<span>${n}</span></button>`
+  const body = e.k === 'd'
+    ? `<div class="pic"><canvas data-c="${c}" data-r="${e.r}"></canvas></div>`
+    : `<p class="txt${e.x ? '' : ' none'}">${e.x ? esc(mask(e.x)) : 'No answer'}</p>`
+  return `<div class="step" data-r="${e.r}"><div class="top"><span class="lab">${e.auto ? who : `<b>${who}</b> ${verb}`}</span>${like}</div>${body}</div>`
+}
+
+// The album keeps the steps it has drawn, so a new step adds one card rather
+// than drawing every picture again.
+let albumKey = ''
+function renderAlbum() {
+  const g = S.g, ov = $('ov'), box = $('ovBox')
+  const { c, i } = g.rv || { c: 0, i: 0 }
+  const list = S.chains[c]
+  const key = `${g.t}:${c}`
+  if (albumKey !== key || ovKey !== 'album') {
+    albumKey = key; ovKey = 'album'
+    const starter = ordOf(g)[c]
+    box.innerHTML = `<div class="ahead"><h2>${esc(mask(nameOf(starter)))}'s phrase</h2><span class="lab">${c + 1} of ${g.n}</span></div><div class="steps" id="steps"></div><div class="afoot" id="afoot"></div>`
+    ov.classList.add('wide', 'album', 'show')
+    layout()
+    ov.scrollTop = 0
+  }
+  const steps = $('steps')
+  if (!list) { $('afoot').innerHTML = '<div class="wait"><i></i>Loading</div>'; return }
+  const shown = steps.children.length
+  for (let j = shown; j <= Math.min(i, list.length - 1); j++) {
+    steps.insertAdjacentHTML('beforeend', stepHTML(list[j], c, j, list))
+    const cvs = steps.lastElementChild.querySelector('canvas')
+    if (cvs) {
+      const k = (window.devicePixelRatio || 1) > 1.4 ? 2 : 1
+      cvs.width = 480 * k; cvs.height = 360 * k
+      const ops = opsOf(list[j].d)
+      if (j === i) replay(cvs, ops); else paint(cvs.getContext('2d', { willReadFrequently: true }), cvs.width / W, ops)
+    }
+  }
+  if (shown <= i) requestAnimationFrame(() => { const last = steps.lastElementChild; if (last) ov.scrollTo({ top: last.offsetTop - 12, behavior: 'smooth' }) })
+  const lastStep = i + 1 >= list.length, lastAlbum = c + 1 >= g.n
+  const label = !lastStep ? 'Next' : lastAlbum ? 'See favourites' : 'Next phrase'
+  const foot = canAdvance()
+    ? `<button class="btn primary big" type="button" id="nextBtn">${label}</button>`
+    : `<div class="wait"><i></i>${esc(mask(nameOf(hostUid())))} is showing the album</div>`
+  if ($('afoot').dataset.html !== foot) { $('afoot').innerHTML = foot; $('afoot').dataset.html = foot }
+}
+
+function endHTML() {
+  const again = '<div class="acts"><button class="btn primary big" type="button" id="againBtn">Play again</button></div>'
+  if (!favs) return `<h2>Favourites</h2><div class="wait"><i></i>Counting likes</div>${again}`
+  if (!favs.length) return `<h2>Favourites</h2><p class="note" style="margin-top:0.6em">No likes this game.</p>${again}`
+  return `<h2>Favourites</h2><div class="favs">${favs.map((e, j) => {
+    const body = e.k === 'd' ? `<div class="pic"><canvas data-fav="${j}"></canvas></div>` : `<p class="txt">${esc(mask(e.x || ''))}</p>`
+    const who = e.auto ? 'An idea' : esc(mask(nameOf(e.u)))
+    return `<div class="step"><div class="top"><span class="rk">${j + 1}</span><span class="lab"><b>${who}</b> ${e.k === 'd' ? 'drew' : e.r === 0 ? 'wrote' : 'guessed'}</span><span class="like mine">${ICON.heart}<span>${e.n}</span></span></div>${body}</div>`
+  }).join('')}</div>${again}`
+}
+function drawFavourites() {
+  if (!favs) return
+  for (const cvs of document.querySelectorAll('canvas[data-fav]')) {
+    const e = favs[+cvs.dataset.fav]
+    const k = (window.devicePixelRatio || 1) > 1.4 ? 2 : 1
+    cvs.width = 480 * k; cvs.height = 360 * k
+    replay(cvs, opsOf(e.d))
+  }
+}
+
+$('ovBox').addEventListener('click', (e) => {
+  const like = e.target.closest('.like[data-k]')
+  if (like) { toggleLike(like.dataset.k); return }
+  const b = e.target.closest('button')
+  if (!b) return
+  const seg = b.closest('[data-set]')
+  if (seg && amHost()) {
+    const name = seg.dataset.set
+    DB.set(R(`s/${name}`), name === 'full' ? b.dataset.v === '1' : +b.dataset.v).catch(() => {})
+    return
+  }
+  if (b.id === 'startBtn') {
+    if (present().length < MIN_PLAYERS) return
+    tx('start' + S.g.t, (c) => (c.ph === 'lobby' ? startGame(c, serverNow()) : undefined))
+  } else if (b.id === 'againBtn') {
+    tx('again' + S.g.t, (c) => (c.ph === 'end' ? toLobby(c) : undefined))
+  } else if (b.id === 'nextBtn') advance()
+  else if (b.id === 'editBtn') edit()
+  else if (b.id === 'copyBtn') copyLink(b)
+})
+
+async function copyLink(btn) {
+  const url = Rooms.inviteUrl('drawing-telephone', S.code)
+  try { await navigator.clipboard.writeText(url) } catch {
+    const i = $('linkIn'); if (i) { i.select(); document.execCommand('copy') }
+  }
+  if (btn.id === 'inviteBtn') { btn.innerHTML = ICON.linkOk; btn.classList.add('done'); setTimeout(() => { btn.innerHTML = ICON.link; btn.classList.remove('done') }, 1400) }
+  else { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy' }, 1400) }
+}
+
+/* ---------- wiring ---------- */
+$('say').addEventListener('submit', (e) => {
+  e.preventDefault()
+  const v = $('sayIn').value
+  $('sayIn').value = ''
+  say(v)
+})
+$('entry').addEventListener('submit', (e) => { e.preventDefault(); submit(false) })
+$('entryIn').addEventListener('input', () => { if (S.task) session.set(`vela:tele:txt:${S.code}:${S.task.t}:${S.task.r}`, $('entryIn').value) })
+$('ideaBtn').addEventListener('click', () => { $('entryIn').value = idea(); $('entryIn').dispatchEvent(new Event('input')); focusEntry() })
+$('drawDone').addEventListener('click', () => submit(false))
+$('inviteBtn').innerHTML = ICON.link
+$('inviteBtn').addEventListener('click', (e) => copyLink(e.currentTarget))
+$('leaveBtn').innerHTML = ICON.leave
+$('leaveBtn').addEventListener('click', leave)
+soundIcon()
+$('soundBtn').addEventListener('click', () => { Sound.on = !Sound.on; store.set('vela:tele:sound', Sound.on ? '1' : '0'); soundIcon() })
+buildTools()
+
+function menuName() {
+  const v = $('nameIn').value.replace(/\s+/g, ' ').trim().slice(0, 20)
+  if (!$('nameIn').readOnly) store.set('vela:tele:name', v)
+  return Rooms ? Rooms.playerName(v || 'Player') : v || 'Player'
+}
+async function go(btn, fn) {
+  $('menuErr').textContent = ''
+  const panel = btn.closest('.panel')
+  panel.classList.add('busy')
+  try {
+    if (!Rooms) throw new Nope('Online play is not available right now.')
+    S.name = menuName()
+    await connect()
+    S.name = menuName()
+    await fn()
+  } catch (err) {
+    $('menuErr').textContent = err instanceof Nope ? err.message : 'Could not connect. Try again.'
+    if (!(err instanceof Nope)) console.warn('drawing telephone', err)
+  } finally { panel.classList.remove('busy') }
+}
+$('createBtn').addEventListener('click', (e) => go(e.currentTarget, create))
+$('joinBtn').addEventListener('click', (e) => go(e.currentTarget, () => join($('codeIn').value)))
+$('codeIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click() })
+$('codeIn').addEventListener('input', (e) => { const v = normCode(e.target.value); if (v !== e.target.value) e.target.value = v })
+
+// A chain nobody started gets its idea from whoever reaches it first; a second
+// device trying the same is refused by the rules on purpose.
+const warn = console.warn.bind(console)
+console.warn = (...args) => {
+  const m = typeof args[0] === 'string' ? args[0] + (args[1] || '') : ''
+  if (/permission_denied/.test(m) && /\/e\/\d+\/\d+\/0/.test(m)) return
+  warn(...args)
+}
+
+setInterval(() => {
+  tick(); clockTick()
+  if (S.g && S.g.ph === 'show') renderAlbum()
+}, 200)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); render() } })
+
+;(async () => {
+  $('nameIn').value = store.get('vela:tele:name') || ''
+  try {
+    ;[Rooms, DB] = await Promise.all([
+      import('../_shared/rooms.js'),
+      import('https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js'),
+    ])
+  } catch { Rooms = null }
+  if (!Rooms || !Rooms.available) {
+    for (const id of ['createBtn', 'joinBtn']) $(id).disabled = true
+    $('menuErr').textContent = Rooms ? 'Online play is not set up yet.' : 'Online play is not available right now.'
+  }
+  if (window.Vela) Vela.ready()
+  const code = Rooms && Rooms.codeFromUrl()
+  if (code) {
+    $('codeIn').value = code
+    if (store.get('vela:tele:name') || $('nameIn').readOnly) go($('joinBtn'), () => join(code))
+    else {
+      $('joinBtn').classList.add('primary'); $('createBtn').classList.remove('primary')
+      $('nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('joinBtn').click() })
+      $('nameIn').focus()
+    }
+  } else if (Rooms && Rooms.available) {
+    let last = null
+    try { last = JSON.parse(store.get('vela:tele:last') || 'null') } catch {}
+    if (last && last.code && Date.now() - last.at < 2 * 3600 * 1000) {
+      await go($('joinBtn'), () => join(last.code))
+      if (!S.code) $('menuErr').textContent = ''
+    }
+  }
+})()
+</script>
+</body>
+</html>

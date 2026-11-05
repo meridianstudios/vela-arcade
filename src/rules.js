@@ -3,6 +3,24 @@
  * true to how the game here actually plays, not to some other house rule.
  */
 export const RULES = {
+  'drawing-telephone': [
+    { h: 'Rounds', items: [
+      'Everyone starts by writing a phrase. Idea fills one in for you.',
+      'Each round you get the chain from the player before you. If it ends in a phrase, draw it. If it ends in a drawing, write what you think it shows.',
+      'You only see the step just before yours.',
+      'A round ends when everyone is done or the clock runs out. Whatever you have when the time is up is sent. Until then you can change it.',
+      'A full game has a round for every player, one fewer when the number of players is even, so every chain ends on a guess. A short game stops after five rounds.',
+    ] },
+    { h: 'Albums', items: [
+      'When the rounds are done, each chain is shown one step at a time, from the first phrase to the last guess.',
+      'The host moves the album on. Like any step you enjoyed, as many as you want, except your own.',
+      'The three steps with the most likes are shown at the end.',
+    ] },
+    { h: 'Rooms', items: [
+      'Make a room and send the code or the invite link. 3 to 12 players.',
+      'Anyone who joins during a game watches, and plays in the next one.',
+    ] },
+  ],
   'draw-and-guess': [
     { h: 'A turn', items: [
       'The drawer picks one of three words and draws it before the clock runs out. Everyone else types guesses in the chat.',

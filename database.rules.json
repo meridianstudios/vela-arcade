@@ -164,6 +164,124 @@
         }
       }
     },
+    "tele": {
+      "rooms": {
+        "$code": {
+          ".write": "auth != null && !newData.exists() && data.child('p').child(auth.uid).exists()",
+          ".validate": "$code.matches(/^[A-HJKMNP-Z2-9]{6}$/)",
+          "s": {
+            ".read": "auth != null",
+            ".write": "auth != null && (!data.exists() || newData.parent().child('p').child(auth.uid).exists())",
+            ".validate": "newData.hasChildren(['draw', 'write', 'max', 'full'])",
+            "draw": {
+              ".validate": "newData.isNumber() && newData.val() >= 30 && newData.val() <= 240"
+            },
+            "write": {
+              ".validate": "newData.isNumber() && newData.val() >= 15 && newData.val() <= 120"
+            },
+            "max": {
+              ".validate": "newData.isNumber() && newData.val() >= 3 && newData.val() <= 12"
+            },
+            "full": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "p": {
+            ".read": "auth != null",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid",
+              ".validate": "newData.hasChildren(['n', 'on']) && newData.parent().parent().child('s').exists()",
+              "n": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+              },
+              "on": {
+                ".validate": "newData.isBoolean()"
+              },
+              "j": {
+                ".validate": "newData.isNumber() && (data.exists() ? newData.val() === data.val() : newData.val() === now)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "g": {
+            ".read": "auth != null",
+            ".write": "auth != null && newData.parent().child('p').child(auth.uid).exists()",
+            ".validate": "newData.hasChildren(['ph', 't', 'tk', 'r', 'rk'])",
+            "ph": {
+              ".validate": "newData.val() === 'lobby' || newData.val() === 'play' || newData.val() === 'show' || newData.val() === 'end'"
+            }
+          },
+          "e": {
+            ".read": "auth != null",
+            "$t": {
+              ".write": "auth != null && !newData.exists() && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && root.child('tele/rooms/' + $code + '/g/tk').val() !== $t",
+              "$c": {
+                "$r": {
+                  ".write": "auth != null && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && newData.exists() && root.child('tele/rooms/' + $code + '/g/ph').val() === 'play' && root.child('tele/rooms/' + $code + '/g/tk').val() === $t && ((root.child('tele/rooms/' + $code + '/g/rk').val() === $r && newData.child('u').val() === auth.uid && (!data.exists() || data.child('u').val() === auth.uid)) || ($r === '0' && !data.exists() && newData.child('auto').val() === true))",
+                  ".validate": "newData.hasChildren(['u', 'k']) && $c.matches(/^[0-9]{1,2}$/) && $r.matches(/^[0-9]{1,2}$/)",
+                  "u": {
+                    ".validate": "newData.isString() && newData.val().length <= 128"
+                  },
+                  "k": {
+                    ".validate": "newData.val() === 'w' || newData.val() === 'd'"
+                  },
+                  "x": {
+                    ".validate": "newData.isString() && newData.val().length <= 80"
+                  },
+                  "auto": {
+                    ".validate": "newData.val() === true"
+                  },
+                  "d": {
+                    "$i": {
+                      ".validate": "$i.matches(/^[0-9]{1,4}$/) && newData.hasChildren(['s', 'c']) && newData.child('c').isNumber() && (!newData.child('p').exists() || (newData.child('p').isString() && newData.child('p').val().length <= 4000))"
+                    }
+                  },
+                  "$other": {
+                    ".validate": false
+                  }
+                }
+              }
+            }
+          },
+          "sub": {
+            ".read": "auth != null",
+            "$t": {
+              ".write": "auth != null && !newData.exists() && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && root.child('tele/rooms/' + $code + '/g/tk').val() !== $t",
+              "$r": {
+                "$uid": {
+                  ".write": "auth != null && auth.uid === $uid && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && root.child('tele/rooms/' + $code + '/g/tk').val() === $t",
+                  ".validate": "newData.val() === true"
+                }
+              }
+            }
+          },
+          "like": {
+            ".read": "auth != null",
+            "$t": {
+              ".write": "auth != null && !newData.exists() && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && root.child('tele/rooms/' + $code + '/g/tk').val() !== $t",
+              "$k": {
+                "$uid": {
+                  ".write": "auth != null && auth.uid === $uid && root.child('tele/rooms/' + $code + '/p/' + auth.uid).exists() && root.child('tele/rooms/' + $code + '/g/tk').val() === $t && (root.child('tele/rooms/' + $code + '/g/ph').val() === 'show' || root.child('tele/rooms/' + $code + '/g/ph').val() === 'end')",
+                  ".validate": "$k.matches(/^[0-9]{1,2}-[0-9]{1,2}$/) && newData.val() === true"
+                }
+              }
+            }
+          },
+          "chat": {
+            ".read": "auth != null",
+            "$k": {
+              ".write": "auth != null && !data.exists() && newData.parent().parent().child('p').child(auth.uid).exists()",
+              ".validate": "newData.hasChildren(['u', 'n', 'x', 'a']) && newData.child('u').val() === auth.uid && newData.child('n').isString() && newData.child('n').val().length <= 20 && newData.child('x').isString() && newData.child('x').val().length >= 1 && newData.child('x').val().length <= 100 && newData.child('a').val() === now"
+            }
+          }
+        }
+      }
+    },
     "plays": {
       "allTime": {
         ".read": true,
