@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.12.2',
+    date: '2026-11-05',
+    games: [],
+    changes: [
+      'Most played ranks no longer tie: games level on players today are split by players all time, so there is always one #1, #2 and #3.',
+    ],
+  },
+  {
     version: '1.12.1',
     date: '2026-11-04',
     games: [],

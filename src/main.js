@@ -201,19 +201,21 @@ async function playsNow() {
 }
 // A game needs this many players before it can rank, so one person can't make a #1.
 const MIN_RANKED = 2
-// Games with at least MIN_RANKED players, most first: [game, players, rank]. Ties share a rank.
-function ranked(counts) {
-  const list = Object.entries(counts || {})
+// Games with at least MIN_RANKED players, most first: [game, players, rank].
+// Every game gets its own rank: a tie goes to the game with more players in
+// `other` (all time for today's list, today for all time), then by name.
+function ranked(counts, other = {}) {
+  const more = (g) => (typeof other[g.slug] === 'number' ? other[g.slug] : 0)
+  return Object.entries(counts || {})
     .map(([slug, n]) => [bySlug(slug), n])
     .filter(([g, n]) => g && playable(g) && typeof n === 'number' && n >= MIN_RANKED)
-    .sort((a, b) => b[1] - a[1] || a[0].title.localeCompare(b[0].title))
-  list.forEach((row, i) => row.push(i && row[1] === list[i - 1][1] ? list[i - 1][2] : i + 1))
-  return list
+    .sort((a, b) => b[1] - a[1] || more(b[0]) - more(a[0]) || a[0].title.localeCompare(b[0].title))
+    .map((row, i) => [...row, i + 1])
 }
 async function showRanks() {
   const p = await playsNow()
-  const top = (counts) => Object.fromEntries(ranked(counts).filter((r) => r[2] <= 3).map((r) => [r[0].slug, r[2]]))
-  const day = top(p.today), ever = top(p.allTime)
+  const top = (counts, other) => Object.fromEntries(ranked(counts, other).slice(0, 3).map((r) => [r[0].slug, r[2]]))
+  const day = top(p.today, p.allTime), ever = top(p.allTime, p.today)
   app.querySelectorAll('.card[data-slug]').forEach((el) => {
     const s = el.dataset.slug
     // one flag a tile: the better of its two ranks, today when they tie
@@ -681,12 +683,12 @@ function renderOnline() {
       </a>`).join('')
     show('online-today', totals.today)
     show('online-all', totals.allTime)
-    const top = (counts) => ranked(counts).slice(0, 5).map(([x, n, r]) => `
+    const top = (counts, other) => ranked(counts, other).slice(0, 5).map(([x, n, r]) => `
       <a href="/play/${x.slug}" data-link>
         ${art(x, 'mini')}
         <span><strong>#${r} ${esc(x.title)}</strong><em>${fmt(n)} ${n === 1 ? 'player' : 'players'}</em></span>
       </a>`).join('')
-    const today = top(p.today), all = top(p.allTime)
+    const today = top(p.today, p.allTime), all = top(p.allTime, p.today)
     for (const [id, html] of [['top-today', today], ['top-all', all]]) {
       const el = document.getElementById(id)
       el.innerHTML = html
