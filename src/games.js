@@ -792,6 +792,25 @@ export const CATALOGUE = [
     art: `<g fill="currentColor"><rect x="8" y="16" width="26" height="36" transform="rotate(-10 21 34)" opacity=".45"/><rect x="26" y="10" width="30" height="44"/><path d="M41 16L49 26H33Z" style="fill:var(--tile)"/><path d="M41 48L33 38H49Z" style="fill:var(--tile)"/></g>`,
   },
   {
+    slug: 'golf',
+    title: 'Golf',
+    description:
+      'Nine holes of top-down golf, par 36: doglegs, ponds, a lake down the side of one fairway and bunkers round the greens. Seven clubs and a putter, wind on every hole, greens that break, and a three-press swing meter for power and accuracy. Shots bounce and roll differently off fairway, rough, sand and green, and trees knock balls down. Play solo, against the computer on Easy, Normal or Hard, or pass and play with 2 to 4 players. Rounds are scored in strokes and in Stableford points.',
+    kind: 'inhouse',
+    src: '/games/golf/index.html',
+    tags: ['Solo', 'Multiplayer', 'Sports'],
+    players: '1 to 4 players',
+    controls: 'Drag to aim, or Left and Right. Up and Down change club. Press Space or Swing three times: to start, to set the power, and on the line for a straight shot. M shows the whole hole.',
+    scores: true,
+    bestLabel: 'Best points',
+    art: `<g fill="currentColor">
+      <path d="M30 8v36h3V18l14-5-14-5z"/>
+      <ellipse cx="31.5" cy="47" rx="17" ry="6" opacity=".55"/>
+      <circle cx="18" cy="50" r="5"/>
+      <ellipse cx="31.5" cy="46" rx="3.5" ry="1.4" style="fill:var(--tile)"/>
+    </g>`,
+  },
+  {
     slug: 'bowling',
     title: 'Bowling',
     description:
@@ -1333,7 +1352,7 @@ export const CATALOGUE = [
 /* Lobby order: the games most people already know first, the ones they will
  * have to learn last. A game missing from this list goes to the end. */
 export const ORDER = [
-  'draw-and-guess', 'drawing-telephone', 'chess', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
+  'draw-and-guess', 'drawing-telephone', 'chess', 'golf', 'blackjack', 'wildcard', 'falling-blocks', 'snake', '2048', 'minesweeper',
   'four-in-a-row', 'checkers', 'sea-battle', 'word-guess', 'holdem', 'pong',
   'block-puzzle', 'slots', 'roulette', 'plinko', 'mines', 'crash', 'hangman',
   'yatzy', 'brick-breaker', 'space-shooter', 'memory-match', 'pinball',

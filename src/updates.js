@@ -6,6 +6,12 @@
  */
 export const UPDATES = [
   {
+    version: '1.14',
+    date: '2026-11-06',
+    games: ['golf'],
+    changes: [],
+  },
+  {
     version: '1.13',
     date: '2026-11-05',
     games: ['drawing-telephone'],

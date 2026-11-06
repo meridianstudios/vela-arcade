@@ -3,6 +3,26 @@
  * true to how the game here actually plays, not to some other house rule.
  */
 export const RULES = {
+  'golf': [
+    { h: 'A hole', items: [
+      'Get the ball from the tee into the cup in as few strokes as you can. Par is what a good player takes.',
+      'With more than one player, whoever is furthest from the hole plays next. The best score on the last hole tees off first.',
+      'A ball in the water costs a stroke and is dropped where it went in. Out of bounds, past the white stakes, costs a stroke and you play again from where you hit.',
+      'Ten strokes on a hole is the most; the ball is picked up there.',
+    ] },
+    { h: 'Shots', items: [
+      'Each club has a full carry. The ring shows where a full swing lands with no wind. Near the green, a wedge swing covers a shorter range, and so does the putter on the green.',
+      'Press once to start the swing, again to set the power, and again as the marker comes back over the line. Early pushes the ball right, late pulls it left. Going past full adds distance and a lot of curve.',
+      'Wind moves the ball while it is in the air: the higher the shot, the more it moves.',
+      'The ball runs on after it lands: far on the fairway and the green, a little in the rough, hardly at all in a bunker. Wedges stop quickly on the green.',
+      'Greens slope. The arrows on the green point downhill.',
+      'A ball that hits a tree drops near it.',
+    ] },
+    { h: 'Scoring', items: [
+      'The scorecard counts strokes; the lowest round wins.',
+      'Your best is kept in Stableford points: 2 for a par, 3 for a birdie, 4 for an eagle, 1 for a bogey and nothing for worse, added up over the nine holes.',
+    ] },
+  ],
   'drawing-telephone': [
     { h: 'Rounds', items: [
       'Everyone starts by writing a phrase. Idea fills one in for you.',
