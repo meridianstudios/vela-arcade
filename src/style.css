@@ -49,7 +49,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .label a:hover { color: var(--text); }
 
 /* ── nav ────────────────────────────────────────────────────── */
-.nav { position: sticky; top: 0; z-index: 50; background: var(--bg); border-bottom: 1px solid var(--line); }
+/* The closing notice on the old addresses (move.js), held above the bar. */
+.moving {
+  position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; gap: 16px;
+  min-height: var(--banner-h); padding: 6px 16px; background: var(--vela); color: #000;
+  font-size: 13.5px; font-weight: 600; line-height: 1.3; text-align: center;
+}
+.moving b { font-weight: 700; }
+.moving-go { flex: none; padding: 6px 12px; background: #000; color: #fff; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; transition: background-color 0.15s var(--ease); }
+.moving-go:hover { background: #1f2227; }
+html.has-moving { --banner-h: 44px; }
+.nav { position: sticky; top: var(--banner-h, 0px); z-index: 50; background: var(--bg); border-bottom: 1px solid var(--line); }
 .nav-inner {
   max-width: 1240px; margin: 0 auto; padding: 0 24px; height: var(--nav-h);
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
@@ -492,7 +502,7 @@ a.card:hover .flag.rank { background: #000; color: var(--text); }
 .empty { color: var(--text-3); padding: 48px 0; text-align: center; }
 
 /* ── player ─────────────────────────────────────────────────── */
-.player { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h)); min-height: 420px; }
+.player { display: flex; flex-direction: column; height: calc(100dvh - var(--nav-h) - var(--banner-h, 0px)); min-height: 420px; }
 .player-bar { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 8px; border-bottom: 1px solid var(--line); }
 .player-title { display: flex; align-items: center; gap: 12px; min-width: 0; margin-right: auto; }
 .player-title .art.mini { width: 26px; height: 26px; }
@@ -591,6 +601,8 @@ a.card:hover .flag.rank { background: #000; color: var(--text); }
 /* ── smaller screens ────────────────────────────────────────── */
 @media (max-width: 1000px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
+  html.has-moving { --banner-h: 62px; }
+  .moving { gap: 10px; font-size: 12.5px; text-align: left; justify-content: space-between; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .log { grid-template-columns: 1fr; gap: 20px; padding: 24px 0 32px; }
   .log-head { flex-direction: row; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; }

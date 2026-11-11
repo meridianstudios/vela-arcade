@@ -6,6 +6,14 @@
  */
 export const UPDATES = [
   {
+    version: '1.14.1',
+    date: '2026-11-11',
+    games: [],
+    changes: [
+      'Vela Arcade lives at arcade.novalabsos.com. velaarc.novalabsos.com and velaarcade.novalabsos.com close on December 11 and send you on from then; Move now on either brings your bests, favourites, recent games and saves with you.',
+    ],
+  },
+  {
     version: '1.14',
     date: '2026-11-06',
     games: ['golf'],

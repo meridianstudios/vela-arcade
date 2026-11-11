@@ -268,9 +268,11 @@ export function isAway(room, who) {
   return latest - ms(room.seen[who]) > BEAT_MS * 3
 }
 
+// The old addresses close on December 11 (src/move.js); links made there point at the main one.
+const linkOrigin = () => (/^velaarc(ade)?\.novalabsos\.com$/.test(location.hostname) ? 'https://arcade.novalabsos.com' : location.origin)
 export function inviteUrl(game, code) {
   // Inside the arcade, the link should open the arcade's player, not the bare game.
-  const base = window.parent !== window ? `${location.origin}/play/${game}` : `${location.origin}${location.pathname}`
+  const base = window.parent !== window ? `${linkOrigin()}/play/${game}` : `${linkOrigin()}${location.pathname}`
   return `${base}?room=${code}`
 }
 export function codeFromUrl() {

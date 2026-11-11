@@ -4,6 +4,7 @@ import { UPDATES, CURRENT_VERSION } from './updates.js'
 import { RULES } from './rules.js'
 import { startHeartbeat, whoIsOnline, visitTotals, setGame, playCounts } from './online.js'
 import * as Account from './account.js'
+import { startMove, shareOrigin } from './move.js'
 
 const app = document.getElementById('app')
 const searchInput = document.getElementById('search')
@@ -558,7 +559,7 @@ function renderPlay(slug) {
   // Phones get the share sheet; elsewhere the link is copied.
   const shareBtn = document.getElementById('share')
   shareBtn.addEventListener('click', async () => {
-    const link = location.origin + '/play/' + slug
+    const link = shareOrigin() + '/play/' + slug
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
       navigator.share({ title: g.title, url: link }).catch(() => {})
       return
@@ -1485,6 +1486,7 @@ document.addEventListener('click', (e) => {
 })
 
 document.getElementById('version').textContent = 'Version ' + CURRENT_VERSION
+startMove()
 startHeartbeat()
 
 /* ── app ─────────────────────────────────────────────────────────
